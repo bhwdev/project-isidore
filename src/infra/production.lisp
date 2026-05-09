@@ -33,10 +33,27 @@ the local machine in ~/.ssh/config."
   (systemd:restarted "firewalld")
   (git:pulled "https://gitlab.com/bhw/project-isidore.git"
               (pathname "/usr/local/src/project-isidore/"))
-  (apt:installed "sbcl")
-  ;; Dependency pinning lives in qlfile + qlfile.lock at the project root,
-  ;; brought in by the git:pulled step above; make.lisp drives qlot to
-  ;; materialise .qlot/ from those files.
+  (apt:installed "sbcl" "curl")
+  ;; ocicl (https://github.com/ocicl/ocicl) — OCI-registry-backed Common Lisp
+  ;; system distribution. Replaces quicklisp + ultralisp + qlot. The signing
+  ;; key path follows Debian trixie convention (Signed-By in the deb822 file
+  ;; pointing to /usr/share/keyrings/, not the deprecated apt-key flow).
+  (cmd:single
+   "test -f /usr/share/keyrings/ocicl-archive-keyring.asc || curl -fsSL https://ocicl.github.io/ocicl/deb-repo/ocicl-archive-keyring.gpg -o /usr/share/keyrings/ocicl-archive-keyring.asc")
+  (apt:additional-sources "ocicl"
+                          "Types: deb
+URIs: https://ocicl.github.io/ocicl/deb-repo
+Suites: stable
+Components: main
+Signed-By: /usr/share/keyrings/ocicl-archive-keyring.asc")
+  (apt:installed "ocicl")
+  ;; Mandatory: writes /root/.local/share/ocicl/ocicl-runtime.lisp, which
+  ;; make.lisp loads (since sbcl --script bypasses .sbclrc). Idempotent.
+  (cmd:single "ocicl setup")
+  ;; Dependency pinning lives in ocicl.csv at the project root, brought in by
+  ;; the git:pulled step above. make.lisp loads ocicl-runtime; ocicl auto-fetches
+  ;; any system listed in ocicl.csv that's missing from the local ocicl/ dir on
+  ;; the first asdf:load-system call.
   (cmd:single :env (list :BUILD_DIR "/usr/local/src/project-isidore/")
               (concatenate 'string
                            "cd /usr/local/src/project-isidore/ && "
@@ -73,7 +90,7 @@ WantedBy=multi-user.target")
   ;; locally. Forward requests from https://123.456.789.100:443 to
   ;; http://127.0.0.1:8080 where Hunchentoot accepts HTTP requests. Obviate need
   ;; to distribute CL+SSL (openssl) when providing release binaries.
-  (apt:installed "caddy" "curl")
+  (apt:installed "caddy")
   (systemd:enabled "caddy")
   (systemd:started "caddy")
   ;; Caddy listens on port 2019 for incremental API configuration.

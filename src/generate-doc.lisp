@@ -6,10 +6,16 @@
 ;;; See subheading 'Generate Reference Manual' at
 ;;; https://www.bhw.name/assets/blog/project-isidore-doc.html
 
-;; Quicklisp is installed in default location.
-(load "~/quicklisp/setup.lisp")
-(ql:quickload :project-isidore)
-(ql:quickload :net.didierverna.declt)
+;; Load ocicl-runtime so ASDF can resolve project-isidore + declt and any
+;; transitive deps from ./ocicl.csv. Mirrors make.lisp's prelude.
+(let ((runtime (or (uiop:getenvp "OCICL_RUNTIME")
+                   (merge-pathnames ".local/share/ocicl/ocicl-runtime.lisp"
+                                    (user-homedir-pathname)))))
+  (when (probe-file runtime) (load runtime)))
+(asdf:initialize-source-registry
+ `(:source-registry (:tree ,(uiop:getcwd)) :inherit-configuration))
+(asdf:load-system :project-isidore)
+(asdf:load-system :net.didierverna.declt)
 (net.didierverna.declt:declt :project-isidore
                              ;; Generate 'project-isidore.texi' in TEXI-DIRECTORY
                              :file-name "reference-manual"

@@ -10,11 +10,6 @@
 (in-consfig "project-isidore/infra")
 (named-readtables:in-readtable :consfigurator)
 
-(defparameter *prod-ql-dist-ver* "20260430154000"
-  "Production Ultralisp Distribution Version STRING passed as an ENV variable
-'QL_DIST_VER', which is utilized in MAKE.LISP. Timestamp must have the same
-format as given in (ql-dist:available-versions (ql::dist \"ultralisp\"))")
-
 (defhost oci-a1-flex (:deploy :ssh)
   "Declarative Configuration for Production Server. To deploy to production run
 locally in the listener,
@@ -39,8 +34,10 @@ the local machine in ~/.ssh/config."
   (git:pulled "https://gitlab.com/bhw/project-isidore.git"
               (pathname "/usr/local/src/project-isidore/"))
   (apt:installed "sbcl")
-  (cmd:single :env (list :BUILD_DIR "/usr/local/src/project-isidore/"
-                         :QL_DIST_VER *prod-ql-dist-ver*)
+  ;; Dependency pinning lives in qlfile + qlfile.lock at the project root,
+  ;; brought in by the git:pulled step above; make.lisp drives qlot to
+  ;; materialise .qlot/ from those files.
+  (cmd:single :env (list :BUILD_DIR "/usr/local/src/project-isidore/")
               (concatenate 'string
                            "cd /usr/local/src/project-isidore/ && "
                            "sbcl "

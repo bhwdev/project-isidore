@@ -70,12 +70,45 @@
                  :path (make-pathname :directory (append *build-dir* '("lib")))))))
 
 (funcall (symbol-function (find-symbol "QUICKLOAD" (find-package "QL")))
-         :qlot :silent t)
-;; qlot:install reads ./qlfile + ./qlfile.lock relative to (uiop:getcwd) /
-;; *default-pathname-defaults*. Production cd's into BUILD_DIR before invoking
-;; sbcl and the local invocation runs from BUILD_DIR; bind explicitly anyway.
-(let ((*default-pathname-defaults* (make-pathname :directory *build-dir*)))
-  (funcall (symbol-function (find-symbol "INSTALL" (find-package "QLOT")))))
+         '(:qlot/install :qlot/utils/repl :lparallel) :silent t)
+;; qlot's progress UI binds lparallel:*kernel* dynamically and never calls
+;; end-kernel — the workers it spawns leak past install-qlfile and block
+;; save-lisp-and-die later. Encapsulate make-kernel before driving qlot so
+;; we can capture every kernel it creates and end them all afterwards.
+(defparameter *captured-lparallel-kernels* nil)
+(let* ((mk-sym (find-symbol "MAKE-KERNEL" (find-package "LPARALLEL")))
+       (orig (symbol-function mk-sym)))
+  (setf (symbol-function mk-sym)
+        (lambda (&rest args)
+          (let ((k (apply orig args)))
+            (push k *captured-lparallel-kernels*)
+            k))))
+
+;; Call qlot's library-level installer directly rather than the user-facing
+;; (qlot:install ...) wrapper. The wrapper routes through `run-qlot', which
+;; dispatches to scripts/run.sh in qlot's source tree whenever :qlot.project
+;; is on *features* (the case after quickloading qlot via ASDF). That script
+;; is not reliably executable in a fresh quicklisp dist install, so we skip
+;; the dispatcher and call install-qlfile in-process. :install-deps nil also
+;; skips the project-introspection sub-step, which adds nothing here because
+;; our qlfile only declares `dist' lines (no per-project pins).
+(let* ((root (make-pathname :directory *build-dir*))
+       (qlfile (merge-pathnames "qlfile" root))
+       (local-ql (merge-pathnames ".qlot/" root)))
+  (funcall (find-symbol "INSTALL-QLFILE" (find-package "QLOT/INSTALL"))
+           qlfile
+           :quicklisp-home local-ql
+           :install-deps nil))
+
+;; End every kernel qlot created. lparallel:end-kernel only acts on the
+;; current dynamic value of *kernel*, so progv-bind it to each captured
+;; kernel in turn. :wait t makes us block until workers exit cleanly.
+(let ((end-kernel (find-symbol "END-KERNEL" (find-package "LPARALLEL")))
+      (k-var (find-symbol "*KERNEL*" (find-package "LPARALLEL"))))
+  (dolist (k *captured-lparallel-kernels*)
+    (progv (list k-var) (list k)
+      (ignore-errors (funcall end-kernel :wait t))))
+  (setf *captured-lparallel-kernels* nil))
 
 ;;; IV. BUILDING
 ;;; Run the build inside qlot's local quicklisp so every ql:quickload and
@@ -85,7 +118,7 @@
 ;;; data and eval it; the source-level reader pass therefore only needs
 ;;; symbols from packages loaded earlier (CL, QL, ASDF, UIOP).
 (eval
- `(,(find-symbol "WITH-LOCAL-QUICKLISP" (find-package "QLOT"))
+ `(,(find-symbol "WITH-LOCAL-QUICKLISP" (find-package "QLOT/UTILS/REPL"))
     (,(make-pathname :directory *build-dir*))
    ;; Caddy is used for SSL Termination and as a Reverse Proxy.
    (push :hunchentoot-no-ssl *features*)
@@ -112,6 +145,15 @@
        (progn
          (format t "~&        ====== Build Successful | Deo Gratias ======~%")
          (format t "~&        ====== END OF MAKE.LISP ======~%")
+         ;; SBCL refuses to save a core with multiple threads running. qlot's
+         ;; progress UI binds an lparallel kernel dynamically inside its own
+         ;; LET, so the workers leak past install-qlfile with no exposed
+         ;; handle. Destroy every non-main thread before save-lisp-and-die.
+         (let ((main (bordeaux-threads:current-thread)))
+           (dolist (th (bordeaux-threads:all-threads))
+             (unless (eq th main)
+               (ignore-errors (bordeaux-threads:destroy-thread th)))))
+         (sleep 0.5)
          (asdf:make "project-isidore") ; see "project-isidore.asd" for more.
          ;; SBCL's `save-lisp-and-die' kills the lisp process at the end.
          ;; However this behaviour is implementation dependent. This command

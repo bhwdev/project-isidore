@@ -587,6 +587,10 @@ submission and url-rewrite for shareable URLs."
 called with a non NIL value for SIGINT-POLL, it will listen for SIGINT (Catch a
 user's Control-c in the terminal) and gracefully shut down the web server and
 exit the lisp process."
+  ;; Symmetric to initialize-application starting the scheduler. Stopping it
+  ;; here lets save-lisp-and-die proceed after asdf:test-system runs the
+  ;; can-app-init-and-exit test, which exercises this lifecycle.
+  (slack-bot:stop-reminder-scheduler)
   (when sigint-poll
     (handler-case (loop (sleep 1))
       (#+sbcl sb-sys:interactive-interrupt

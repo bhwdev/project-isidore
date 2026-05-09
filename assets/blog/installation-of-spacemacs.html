@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- 2026-05-08 Fri 19:48 -->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Installation of Spacemacs on Windows via WSL2</title>
+<meta name="author" content="Site Admin." />
+<meta name="generator" content="Org Mode" />
+
+                      <link rel="stylesheet" type="text/css" href="../global.css"/>
+                      <link rel="stylesheet"
+                            href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.2.0/styles/base16/solarized-light.min.css">
+                      <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.2.0/highlight.min.js" defer></script>
+                      <script>var hlf=function(){Array.prototype.forEach.call(document.querySelectorAll("pre.src"),function(t){var e;e=t.getAttribute("class"),e=e.replace(/src-(w+)/,"src-$1 $1"),console.log(e),t.setAttribute("class",e),hljs.highlightBlock(t)})};addEventListener("DOMContentLoaded",hlf);</script>
+<script>
+  window.MathJax = {
+    tex: {
+      ams: {
+        multlineWidth: '85%'
+      },
+      tags: 'ams',
+      tagSide: 'right',
+      tagIndent: '.8em'
+    },
+    chtml: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    svg: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    output: {
+      font: 'mathjax-modern',
+      displayOverflow: 'overflow'
+    }
+  };
+</script>
+
+<script
+  id="MathJax-script"
+  async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
+</head>
+<body>
+<div id="preamble" class="status">
+
+                                    <div class="header header-fixed">
+                                      <div class="navbar container">
+                                        <div class="logo"><a href="/">BHW</a></div>
+                                        <input type="checkbox" id="navbar-toggle" >
+                                        <label for="navbar-toggle"><i></i></label>
+                                        <nav class="menu">
+                                          <ul>
+                                            <li><a href="/about">About</a></li>
+                                            <li><a href="/work">Work</a></li>
+                                            <li><a href="/assets/blog/archive.html">Blog</a></li>
+                                            <li><a href="/contact">Contact</a></li>
+                                          </ul>
+                                        </nav>
+                                      </div>
+                                    </div>
+                                    <h1 class="title">Installation of Spacemacs on Windows via WSL2</h1>
+                                    <p class="subtitle">A step by step guided installation tutorial with context</p> <br/>
+                                    <p class="updated"><a href="/contact#article-history">Updated:</a> 2026-02-12 Thu 22:18</p>
+</div>
+<div id="content" class="content">
+<div class="abstract" id="org90ad71b">
+<p>
+
+</p>
+
+<p>
+Take advantage of the unparalleled, extensible, and powerful text editing
+capabilities of GNU Emacs from within Windows OS.
+</p>
+
+</div>
+<p>
+<hr/>
+</p>
+<nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#Introduction">1. Introduction</a></li>
+<li><a href="#orgdae521a">2. Install WSL &amp; Emacs</a></li>
+<li><a href="#Install-Spacemacs">3. Install Spacemacs</a>
+<ul>
+<li>
+<ul>
+<li><a href="#Fixing-the-Font">3.0.1. Fixing the Font</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#How-WSL-Ubuntu-files-are-treated-by-Windows">4. How WSL (Ubuntu) files are treated by Windows</a>
+<ul>
+<li><a href="#Further-Reading">4.1. Further Reading</a></li>
+<li><a href="#Symlink-to-your-Windows-folders">4.2. Symlink to your Windows folders</a></li>
+</ul>
+</li>
+<li><a href="#Getting-Comfortable-with-Spacemacs">5. Getting Comfortable with Spacemacs</a>
+<ul>
+<li><a href="#Prerequisite-familiarity-with-basic-vim-operations">5.1. Prerequisite: familiarity with basic vim operations</a></li>
+<li><a href="#Watch-and-Learn">5.2. Watch and Learn</a></li>
+<li><a href="#Do-and-Explore">5.3. Do and Explore</a></li>
+<li><a href="#Customize">5.4. Customize</a></li>
+</ul>
+</li>
+<li><a href="#Conclusion">6. Conclusion</a></li>
+<li><a href="#org0b1ab84">7. Troubleshooting</a>
+<ul>
+<li><a href="#org1b769a9">7.1. Emacs with Lucid Toolkit has no dark theme for the window frame</a></li>
+<li><a href="#org74e5fea">7.2. Emacs GUI session is killed upon waking from sleep</a></li>
+<li><a href="#Performance-tips-and-tricks">7.3. Performance tips and tricks</a></li>
+<li><a href="#orgb398bef">7.4. Storage Issues</a></li>
+<li><a href="#orgc553b75">7.5. Window Management</a></li>
+</ul>
+</li>
+<li><a href="#org8885c4c">8. Legacy Windows 10 Installation</a>
+<ul>
+<li><a href="#Install-Microsoft-Windows-Subsystem-for-Linux-WSL-Your-Linux-Distribution">8.1. Install Microsoft Windows Subsystem for Linux (WSL) &amp; Your Linux Distribution</a></li>
+<li><a href="#Install-X-Server">8.2. Install X Server</a></li>
+<li><a href="#org852108b">8.3. Install Emacs</a></li>
+<li><a href="#Bonus-Why-is-my-GUI-Spacemacs-interrupted-by-Sleep">8.4. Why is my GUI Spacemacs interrupted by Sleep?</a></li>
+</ul>
+</li>
+<li><a href="#Sources-and-Credits">9. Sources and Credits</a></li>
+</ul>
+</div>
+</nav>
+<div id="outline-container-Introduction" class="outline-2">
+<h2 id="Introduction"><span class="section-number-2">1.</span> Introduction</h2>
+<div class="outline-text-2" id="text-Introduction">
+<p>
+<span class="dropcap">I</span>s it possible to judge whether
+or not a piece of music is objectively good, perfect and beautiful? The word
+&ldquo;objectively&rdquo; must sound a bit old fashioned, after all, every man is doing what
+is right in his own eyes in these times<sup><a id="fnr.1" class="footref" href="#fn.1" role="doc-backlink">1</a></sup>. But we can be reasonably certain
+that a song which has been well loved generation after generation has a quality
+absent from a yet untested, recently released album. Yes, I&rsquo;m talking about
+Emacs here. 40 odd years is a terribly long time in the world of software. We
+have reason to be grateful as Spacemacs has done its part in flattening the
+notorious Emacs learning curve. This tutorial can be said to be directed towards
+non-programmers who are comfortable with computing (as this write-up originally
+existed as personal notes of mine). I hope you take away something useful!
+</p>
+
+<p>
+Window Subsystem for Linux (WSL) runs a real Linux kernel on a lightweight
+Virtual Machine. Praise be to the Windows team responsible for the continued
+development of WSL. A couple of milestone achievements include,
+</p>
+
+<ul class="org-ul">
+<li><p>
+<a href="https://learn.microsoft.com/en-us/windows/wsl/tutorials/gui-apps">Graphical User Interfaces and sound</a>
+</p>
+
+<p>
+I have kept the <a href="#org8885c4c">Legacy Windows 10 Installation</a> steps in case you are on an
+older version and are unable to upgrade.
+</p></li>
+
+<li><a href="https://learn.microsoft.com/en-us/windows/wsl/systemd">Systemd, an init system and system manager</a></li>
+<li><a href="https://devblogs.microsoft.com/commandline/windows-subsystem-for-linux-september-2023-update/">Memory, Hard Disk, and Networking</a> compatibility improvements</li>
+<li>Official support for <a href="https://devblogs.microsoft.com/commandline/fedora-linux-is-now-an-official-wsl-distro/">Red Hat Enterprise Linux</a></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-orgdae521a" class="outline-2">
+<h2 id="orgdae521a"><span class="section-number-2">2.</span> Install WSL &amp; Emacs</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+<a href="https://learn.microsoft.com/en-us/windows/wsl/">The official WSL documentation</a> is now much more polished than when this tutorial
+was initially published. The following inside Windows Powershell (run as Admin)
+will enable WSL, Linux distributions are operating systems that use the Linux
+kernel. We are running a Linux operating system within a Windows operating
+system &ndash; shortened to subsystem if you will.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>  wsl --install
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Installs WSL and sets the default distribution to Debian.
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">Use wsl --list --online to list available Linux distributions.
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">See https://docs.microsoft.com/en-us/windows/wsl/install for more.
+</span>  wsl --install -d Debian
+  <span class="org-comment-delimiter"># </span><span class="org-comment">(OPTIONAL) Enables Sparse VHD &#8211; Automatically shrinks the WSL virtual hard
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">disk (VHD) as you use it. Otherwise large artifacts like docker containers
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">would pile up.
+</span>  wsl --manage Debian --set-sparse true --allow-unsafe
+</code></pre>
+</div>
+
+<p>
+Install Emacs from official Debian package distribution. Inside your WSL bash
+shell,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Why not emacs-pgtk? See https://github.com/microsoft/wslg/issues/294#issuecomment-1911481055
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">As of December 2025, the above issue of pgtk windows disappearing
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">after laptop </span><span class="org-type"><span class="org-comment">sleep</span></span><span class="org-comment"> still applies. Lucid is unaffected by this.
+</span>  <span class="org-type">sudo</span> apt update &amp;&amp; <span class="org-type">sudo</span> apt upgrade
+  <span class="org-type">sudo</span> apt install emacs-lucid
+</code></pre>
+</div>
+</div>
+</div>
+<div id="outline-container-Install-Spacemacs" class="outline-2">
+<h2 id="Install-Spacemacs"><span class="section-number-2">3.</span> Install Spacemacs</h2>
+<div class="outline-text-2" id="text-Install-Spacemacs">
+<p>
+Enter the following in your WSL terminal to install Spacemacs. We do this in two
+instructions sent to the terminal. The first is to download a <a href="https://en.wikipedia.org/wiki/Version_control">version-control</a>
+software called <a href="https://git-scm.com/">Git</a>. Think of Git as allowing multiple developers (writers) to
+collaborate on the creation of software (documents) in a distributed manner. The
+next instruction is to download a copy of Spacemacs onto our local computer.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>  <span class="org-type">sudo</span> apt install <span class="org-type">git</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Note for myself, at this point head to =dotspacemacs.org= to load my custom config
+</span>  <span class="org-type">git</span> clone https://github.com/syl20bnr/spacemacs ~/.emacs.d
+</code></pre>
+</div>
+
+<p>
+Now for the moment of truth. Launch Spacemacs by the following command in the WSL terminal.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>  emacs &amp;
+</code></pre>
+</div>
+
+<p>
+On the initial startup, you will be presented with a few choices. Pick &ldquo;All
+aboard the evil&hellip;..Vim&rdquo; and then &ldquo;Full Installation&rdquo; for the second choice.
+Rest assured, you will be able to change the first option later on in your
+dotspacemacs (~/.spacemacs) file and if you are a beginner, the full
+installation is preferred over the base installation. In the first initial
+startup, you will have to wait for all the MELPA packages to download and
+install. MELPA is the package manager for all Emacs packages. After the download
+is completed, you will have successfully installed Spacemacs. Launching
+Spacemacs is now as simple as using the shortcut Windows has automatically
+created for Emacs in your Windows start menu.
+</p>
+</div>
+<div id="outline-container-Fixing-the-Font" class="outline-4">
+<h4 id="Fixing-the-Font"><span class="section-number-4">3.0.1.</span> Fixing the Font</h4>
+<div class="outline-text-4" id="text-Fixing-the-Font">
+<p>
+If you get a message informing you that &ldquo;adobe source code pro&rdquo; cannot be
+found, you can install it with the following WSL bash commands<sup><a id="fnr.2" class="footref" href="#fn.2" role="doc-backlink">2</a></sup>, or
+manually after having consulted: <a href="https://wiki.debian.org/Fonts#Manually">Fonts - Debian Wiki</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash"><code>  <span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/bash
+</span>  <span class="org-builtin">set</span>  -euo pipefail
+  <span class="org-variable-name">I1FS</span>=$<span class="org-string">'\n\t'</span>
+  <span class="org-type">mkdir</span> -p /tmp/adodefont
+  <span class="org-type">cd</span> /tmp/adodefont
+  wget -q --show-progress -O source-code-pro.zip https://github.com/adobe-fonts/source-code-pro/archive/2.030R-ro/1.050R-it.zip
+  unzip -q source-code-pro.zip -d source-code-pro
+  <span class="org-variable-name">fontpath</span>=<span class="org-string">"</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">{XDG_DATA_HOME:-$HOME/.local/share}</span></span><span class="org-string">"</span>/fonts
+  <span class="org-type">mkdir</span> -p $<span class="org-variable-name">fontpath</span>
+  <span class="org-type">cp</span> -v source-code-pro/*/OTF/*.otf $<span class="org-variable-name">fontpath</span>
+  fc-cache -f
+  <span class="org-type">rm</span> -rf source-code-pro{,.zip}
+</code></pre>
+</div>
+
+<p>
+In addition, if you&rsquo;re running Spacemacs as a daemon, then <a href="https://github.com/syl20bnr/spacemacs/issues/11321#issuecomment-619051331">the following fix</a> is
+needed to display the correct font.
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-How-WSL-Ubuntu-files-are-treated-by-Windows" class="outline-2">
+<h2 id="How-WSL-Ubuntu-files-are-treated-by-Windows"><span class="section-number-2">4.</span> How WSL (Ubuntu) files are treated by Windows</h2>
+<div class="outline-text-2" id="text-How-WSL-Ubuntu-files-are-treated-by-Windows">
+<p>
+<b>DO NOT</b> access the WSL linux files under @appdata/canonical etc. in the Windows
+explorer. <a href="https://learn.microsoft.com/en-us/windows/wsl/filesystems%20">According to the WSL developers,</a> this is due to differences in how
+file metadata is implemented in Linux versus Windows. 2 methods of properly
+accessing your files:
+</p>
+
+<ol class="org-ol">
+<li><p>
+To access your linux files, in your WSL bash terminal enter in
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash"><code>        explorer.exe .
+</code></pre>
+</div></li>
+
+<li>WSL Filepath method. Location of these files is under &ldquo;\\wsl$&rdquo;. Click on windows explorer address bar at the top to input this address.</li>
+</ol>
+</div>
+<div id="outline-container-Further-Reading" class="outline-3">
+<h3 id="Further-Reading"><span class="section-number-3">4.1.</span> Further Reading</h3>
+<div class="outline-text-3" id="text-Further-Reading">
+<ul class="org-ul">
+<li><a href="https://devblogs.microsoft.com/commandline/whats-new-for-wsl-in-windows-10-version-1903/">What&rsquo;s new for WSL in Windows 10 version 1903? | Windows Command Line</a></li>
+<li><a href="https://devblogs.microsoft.com/commandline/a-deep-dive-into-how-wsl-allows-windows-to-access-linux-files/">A Deep Dive Into How WSL Allows Windows to Access Linux Files | Windows
+Comma&hellip;</a></li>
+<li><a href="https://devblogs.microsoft.com/commandline/do-not-change-linux-files-using-windows-apps-and-tools/">Do not change Linux files using Windows apps and tools | Windows Command
+Line</a></li>
+<li><a href="https://www.howtogeek.com/426749/how-to-access-your-linux-wsl-files-in-windows-10/">How to Access Your Linux (WSL) Files in Windows 10</a></li>
+<li><a href="https://docs.microsoft.com/en-us/windows/wsl/file-permissions">File Permissions | Microsoft Docs</a></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-Symlink-to-your-Windows-folders" class="outline-3">
+<h3 id="Symlink-to-your-Windows-folders"><span class="section-number-3">4.2.</span> Symlink to your Windows folders</h3>
+<div class="outline-text-3" id="text-Symlink-to-your-Windows-folders">
+<p>
+Author has created symbolic links to make filesystem navigation more
+simple. Without symbolic links, your Windows files are accessible through
+&ldquo;<i>mnt/c</i>&rdquo; from the Ubuntu root directory.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash"><code>  <span class="org-type">ln</span> -s /mnt/c/Users/bened/Documents/ ~/
+  <span class="org-type">ln</span> -s /mnt/c/Users/bened/Downloads/ ~/
+  <span class="org-type">ln</span> -s /mnt/c/Users/bened/Pictures/ ~/
+  <span class="org-type">ln</span> -s /mnt/c/Users/bened/Music/ ~/
+  <span class="org-type">ln</span> -s /mnt/c/Users/bened/Videos/ ~/
+</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-Getting-Comfortable-with-Spacemacs" class="outline-2">
+<h2 id="Getting-Comfortable-with-Spacemacs"><span class="section-number-2">5.</span> Getting Comfortable with Spacemacs</h2>
+<div class="outline-text-2" id="text-Getting-Comfortable-with-Spacemacs">
+<p>
+A couple of first steps to get yourself grounded. Makre sure you take
+caution to avoid the dreaded Emacs pinkie. Repetitive strain injury and
+carpal tunnel are painful and debilitating. Personally, I have made the
+following changes to my keyboard layout to make it more ergonomic. The
+benefits spill over to applications outside of Emacs as well. To do so:
+</p>
+
+<ol class="org-ol">
+<li><a href="https://github.com/microsoft/PowerToys">Install Microsoft PowerToys</a></li>
+<li>Under the Keyboard Remapper, swap right ctrl and right alt.</li>
+<li>swap left ctrl and left alt.</li>
+<li>swap left alt (physically the left ctrl key) with the Windows key. This
+will retain comfortable alt-tabbing.</li>
+<li><p>
+swap esc with caps lock.
+</p>
+
+<p>
+Emacs is designed to be keyboard driven, although scrolling and mouse
+support works out of the box. Now let&rsquo;s get started.
+</p></li>
+</ol>
+</div>
+<div id="outline-container-Prerequisite-familiarity-with-basic-vim-operations" class="outline-3">
+<h3 id="Prerequisite-familiarity-with-basic-vim-operations"><span class="section-number-3">5.1.</span> Prerequisite: familiarity with basic vim operations</h3>
+<div class="outline-text-3" id="text-Prerequisite-familiarity-with-basic-vim-operations">
+<p>
+If are new or want a brushup, access the built in tutorial via &ldquo;SPC h T v&rdquo; in
+Spacemacs (&ldquo;SPC h T e&rdquo; for the emacs version). If you pause after hitting &ldquo;SPC&rdquo;,
+you will see a popup. This package is called <a href="https://github.com/justbur/emacs-which-key">&ldquo;emacs-which-key&rdquo;</a> and it frees you
+for remembering 1001 commands. Like memorizing a piano piece, you will pick up
+your most commonly used bindings soon enough. To extend this analogy further,
+Spacemacs bindings are not without reason, but are designed to be mnemonic. If
+you are new to vim&rsquo;s way of modal editing, here is some helpful reading: <a href="https://stackoverflow.com/questions/1218390/what-is-your-most-productive-shortcut-with-vim/1220118#1220118">vi -
+What is your most productive shortcut with Vim? - Stack Overflow</a>. Even more
+interactive vim tutorials are easily found online.
+</p>
+
+<p>
+Think of Vim as a domain specific language for editing text, whereas Emacs&rsquo;
+traditional keybindings are of a chordal nature. But Emacs is written in a
+dialect of LISP, a computer language uniquely suited to build domain specific
+languages. A marriage made in heaven as far as I&rsquo;m concerned.
+</p>
+</div>
+</div>
+<div id="outline-container-Watch-and-Learn" class="outline-3">
+<h3 id="Watch-and-Learn"><span class="section-number-3">5.2.</span> Watch and Learn</h3>
+<div class="outline-text-3" id="text-Watch-and-Learn">
+<p>
+In terms of time efficiency, depth of content covered, and ease of
+understanding, nothing
+surpasses:<a href="https://www.youtube.com/watch?v=fdLCuJcS2Aw">Spacemacs:
+Installation, Configuration, and Navigation Tutorial - YouTube (20 min).</a>
+I seriously and whole-heartedly recommend the rest of his videos.
+Definitely try following along.
+</p>
+
+<p>
+Almost all configuration will be done in your ~/.spacemacs file. For a
+proper understanding of the ~/.spacemacs file,
+<a href="https://stackoverflow.com/questions/37076998/how-to-configure-spacemacs-so-that-it-executes-code-when-you-start-it">see
+Streaky Cobra&rsquo;s breakdown of the file.</a> The only update to this
+information is the placement of custom user layers and snippets in the
+&ldquo;private&rdquo; directory of the ~/.emacs.d . But that is a worry for later.
+</p>
+</div>
+</div>
+<div id="outline-container-Do-and-Explore" class="outline-3">
+<h3 id="Do-and-Explore"><span class="section-number-3">5.3.</span> Do and Explore</h3>
+<div class="outline-text-3" id="text-Do-and-Explore">
+<p>
+Spacemacs places it&rsquo;s help commands under &ldquo;SPC h&rdquo;, so give those a try. A
+hint for new users, &ldquo;SPC h d&rdquo;, opens up a plethora of information. I&rsquo;m am
+proceeding under the assumption you have watched the video in 1) and so one
+of the topics only lightly discussed was the concept of major and minor
+modes. A buffer can have one major mode, and multiple minor modes. Of
+course, Emacs being Emacs, it&rsquo;s possible to have two major modes
+<a href="https://github.com/polymode/polymode">with the package Polymode.</a> &ldquo;SPC h
+d b&rdquo; will pull up a buffer describing the currently active modes. You can
+access the Spacemacs beginner tutorial with &ldquo;SPC h SPC&rdquo;, and then typing in
+&ldquo;Beginner&rsquo;s Tutorial&rdquo;. Now you can navigate the tutorial with the movement
+keys you have just learned.
+<a href="https://develop.spacemacs.org/doc/BEGINNERS_TUTORIAL.html">The tutorial
+is also accessible here (or in Emacs, &ldquo;SPC h r&rdquo;).</a>
+</p>
+</div>
+</div>
+<div id="outline-container-Customize" class="outline-3">
+<h3 id="Customize"><span class="section-number-3">5.4.</span> Customize</h3>
+<div class="outline-text-3" id="text-Customize">
+<p>
+Lastly here is a step by step example to install <a href="https://github.com/Wilfred/helpful">the &ldquo;helpful&rdquo; package.</a> This is
+just a concrete example of package installation &amp; configuration process. This
+particular package was chosen simply because it extends the &ldquo;self-documenting&rdquo;
+aspect of Emacs.
+</p>
+
+<p>
+If you have found a useful Emacs package, the installation differs slightly than
+vanilla Emacs. The first thing to do is check the <a href="https://develop.spacemacs.org/layers/LAYERS.html">spacemacs develop layers list</a>
+to see if a layer has included your desired package. Lets do that with the
+&ldquo;helpful&rdquo; package. Huh. <a href="https://develop.spacemacs.org/layers/+emacs/helpful/README.html">So it is already included in a layer!</a> That makes life
+easier for us, we can follow the README installation instructions. Remember you
+can access your dotspacemacs configuration file with &ldquo;SPC f e d&rdquo;. Don&rsquo;t forget
+to hit &ldquo;SPC f e R&rdquo; to reload your configuration after adding the layer to your
+~/.spacemacs file.
+</p>
+
+<p>
+Now if your package is not already pre-configured in a layer, it is most likely
+either on MELPA or Github. If it is a local package, I&rsquo;m afraid you&rsquo;ll have to
+consult the README.md found in ~/.emacs.d/private/local . In fact, that README
+contains all the information we need for all three use cases above. Quoted
+below:
+</p>
+
+<blockquote>
+<ol class="org-ol">
+<li>For a local package:
+
+<ul class="org-ul">
+<li><p>
+Load the file explicitly, using the full path to the file, by placing a
+</p>
+
+<p>
+\`(load &ldquo;~/.emacs.d/private/local/package-name&rdquo;)\` within the body of
+the \`dotspacemacs/user-config\` function of your dotspacemacs file.
+</p>
+
+<ul class="org-ul">
+<li>Alternatively create a directory with the name of the package in the</li>
+</ul>
+
+<p>
+\`.emacs.d/private/local\` directory, and add that directory to the
+load-path variable by adding \`(some-package :location local)\` to the
+list \`dotspacemacs-additional-packages\` within the
+\`dotspacemacs/layers\` function of your dotspacemacs file. After
+placing your package file into this package-directory the file can be
+loaded, without requiring the full path, by placing a \`(require
+&rsquo;package-name)\` within the body of the \`dotspacemacs/user-config\`
+function of your dotspacemacs file.
+</p></li>
+</ul></li>
+
+<li>If the package is on (M)ELPA simply add the package name to the list
+\`dotspacemacs-additional-packages\` in your dotspacemacs file</li>
+
+<li><p>
+For a package hosted on github the recipe for github packages can be used i.e. add
+</p>
+
+<p>
+\`\`\` (some-package :location (recipe :fetcher github :repo
+&ldquo;some/repo&rdquo;)) \`\`\`
+</p>
+
+<p>
+to the list \`dotspacemacs-additional-packages\` in your dotspacemacs
+file.
+</p></li>
+</ol>
+</blockquote>
+
+<p>
+There is no substitute for reading the documentation of the package. Or the
+source code itself. Luckily, the package we are about to customize makes
+the latter task slightly easier. Let us pretend we want to customize a
+variable in our dotspacemacs file. Before we do that, let&rsquo;s switch to the
+previously opened ~/.spacemacs (dotspacemacs) file buffer with &ldquo;SPC b b&rdquo;.
+</p>
+
+<p>
+One important point to keep in mind is that all key bindings are simply
+calling a command. From the code and package docs we can see that
+&ldquo;helpful-variable&rdquo; is a command. To run any interactive function in Emacs,
+we will use M-x (&ldquo;alt-x&rdquo; or the Spacemacs way: &ldquo;SPC SPC&rdquo;) and type in
+&ldquo;helpful-variable&rdquo;. Before we run it by hitting RET (enter), we notice &ndash;
+thanks to helm, an emacs completion package &ndash; that the keybinding already
+set for that command is &ldquo;C-h v&rdquo;. Good to know. Press ESC to exit.
+</p>
+
+<p>
+&ldquo;SPC b d&rdquo;, ESC, q and C-g are the common default bindings to close a buffer
+or window.
+</p>
+
+<p>
+In our dotspacemacs file let&rsquo;s press &ldquo;SPC s s&rdquo; and type in
+&ldquo;dotspacemacs-themes&rdquo;. Make sure our cursor is placed on the variable
+&ldquo;dotspacemacs-themes&rdquo; and use the keybind we learned earlier: &ldquo;C-h v&rdquo;. The
+variable at our cursor is filled in and a helpful buffer is drawn up. Give
+it a quick read. If you are curious you can compare it to &ldquo;SPC h d v&rdquo; with
+the cursor on the same point. Try swapping the &ldquo;dotspacemacs-themes&rdquo;
+variable. Save, &ldquo;SPC f s&rdquo; and reload &ldquo;SPC f e R&rdquo;.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><code>        dotspacemacs-themes <span class="org-highlight-quoted-quote">'</span>(spacemacs-light spacemacs-dark)
+</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-Conclusion" class="outline-2">
+<h2 id="Conclusion"><span class="section-number-2">6.</span> Conclusion</h2>
+<div class="outline-text-2" id="text-Conclusion">
+<p>
+The universality and power of vim&rsquo;s modal editing combined with the endless
+flexibility of the Emacs lisp interpreter; all this made accessible thanks to
+the blood, sweat, and tears of open-source contributors. Where to go from here?
+</p>
+
+<ul class="org-ul">
+<li>Install the appropriate layer for your favourite language and get
+working.</li>
+<li>Explore the &ldquo;killer features&rdquo; of Emacs:
+<ol class="org-ol">
+<li><a href="https://www.youtube.com/watch?v=S4f-GUxu3CY&amp;list=PLd_Oyt6lAQ8RgaMN3JnmZjxhPZ8jU34fP">org-mode</a></li>
+<li><a href="https://www.youtube.com/watch?v=NDP91RNgT4A">magit</a></li>
+<li><a href="https://develop.spacemacs.org/layers/+tools/lsp/README.html">LSP</a></li>
+<li>mu4e</li>
+<li>dired</li>
+<li>calc</li>
+<li>info</li>
+<li>tramp</li>
+</ol></li>
+<li>Try the browser extension <a href="https://github.com/tridactyl/tridactyl">Tridactyl</a> to browse the web with vim keybindings.</li>
+<li>Familiarize your self with Emacs Lisp or perhaps even <a href="http://lispcookbook.github.io/cl-cookbook/">Common Lisp</a>?</li>
+<li>A no-nonsense &ldquo;hit the ground running&rdquo; intro - <a href="http://steve-yegge.blogspot.com/2008/01/emergency-elisp.html">Stevey&rsquo;s Blog Rants: Emergency
+Elisp</a></li>
+<li>GNU Intro to Elisp Manual - <a href="https://www.gnu.org/software/emacs/manual/html_node/eintr/">Top (Programming in Emacs Lisp)</a></li>
+<li><a href="https://news.ycombinator.com/item?id=16842786">A much more powerful version of Jupyter notebooks</a> once you get familiar with
+Emacs. In particular, this is thanks to <a href="https://rgoswami.me/posts/jupyter-orgmode/">the org-babel package.</a></li>
+<li>Fear of missing out on the freshest news in the Emacs sphere?
+<a href="https://sachachua.com/blog/emacs/">Sacha Chua has got you covered.</a></li>
+</ul>
+
+<p>
+Once you get comfortable enough, you may even want to remove Spacemacs and
+roll your own custom configuration. There is no rush at all. My
+thoughts on future blog posts include a showcase of three org-mode packages
+which are particularly dear to my heart: org-brain, org-agenda, and
+org-babel. I hope this tutorial has helped you, and have a wonderful day.
+</p>
+</div>
+</div>
+<div id="outline-container-org0b1ab84" class="outline-2">
+<h2 id="org0b1ab84"><span class="section-number-2">7.</span> Troubleshooting</h2>
+<div class="outline-text-2" id="text-7">
+</div>
+<div id="outline-container-org1b769a9" class="outline-3">
+<h3 id="org1b769a9"><span class="section-number-3">7.1.</span> Emacs with Lucid Toolkit has no dark theme for the window frame</h3>
+<div class="outline-text-3" id="text-7-1">
+<p>
+Why do none of the options for enabling dark mode as a WSLg seem to affect
+Emacs? It&rsquo;s the difference between Server Side Decorations and Client Side
+Decorations.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>  <span class="org-type">sudo</span> apt install x11-apps
+  xeyes
+  <span class="org-comment-delimiter"># </span><span class="org-comment">or
+</span>  xclock
+  <span class="org-comment-delimiter"># </span><span class="org-comment">look at the white window frame in all its glory.</span>
+</code></pre>
+</div>
+
+<blockquote>
+<p>
+That&rsquo;s (the title &amp; borders) called Server Side Decorations (SSDs) of the Xorg
+apps and what you&rsquo;re seeing is the default, ugly ass Adwaita light theme that&rsquo;s
+in the WSLg system container. :D
+</p>
+
+<p>
+WSLg is using Wayland as the display protocol and on Wayland the &ldquo;legacy&rdquo; Xorg
+apps are displayed by XWayland. WSLg, the WSL system container is the one
+drawing these borders and WSLg still doesn&rsquo;t have a dark theme or a way to
+determine whether Windows is using light or dark mode at the moment.
+</p>
+
+<p>
+The only way to (permanently) change that is to build your own WSLg system
+container that&rsquo;s set to use some other theme than that. As in any changes to
+that container&rsquo;s environment are discarded upon shutting down WSL (but you can
+mess around if you want to: wsl &ndash;system -u wslg).
+</p>
+
+<p>
+On Wayland the new apps are generally supposed to be able to use Client Side
+Decorations (CSDs) instead, which get themed by the client side environment
+(your WSL distros).
+</p>
+
+<p>
+But still, for the Xorg apps that get displayed by XWayland, WSLg needs to add a
+dark theme as well but they said it&rsquo;s a low priority task for them to do so.
+</p>
+
+<ul class="org-ul">
+<li><a href="https://www.reddit.com/r/bashonubuntuonwindows/comments/10g54lc/is_there_a_way_to_remove_or_change_the_ugly/">https://www.reddit.com/r/bashonubuntuonwindows/comments/10g54lc/is_there_a_way_to_remove_or_change_the_ugly/</a></li>
+</ul>
+</blockquote>
+
+<p>
+From the above we can surmise that GUI Emacs on Wayland under WSL might not have
+the same issues. A <a href="https://github.com/microsoft/wslg/issues/294#issuecomment-1911481055">reminder</a> that we run GUi Emacs with the Lucid toolkit on WSL
+to avoid Emacs instances disappearing after system sleep. So the next best thing
+we can do to avoid OLED burn in and remove the annoyance of a glaring white
+window frame is to hide the window frame completely. This is a workaround as one
+will be unable to resize the windowed Emacs. We tweak the <a href="https://github.com/microsoft/wslg/issues/530#issuecomment-2375840239%20">script</a> from the Github
+Issue tracker,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash"><code><span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/</span><span class="org-keyword">bash</span><span class="org-comment">
+</span>
+<span class="org-comment-delimiter"># </span><span class="org-comment">Check if arguments were passed
+</span><span class="org-keyword">if</span> [ $<span class="org-variable-name">#</span> -eq 0 ]; <span class="org-keyword">then</span>
+  <span class="org-type">echo</span> <span class="org-string">"Usage: </span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">0</span></span><span class="org-string"> &lt;window_name&gt;"</span>
+  <span class="org-keyword">exit</span> 1
+<span class="org-keyword">fi</span>
+
+<span class="org-variable-name">window_name</span>=<span class="org-string">"</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">1</span></span><span class="org-string">"</span>
+<span class="org-variable-name">window_ids</span>=$(<span class="org-sh-quoted-exec">xdotool search --onlyvisible --name "$window_name"</span>)
+
+<span class="org-keyword">if</span> [ -z <span class="org-string">"</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">window_ids</span></span><span class="org-string">"</span> ]; <span class="org-keyword">then</span>
+  <span class="org-type">echo</span> <span class="org-string">"No visible windows found matching '</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">window_name</span></span><span class="org-string">'"</span>
+  <span class="org-keyword">exit</span> 1
+<span class="org-keyword">fi</span>
+
+<span class="org-keyword">for</span> window_id<span class="org-keyword"> in</span> $<span class="org-variable-name">window_ids</span>; <span class="org-keyword">do</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Check if the window is currently fullscreen
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">We look for _NET_WM_STATE_FULLSCREEN in the window properties
+</span>  <span class="org-variable-name">is_fullscreen</span>=$(<span class="org-sh-quoted-exec">xprop -id "$window_id" _NET_WM_STATE | grep "_NET_WM_STATE_FULLSCREEN"</span>)
+
+  <span class="org-keyword">if</span> [ -z <span class="org-string">"</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">is_fullscreen</span></span><span class="org-string">"</span> ]; <span class="org-keyword">then</span>
+    <span class="org-type">echo</span> <span class="org-string">"Processing ID </span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">window_id</span></span><span class="org-string">: Enabling Fullscreen &amp; Removing Borders"</span>
+    <span class="org-comment-delimiter"># </span><span class="org-comment">Remove borders
+</span>    xprop -id <span class="org-string">"</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">window_id</span></span><span class="org-string">"</span> -f _MOTIF_WM_HINTS 32c -set _MOTIF_WM_HINTS <span class="org-string">"2, 0, 0, 0, 0"</span>
+    <span class="org-comment-delimiter"># </span><span class="org-comment">Add fullscreen state
+</span>    wmctrl -ir <span class="org-string">"</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">window_id</span></span><span class="org-string">"</span> -b add,fullscreen
+  <span class="org-keyword">else</span>
+    <span class="org-type">echo</span> <span class="org-string">"Processing ID </span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">window_id</span></span><span class="org-string">: Restoring Borders &amp; Exiting Fullscreen"</span>
+    <span class="org-comment-delimiter"># </span><span class="org-comment">Restore borders (The '1' in the third position re-enables decorations)
+</span>    xprop -id <span class="org-string">"</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">window_id</span></span><span class="org-string">"</span> -f _MOTIF_WM_HINTS 32c -set _MOTIF_WM_HINTS <span class="org-string">"2, 0, 1, 0, 0"</span>
+    <span class="org-comment-delimiter"># </span><span class="org-comment">Remove fullscreen state
+</span>    wmctrl -ir <span class="org-string">"</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">window_id</span></span><span class="org-string">"</span> -b remove,fullscreen
+  <span class="org-keyword">fi</span>
+<span class="org-keyword">done</span>
+</code></pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Place the above shell script in a file.
+</span>  <span class="org-type">sudo</span> apt install xdotool wmctrl
+  <span class="org-type">chmod</span> +x /path/to/above/script
+  emacs &amp;
+  ./fullscreen.sh emacs
+  <span class="org-comment-delimiter"># </span><span class="org-comment">call the script again to remove fullscreen
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">./fullscreen.sh emacs</span>
+</code></pre>
+</div>
+
+<p>
+Is this jank? Absolutely.
+</p>
+</div>
+</div>
+<div id="outline-container-org74e5fea" class="outline-3">
+<h3 id="org74e5fea"><span class="section-number-3">7.2.</span> Emacs GUI session is killed upon waking from sleep</h3>
+<div class="outline-text-3" id="text-7-2">
+<p>
+<a href="https://github.com/microsoft/wslg/issues/294">microsoft/wslg#294 GUI session get killed on waking from sleep</a>
+</p>
+</div>
+</div>
+<div id="outline-container-Performance-tips-and-tricks" class="outline-3">
+<h3 id="Performance-tips-and-tricks"><span class="section-number-3">7.3.</span> Performance tips and tricks</h3>
+<div class="outline-text-3" id="text-Performance-tips-and-tricks">
+<p>
+In the Lisp programming language family, <a href="https://dl.acm.org/doi/pdf/10.1145/3386324">Emacs Lisp</a> is a derivative of Maclisp
+circa 1980&rsquo;s. For a general purpose programming language other lisp dialects
+are better suited, such as ANSI Common Lisp. Emacs Lisp however remains
+perfectly adequate as a Domain Specific Language (DSL) for editing text.
+</p>
+
+<p>
+Emacs configs are treated less like a software program (for which typical best
+practices apply) and more like a throwaway script hacked together by copy-paste.
+When it comes to subpar Emacs performance, the culprit and resolution is not so
+different from performance problems in other languages: check for errors in your
+own code or the libraries you use. Performance comes from data structures, and
+efficiency from algorithms. To optimize, then it would be wise to profile first.
+</p>
+
+<p>
+Open the built-in Emacs Profiler with <code>SPC h P s.</code>
+</p>
+
+<p>
+Messing with the Emacs garbage collector is not a good idea. But if you must,
+check out the <a href="https://gitlab.com/koral/gcmh">gcmh melpa package</a>.
+</p>
+
+<p>
+To see what functions are running at set times, see the variables <code>timer-list</code>
+and <code>timer-idle-list</code>.
+</p>
+</div>
+</div>
+<div id="outline-container-orgb398bef" class="outline-3">
+<h3 id="orgb398bef"><span class="section-number-3">7.4.</span> Storage Issues</h3>
+<div class="outline-text-3" id="text-7-4">
+<p>
+<a href="https://github.com/microsoft/WSL/issues/4699#issuecomment-1411209537">Prompt WSL to release disk space back to host Windows OS.</a>
+</p>
+</div>
+</div>
+<div id="outline-container-orgc553b75" class="outline-3">
+<h3 id="orgc553b75"><span class="section-number-3">7.5.</span> Window Management</h3>
+<div class="outline-text-3" id="text-7-5">
+<p>
+<a href="https://github.com/microsoft/wslg/issues/22">microsoft/wslg#22 WSLg windows do not work with window-snapping (to sides or &hellip;</a>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-org8885c4c" class="outline-2">
+<h2 id="org8885c4c"><span class="section-number-2">8.</span> Legacy Windows 10 Installation</h2>
+<div class="outline-text-2" id="text-8">
+<ol class="org-ol">
+<li><p>
+Prerequisites
+</p>
+
+<p>
+Check that you meet the requirements for running WSL2. &ldquo;Win + r&rdquo;, type in
+&ldquo;winver&rdquo; and hit enter. Compare your Windows version with the below
+</p>
+
+<ul class="org-ul">
+<li>For x64 systems: Version 1903 or higher, with Build 18362 or higher.</li>
+<li>For ARM64 systems: Version 2004 or higher, with Build 19041 or higher.</li>
+</ul></li>
+</ol>
+</div>
+<div id="outline-container-Install-Microsoft-Windows-Subsystem-for-Linux-WSL-Your-Linux-Distribution" class="outline-3">
+<h3 id="Install-Microsoft-Windows-Subsystem-for-Linux-WSL-Your-Linux-Distribution"><span class="section-number-3">8.1.</span> Install Microsoft Windows Subsystem for Linux (WSL) &amp; Your Linux Distribution</h3>
+<div class="outline-text-3" id="text-Install-Microsoft-Windows-Subsystem-for-Linux-WSL-Your-Linux-Distribution">
+<p>
+First, install the Microsoft Windows Subsystem for Linux version 2. Unless
+explicitly mentioned as WSL1, WSL refers to WSL version 2. WSL2 is recommended
+over WSL1 Unless you plan on using Linux commandline on files stored in the
+Native Windows file system instead of the WSL filesystem. I will go into more
+detail later, but the WSL filesystem is accessible in Windows Explorer and shows
+up as a network drive. If you are unsure, go with WSL2. <a href="https://docs.microsoft.com/en-us/windows/wsl/install-win10#step-1---enable-the-windows-subsystem-for-linux">This process is already
+documented by Microsoft (includes troubleshooting guidelines).</a> Repeated here for
+completion&rsquo;s sake:
+</p>
+
+<p>
+Enable the windows feature called &ldquo;Windows subsystem for Linux&rdquo; by either
+checking the box in the GUI screen. You can get there by searching &ldquo;Turn
+Windows features on or off&rdquo; in the control panel search box. Do the same for
+the check box titled &ldquo;virtual machine platform&rdquo;. you can enable these 2
+features via the shell as well.
+</p>
+
+<p>
+OR open the power shell as administrator and run:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>  dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
+  dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
+</code></pre>
+</div>
+
+<p>
+now you have to download and run the Linux kernel update package from Microsoft. Again make sure you download the right one for your CPU architecture.
+</p>
+
+<ul class="org-ul">
+<li><a href="https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi">https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_x64.msi</a></li>
+<li><p>
+<a href="https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_arm64.msi">https://wslstorestorage.blob.core.windows.net/wslblob/wsl_update_arm64.msi</a>
+</p>
+
+<p>
+Last but not least, set WSL 2 as the default version when you install a new
+Linux distribution.
+</p>
+
+<p>
+Open the powershell and run:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>    wsl --set-default-version 2
+</code></pre>
+</div>
+
+<p>
+Now you can go to the window store and download your preferred Linux distribution. I went with Ubuntu. One thing to note is that you may find three results when you search Ubuntu in the Windows store.
+</p>
+
+<ul class="org-ul">
+<li>Ubuntu (This one updates to the latest long term support version)</li>
+<li>Ubuntu 20.04 (Stays on 20.04 LTS)</li>
+<li><p>
+Ubuntu 18.04 (Stays on 18.04 LTS)
+</p>
+
+<p>
+<a href="https://docs.microsoft.com/en-us/windows/wsl/install-manual">If for some reason you are unable to download applications from the Windows
+store, you can install the distribution through manual methods.</a> After
+installing through the window store, launching the Ubuntu will ask you for a
+username and password for your superuser account.
+</p></li>
+</ul></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-Install-X-Server" class="outline-3">
+<h3 id="Install-X-Server"><span class="section-number-3">8.2.</span> Install X Server</h3>
+<div class="outline-text-3" id="text-Install-X-Server">
+<p>
+This is the software that allows Linux to display GUI elements. You have
+many options here:
+</p>
+
+<ol class="org-ol">
+<li>Xming</li>
+<li>Mobaxterm</li>
+<li>Vcxsrv</li>
+</ol>
+
+<p>
+I have chosen Vcxsrv. Simple installation and configuration.
+Download and run the sourceforge
+installer and you can launch the program by the &ldquo;Xlaunch&rdquo; shortcut. No
+need to change any of the settings. Click next until the end and you should
+see a system tray icon. Feel free to add the &ldquo;X Launch&rdquo; shortcut to your
+Windows (Win + R) folder.
+</p>
+
+<p>
+After installation, create a new desktop shortcut and use the following
+command. Add the following command in the properties → shortcut →target
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>  <span class="org-string">"C:\Program Files\VcXsrv\vcxsrv.exe"</span> :0 -ac -terminate -lesspointer -multiwindow -clipboard -wgl -dpi auto
+</code></pre>
+</div>
+
+<p>
+The last step before launching is to configure your X Server correctly. In
+the WSL terminal, export the DISPLAY variable.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash"><code>  $ export <span class="org-variable-name">DISPLAY</span>=$(<span class="org-sh-quoted-exec">awk '/nameserver / {print $2; exit}' /etc/resolv.conf 2&gt;/dev/null</span>):0
+  $ export <span class="org-variable-name">LIBGL_ALWAYS_INDIRECT</span>=1
+</code></pre>
+</div>
+
+<p>
+The reason for the above is because the internal IP address of the WSL (2)
+server changes on reboot. Don&rsquo;t worry, the team at WSL has ensured that
+connections to WSL from Windows (Ex. localhost:8000) require no extra
+configuration. The snippet above for is for WSL to Windows 10 GUI applications.
+You will probably want to put the two export commands into your .bashrc file,
+located in &rsquo;~/home/$USER$/&rsquo; folder. We can do this after completing the steps
+below.
+</p>
+</div>
+</div>
+<div id="outline-container-org852108b" class="outline-3">
+<h3 id="org852108b"><span class="section-number-3">8.3.</span> Install Emacs</h3>
+<div class="outline-text-3" id="text-8-3">
+<p>
+Spacemacs is a preset configuration of Emacs, so we must first make sure Emacs
+is installed properly. The default Emacs build that comes with Ubuntu 20.04 on
+WSL doesn&rsquo;t support XWindows (the X Server we just installed). To fix this we
+are going to add Kevin Kelley&rsquo;s builds of Emacs with XWindows supports, simply
+by adding Kevin&rsquo;s PPA to WSL. Enter the following in the WSL Terminal.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash"><code>  <span class="org-type">sudo</span> apt update &amp;&amp; <span class="org-type">sudo</span> apt upgrade
+  <span class="org-type">sudo</span> add-apt-repository ppa:kelleyk/emacs
+  <span class="org-type">sudo</span> apt update
+  <span class="org-type">sudo</span> apt install emacs27
+</code></pre>
+</div>
+
+<p>
+Now we are ready to proceed to <a href="#Install-Spacemacs">3</a>
+</p>
+</div>
+</div>
+<div id="outline-container-Bonus-Why-is-my-GUI-Spacemacs-interrupted-by-Sleep" class="outline-3">
+<h3 id="Bonus-Why-is-my-GUI-Spacemacs-interrupted-by-Sleep"><span class="section-number-3">8.4.</span> Why is my GUI Spacemacs interrupted by Sleep?</h3>
+<div class="outline-text-3" id="text-Bonus-Why-is-my-GUI-Spacemacs-interrupted-by-Sleep">
+<div class="org-src-container">
+<pre class="src src-bash"><code><span class="org-comment-delimiter"># </span><span class="org-comment">Allows us to open links in Spacemacs to our Windows 10 browser
+</span><span class="org-function-name">fix_wsl2_interop</span>() {
+    <span class="org-keyword">for</span> i<span class="org-keyword"> in</span> $(<span class="org-sh-quoted-exec">pstree -np -s $$ | grep -o -E '[0-9]+'</span>); <span class="org-keyword">do</span>
+        <span class="org-keyword">if</span> [[ -e <span class="org-string">"/run/WSL/</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">{i}</span></span><span class="org-string">_interop"</span> ]]; <span class="org-keyword">then</span>
+            <span class="org-builtin">export</span> <span class="org-variable-name">WSL_INTEROP</span>=/run/WSL/${<span class="org-variable-name">i</span>}_interop
+        <span class="org-keyword">fi</span>
+    <span class="org-keyword">done</span>
+}
+
+<span class="org-comment-delimiter">#</span><span class="org-comment">Call the function
+</span><span class="org-builtin">export</span> -f fix_wsl2_interop
+fix_wsl2_interop
+</code></pre>
+</div>
+
+<p>
+I have kept this for last because this adds quite a bit of complexity to the
+installation process. It&rsquo;s best to make sure the above is familiar before
+marching on. WSL2 networking is still very much a work in progress, and <a href="https://github.com/microsoft/wslg">WSLg</a> was
+in the works at the time of writing. <a href="https://superuser.com/questions/1474559/wsl2-x11-programs-disappear">Therefore X server sessions are not kept
+alive</a> after the computer goes to sleep. This can be a deal breaker for some.
+If that is the case, then here is the workaround I use: <a href="https://derkoe.dev/blog/development-environment-in-wsl2/">courtesy of Mr.
+Christian Koberl.</a>
+</p>
+
+<p>
+DO NOT uninstall or change your previous VCXSRV setup. I keep both X2Go and
+VCXSRV open as otherwise my clipboard will stop working. Hard to debug.
+</p>
+
+<p>
+After each WSL/Windows restart
+</p>
+
+<ul class="org-ul">
+<li>Launch ssh in Linux (if not started yet): sudo service ssh start</li>
+<li>Launch “X2Go Client” on Windows ad connect to the server with WSL user/password</li>
+<li>Now you can launch X11 apps via the tray icon (see X2Go Published Applications)</li>
+</ul>
+
+<p>
+To get sound you can use this link, <a href="https://www.linuxuprising.com/2021/03/how-to-get-sound-pulseaudio-to-work-on.html">How To Get Sound (PulseAudio) To Work On
+WSL2 - Linux Uprising Blog</a>
+</p>
+
+<p>
+The reason I do not use this option is due to battery usage as indicated by the
+Windows task manager. X2go client uses pulseaudio server and the cpu usage for
+<code>windows audio process</code> will be stuck around 8-10% CPU. My elfeed-mpv function
+is also very slow. I will have to wait until WSLg before managing my music with
+Emacs.
+</p>
+
+<blockquote>
+<p>
+Under Options → Settings → Pulseaudio settings, you can now disable audio input
+(microphone support.) This itself is desirable for many users, but it also
+serves as a workaround for the issue of PulseAudio failing to do output simply
+because input is unavailable. &ndash; <a href="https://wiki.x2go.org/doku.php/doc:release-notes-mswin:x2goclient-4.0.5.1">doc:release-notes-mswin:x2goclient-4.0.5.1 {X2Go - everywhere@home}</a>
+</p>
+</blockquote>
+</div>
+</div>
+</div>
+<div id="outline-container-Sources-and-Credits" class="outline-2">
+<h2 id="Sources-and-Credits"><span class="section-number-2">9.</span> Sources and Credits</h2>
+<div class="outline-text-2" id="text-Sources-and-Credits">
+<ul class="org-ul">
+<li><a href="http://mdr78.github.io/2019/07/01/windows-spacemacs-install.html">The definitive guide to installing Spacemacs on Windows</a></li>
+<li><a href="https://github.com/hubisan/emacs-wsl">GitHub - hubisan/emacs-wsl: Install and run Emacs with the Windows Subsystem &hellip;</a></li>
+<li><a href="https://shelper.github.io/posts/setup-emacs-in-wsl2/">Emacs in WSL2 | So I Write</a></li>
+</ul>
+</div>
+</div>
+<div id="footnotes">
+<h2 class="footnotes">Footnotes: </h2>
+<div id="text-footnotes">
+
+<div class="footdef"><sup><a id="fn.1" class="footnum" href="#fnr.1" role="doc-backlink">1</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+Judges 21:24 DRA. What would medieval Thomists think of the word
+&ldquo;self-actualization&rdquo;? Can man remake himself in his own image anymore than a
+creature can be the first cause of itself, to reduce his potential to actual in
+such a manner?
+</p></div></div>
+
+<div class="footdef"><sup><a id="fn.2" class="footnum" href="#fnr.2" role="doc-backlink">2</a></sup> <div class="footpara" role="doc-footnote"><p class="footpara">
+<a href="https://askubuntu.com/questions/193072/how-to-use-the-adobe-source-code-pro-font">Software installation - How to use the Adobe Source Code Pro font? - Ask
+Ubuntu</a>
+</p></div></div>
+
+
+</div>
+</div></div>
+<div id="postamble" class="status">
+<script>
+                              const headers = Array.from( document.querySelectorAll('h2, h3, h4, h5, h6') );
+
+                              headers.forEach( header => {
+                                header.insertAdjacentHTML('afterbegin',
+                                 '<a href="#table-of-contents">&#8689;</a>'
+                                );
+                              });
+                              </script>
+                              <hr/>
+                              <footer>
+                                <div class="copyright-container">
+                                    Comments? Corrections? <a href="https://bhw.name/contact"> Please do reach out.</a><a href="https://bhw.name/assets/blog/atom.xml"> RSS Feed. </a><a href="https://bhw.name/subscribe"> Mailing List. </a><br/>
+                                    Copyright 2021 Benedict H. Wang. <br/>
+                                    Blog content is available under <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"> CC-BY-SA 4.0 </a> unless otherwise noted.<br/>
+                                    Created with <a href="https://www.gnu.org/software/emacs/">Emacs</a> 30.1 (<a href="https://orgmode.org">Org</a> mode 9.8.2) on <a href="https://www.gnu.org">GNU</a>/<a href="https://www.kernel.org/">Linux</a><br/>
+                                </div>
+                              </footer>
+</div>
+</body>
+</html>

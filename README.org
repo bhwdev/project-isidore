@@ -1,0 +1,78 @@
+* Project Isidore
+
+The third iteration of my personal website. It was quite fun building this with
+Common Lisp. Pull requests and patches -- see "project-isidore.asd" for the
+correct mailing address -- are most welcome.
+
+Copyright (c) 2021  Ben H. W. Source code is under the [[https://www.gnu.org/licenses/agpl-3.0-standalone.html][GNU-AGPL-3.0
+License]]. Blog content is available under the [[https://creativecommons.org/licenses/by-sa/4.0/][CC-BY-SA 4.0 License]] unless
+otherwise noted.
+
+** Development Quick Start
+
+Prerequisite(s):
+
+An ANSI Common Lisp implementation. The development platform is x86_64 Debian
+GNU/Linux with [[http://www.sbcl.org/][SBCL.]]
+
+#+begin_src bash
+$ sudo apt install sbcl
+#+end_src
+
+The [[https://www.quicklisp.org/beta/][Quicklisp]] library manager to download system dependencies.
+
+#+begin_src bash
+$ curl -O https://beta.quicklisp.org/quicklisp.lisp
+$ sbcl --load quicklisp.lisp
+,* (quicklisp-quickstart:install)
+,* (ql:add-to-init-file)
+,* (quit)
+#+end_src
+
+1. Clone the repository,
+
+   #+begin_src bash
+   $ git clone https://gitlab.com/bhw/project-isidore.git /home/$USER/quicklisp/local-projects/
+   #+end_src
+
+2. Within [[https://www.gnu.org/software/emacs/][Emacs]], start a Common Lisp IDE ([[https://github.com/joaotavora/sly][SLY]]) REPL buffer with =M-x sly=.
+   Depending on the current working directory, =M-x sly-mrepl-set-directory= to
+   Project Isidore root directory may be needed. [[https://lispcookbook.github.io/cl-cookbook/editor-support.html#vscode][Here are some Non-Emacs Common
+   Lisp IDE options.]] Or you may use the REPL inside your shell, as outlined in
+   the Quicklisp installation steps.
+
+3. Load Project Isidore & start local development server.
+
+   #+begin_src lisp
+     CL-USER> (ql:quickload "project-isidore/test")
+     CL-USER> (asdf:test-system "project-isidore")
+     ;; Switch to package namespace.
+     CL-USER> (in-package :project-isidore)
+     ;; Starts web server at http://localhost:8080.
+     PROJECT-ISIDORE> (initialize-application)
+     PROJECT-ISIDORE> (terminate-application)
+   #+end_src
+
+4. To build a standalone executable binary locally,
+
+   #+begin_src bash
+     $ sbcl --load /home/$USER/quicklisp/local-projects/project-isidore/make.lisp
+     # Run the executable.
+     $ /home/$USER/quicklisp/local-projects/project-isidore/bin/ProjectIsidore
+   #+end_src
+
+5. To build a docker image first create a Dockerfile at the repository root. See
+   commit c23d6a7e661dc42b21008b7ece8b4254e517c6d4 for an example Dockerfile.
+
+   #+begin_src sh
+     $ sudo dockerd
+     # After creating said Dockerfile.
+     $ docker build -t project-isidore-image /home/$USER/quicklisp/local-projects/project-isidore/
+     $ docker run -dp 8080:8080 project-isidore-image
+     $ docker stop $(docker ps -a -q)
+     $ docker system prune
+     $ sudo pkill -9 dockerd
+   #+end_src
+
+Please visit https://www.bhw.name/assets/blog/project-isidore-doc.html for
+online documentation.

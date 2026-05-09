@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- 2026-05-08 Fri 20:24 -->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Communication Setup in Emacs</title>
+<meta name="author" content="Site Admin." />
+<meta name="generator" content="Org Mode" />
+
+                      <link rel="stylesheet" type="text/css" href="../global.css"/>
+                      <link rel="stylesheet"
+                            href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.2.0/styles/base16/solarized-light.min.css">
+                      <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.2.0/highlight.min.js" defer></script>
+                      <script>var hlf=function(){Array.prototype.forEach.call(document.querySelectorAll("pre.src"),function(t){var e;e=t.getAttribute("class"),e=e.replace(/src-(w+)/,"src-$1 $1"),console.log(e),t.setAttribute("class",e),hljs.highlightBlock(t)})};addEventListener("DOMContentLoaded",hlf);</script>
+</head>
+<body>
+<div id="preamble" class="status">
+
+                                    <div class="header header-fixed">
+                                      <div class="navbar container">
+                                        <div class="logo"><a href="/">BHW</a></div>
+                                        <input type="checkbox" id="navbar-toggle" >
+                                        <label for="navbar-toggle"><i></i></label>
+                                        <nav class="menu">
+                                          <ul>
+                                            <li><a href="/about">About</a></li>
+                                            <li><a href="/work">Work</a></li>
+                                            <li><a href="/assets/blog/archive.html">Blog</a></li>
+                                            <li><a href="/contact">Contact</a></li>
+                                          </ul>
+                                        </nav>
+                                      </div>
+                                    </div>
+                                    <h1 class="title">Communication Setup in Emacs</h1>
+                                    <p class="subtitle">Much ink has been spilled on&hellip;how best to spill ink?</p> <br/>
+                                    <p class="updated"><a href="/contact#article-history">Updated:</a> 2026-05-01 Fri 09:45</p>
+</div>
+<div id="content" class="content">
+<div class="abstract" id="orgcaba505">
+<p>
+
+</p>
+
+<p>
+“There are no ordinary people. You have never talked to a mere mortal. Nations,
+cultures, arts, civilizations - these are mortal, and their life is to ours as
+the life of a gnat. But it is immortals whom we joke with, work with, marry,
+snub and exploit - immortal horrors or everlasting splendors. This does not mean
+that we are to be perpetually solemn. We must play. But our merriment must be of
+that kind (and it is, in fact, the merriest kind) which exists between people
+who have, from the outset, taken each other seriously - no flippancy, no
+superiority, no presumption.” &ndash; C.S. Lewis
+</p>
+
+</div>
+<p>
+<hr/>
+</p>
+<nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#Introduction">1. Introduction</a></li>
+<li><a href="#org4905f1d">2. Instant Messaging - Meta with Matrix and Ement</a>
+<ul>
+<li><a href="#orgdad3207">2.1. Matrix-synapse server Installation</a></li>
+<li><a href="#org3e386ca">2.2. WhatsApp Bridge Installation</a></li>
+<li><a href="#org8ce44a2">2.3. Conclusion</a></li>
+</ul>
+</li>
+<li><a href="#org8a296db">3. Email - GMail with Mbsync and Mu4e</a>
+<ul>
+<li><a href="#org30db46b">3.1. Viewing HTML email in your internet browser</a></li>
+</ul>
+</li>
+<li><a href="#org6d375b6">4. Web logs &amp; Web feeds - Org Publish and Elfeed</a></li>
+</ul>
+</div>
+</nav>
+<p>
+<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-04-07T15:47:00">[2026-04-07 Tue 15:47]</time></span> &lt;- <a href="../dotemacs.html#ID-20220829T170201.833199">Elfeed Config</a>
+<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-04-07T15:47:00">[2026-04-07 Tue 15:47]</time></span> &lt;- <a href="../dotemacs.html#ID-20220829T170149.630909">Email Config</a>
+<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-04-07T15:47:00">[2026-04-07 Tue 15:47]</time></span> &lt;- <a href="../dotemacs.html#ID-20220829T170131.891099">Ement Config</a>
+<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-04-07T15:47:00">[2026-04-07 Tue 15:47]</time></span> &lt;- <a href="../.stversions/cpb.html#ID-4a9ea0cd-0b3a-4e9e-9236-dfe3b917fd50">GNU Emacs</a>
+</p>
+<ul class="org-ul">
+<li><a href="../.stversions/cpb.html#ID-4a9ea0cd-0b3a-4e9e-9236-dfe3b917fd50">&lt;&ndash;GNU Emacs</a></li>
+</ul>
+<div id="outline-container-Introduction" class="outline-2">
+<h2 id="Introduction"><span class="section-number-2">1.</span> Introduction</h2>
+<div class="outline-text-2" id="text-Introduction">
+<p>
+<span class="dropcap">D</span> unbar&rsquo;s number(s) may vary
+widely between individuals but what man hasn&rsquo;t been deluged by the onslaught of
+the information age? Here&rsquo;s how I try keep things under control. This article
+details the setup of my communication channels in Emacs on Debian GNU/Linux.
+Workflow configuration specific to myself is relegated to my dotfiles.
+</p>
+</div>
+</div>
+<div id="outline-container-org4905f1d" class="outline-2">
+<h2 id="org4905f1d"><span class="section-number-2">2.</span> Instant Messaging - Meta with Matrix and Ement</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+<a href="https://matrix.org/docs/matrix-concepts/elements-of-matrix/">Matrix</a> is a protocol for secure, decentralized real time communication in a
+similar fashion as Email. Three options exist:
+</p>
+
+<ol class="org-ol">
+<li>Self-host a Matrix server</li>
+<li>Hosted Matrix server at <a href="https://www.beeper.com/">beeper</a></li>
+<li>The <code>matrix.org</code> Matrix server (<a href="https://app.element.io/#/register">Create account here</a>)</li>
+</ol>
+
+<p>
+Options 1. and 2. can be <a href="https://matrix.org/ecosystem/bridges/">bridged to third party services</a> at your convenience
+while 3. has no bridging capabilities as of this writing. The focus of this
+article is option 1. although 2. <a href="https://www.reddit.com/r/emacs/comments/1crerbh/access_signalwhatsapp_messages_with_ement_via/">could be possible</a> to use with <a href="https://github.com/alphapapa/ement.el">Ement.el.</a> I am
+living the dream with Facebook messenger, WhatsApp and SMS bridged onto a
+self-hosted Matrix server. A server that has Emacs as the client on my computer
+and <a href="https://element.io/download">element</a> on mobile. The whole process shouldn&rsquo;t take you more than 1 hour. My
+own notes follow, hope that helps.
+</p>
+</div>
+<div id="outline-container-orgdad3207" class="outline-3">
+<h3 id="orgdad3207"><span class="section-number-3">2.1.</span> Matrix-synapse server Installation</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+Prerequisites:
+</p>
+
+<ul class="org-ul">
+<li>A domain name</li>
+<li>A (VPS) virtual private server with SSH access</li>
+<li>File editor to modify files on your VPS</li>
+</ul>
+
+<p>
+I am installing the Synapse (as of writing, v1.135.0) implementation of the
+Matrix protocol on Debian 13. Replace all instances of <code>matrix.bhw.name</code> with
+your domain name <code>matrix.example.com</code>. Matrix-synapse is not currently packaged
+for Debian 13 but was for Debian 12, therefore I am building from source. For a
+simpler Debian 12 version of this article see <a href="https://gitlab.com/bhw/project-isidore/-/blob/2f4d9517352862d21b4e19267f9bc91642859712/assets/blog/communication-setup-in-emacs.html">commit 2f4d9517</a>. The steps
+outlined here are only what&rsquo;s required for a single user to self-host a
+matrix-synapse server with user defined <a href="https://matrix.org/ecosystem/bridges/">bridges</a>. Look to <a href="https://docs.vultr.com/create-a-chat-server-using-matrix-synapse-and-element-on-debian-11">this tutorial</a> if you
+would like to add features like voice/video calling and to self-host the client
+as well.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">My server environment,
+</span>  uname -a
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Linux oci-a1-flex 6.12.38+deb13-cloud-arm64 #1 SMP Debian 6.12.38-1 (2025-07-16) aarch64 GNU/Linux
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">On the server machine,
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">https://element-hq.github.io/synapse/latest/setup/installation.html#platform-specific-prerequisites
+</span>  <span class="org-type">sudo</span> apt install build-essential python3-dev libffi-dev <span class="org-sh-escaped-newline">\</span>
+       python3-pip python3-setuptools sqlite3 <span class="org-sh-escaped-newline">\</span>
+       libssl-dev virtualenv libjpeg-dev libxslt1-dev
+  <span class="org-type">mkdir</span> -p /usr/local/src/matrix-synapse
+  <span class="org-type">cd</span> /usr/local/src/matrix-synapse
+  virtualenv -p python3 /usr/local/src/matrix-synapse/env
+  <span class="org-builtin">source</span> /usr/local/src/matrix-synapse/env/bin/activate
+  pip install --upgrade pip
+  pip install --upgrade setuptools
+  <span class="org-comment-delimiter"># </span><span class="org-comment">PostgreSQL database adapter for Python.
+</span>  pip install psycopg2-binary
+  pip install matrix-synapse
+  python -m synapse.app.homeserver <span class="org-sh-escaped-newline">\</span>
+         --server-name matrix.bhw.name <span class="org-sh-escaped-newline">\</span>
+         --config-path /usr/local/src/matrix-synapse/homeserver.yaml <span class="org-sh-escaped-newline">\</span>
+         --generate-config <span class="org-sh-escaped-newline">\</span>
+         --report-stats=yes
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Set up PostgreSQL Database.
+</span>  <span class="org-type">sudo</span> apt install postgresql
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Log into the PostgreSQL user.
+</span>  <span class="org-type">sudo</span> -su postgres
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Create a user synapse and a database synapse for PostgreSQL.
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">Remember the password in the next step.
+</span>  createuser --pwprompt synapse
+  createdb --encoding=UTF8 --locale=C --template=template0 --owner=synapse synapse
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Leave the postgres account.
+</span>  <span class="org-keyword">exit</span>
+</code></pre>
+</div>
+
+<p>
+<code>/usr/local/src/matrix-synapse/homeserver.yaml</code> is where we configure our
+matrix-synapse server. Please read through it, and if you are going to copy
+paste it, the minimal changes needed are to the <code>server_name</code> and <code>database</code>
+configurations.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-conf"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Configuration file for Synapse.
+</span>  <span class="org-comment-delimiter">#</span><span class="org-comment">
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">This is a YAML file: see [1] for a quick introduction. Note in particular
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">that *indentation is important*: all the elements of a list or dictionary
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">should have the same indentation.
+</span>  <span class="org-comment-delimiter">#</span><span class="org-comment">
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">[1] https://docs.ansible.com/ansible/latest/reference_appendices/YAMLSyntax.html
+</span>  <span class="org-comment-delimiter">#</span><span class="org-comment">
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">For more information on how to configure Synapse, including a complete accounting of
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">each option, go to docs/usage/configuration/config_documentation.md or
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">https://element-hq.github.io/synapse/latest/usage/configuration/config_documentation.html
+</span>  server_name: <span class="org-string">"matrix.bhw.name"</span>
+  pid_file: /usr/local/src/matrix-synapse/homeserver.pid
+  listeners:
+    - port: 8008
+      tls: false
+      type: http
+      x_forwarded: true
+      bind_addresses: [<span class="org-string">'::1'</span>, <span class="org-string">'127.0.0.1'</span>]
+      resources:
+        - names: [client, federation]
+          compress: false
+  presence:
+    enabled: false
+  database:
+    name: psycopg2
+    args:
+      user: synapse
+      password: yourpassword
+      database: synapse
+      host: localhost
+      cp_min: 5
+      cp_max: 10
+  log_config: <span class="org-string">"/usr/local/src/matrix-synapse/matrix.bhw.name.log.config"</span>
+  media_store_path: /usr/local/src/matrix-synapse/media_store
+  report_stats: true
+  signing_key_path: <span class="org-string">"/usr/local/src/matrix-synapse/matrix.bhw.name.signing.key"</span>
+  trusted_key_servers:
+    - server_name: <span class="org-string">"matrix.org"</span>
+
+  <span class="org-comment-delimiter"># </span><span class="org-comment">vim:ft=yaml</span>
+</code></pre>
+</div>
+
+<p>
+Allow inbound HTTPS traffic on port 443 and port 8448 if you desire to use
+<a href="https://element-hq.github.io/synapse/latest/federate.html">Matrix federation</a>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>  firewall-cmd --get-services
+  firewall-cmd --zone=public --permanent --add-port=443/tcp
+  firewall-cmd --zone=public --permanent --add-port=8448/tcp
+  firewall-cmd --reload
+  firewall-cmd --list-ports
+</code></pre>
+</div>
+
+<p>
+We are going to <a href="https://element-hq.github.io/synapse/latest/reverse_proxy.html?highlight=reverse%20proxy%20caddy#caddy-v2">reverse proxy the Matrix server with Caddy</a>. <code>sudo apt install
+caddy</code> and make sure <code>/etc/caddy/Caddyfile</code> includes the following content.
+Start Caddy with <code>systemctl start caddy.service</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-conf"><code>  <span class="org-type">matrix.bhw.name</span> {
+      reverse_proxy /_matrix/* localhost:8008
+      reverse_proxy /_synapse/client/* localhost:8008
+  }
+  matrix.bhw.name:8448 {
+      reverse_proxy /_matrix/* localhost:8008
+  }
+</code></pre>
+</div>
+
+<p>
+We can start the server and perform a quick sanity check by visiting from your
+web browser <a href="https://matrix.bhw.name/_matrix/">https://matrix.bhw.name/_matrix/</a>. You should get an error code
+response of &ldquo;Unrecognized request&rdquo;.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>  <span class="org-type">cd</span> /usr/local/src/matrix-synapse/
+  <span class="org-builtin">source</span> env/bin/activate
+  synctl start
+</code></pre>
+</div>
+
+<p>
+Now our aim is to create an administrator user. Since <a href="https://element-hq.github.io/synapse/latest/admin_api/register_api.html%20">shared secret registration</a>
+fails due to the nonce for me we will have to workaround this. Our plan is to
+upgrade a regular user to admin by directly editing the database. I create a
+regular user by first allowing registration without verification. This allows us
+to create a user without the hassle of CAPTCHA&rsquo;s or email verification. Opening
+my web browser to <a href="https://app.element.io/#/register">https://app.element.io/#/register</a> &ndash; note that we must change
+the &ldquo;Homeserver&rdquo; from <code>matrix.org</code> to <code>https://matrix.bhw.name</code> &ndash; and creating
+a user with a password will seem to hang and not complete. This is expected. The
+user has still been created. We will now return to our server shell and give our
+user <a href="https://element-hq.github.io/synapse/latest/usage/administration/admin_faq.html#how-do-i-become-a-server-admin%20">admin permissions</a>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>  <span class="org-type">sudo</span> -su postgres
+  psql -d synapse
+  UPDATE users SET admin = 1 WHERE name = <span class="org-string">'@yourusername:matrix.bhw.name'</span>;
+  <span class="org-keyword">exit</span>
+  <span class="org-keyword">exit</span>
+</code></pre>
+</div>
+
+<p>
+The last step is to automate the starting and stopping of the matrix-synapse
+server. The <a href="https://element-hq.github.io/synapse/latest/systemd-with-workers/index.html#setting-up-synapse-with-workers-and-systemd%20">docs</a> provide an exemplar as well as <a href="https://browse.dgit.debian.org/matrix-synapse.git/plain/contrib/systemd/matrix-synapse.service?h=archive/debian/1.78.0-1_bpo11%2B1%20">Debian</a>. Below is my current
+<code>/etc/systemd/system/matrix-synapse.service/</code> file. Do note that I run with
+<code>User</code> as <code>root</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-conf"><code>[<span class="org-type">Unit</span>]
+<span class="org-variable-name">Description</span>=Synapse Matrix homeserver
+<span class="org-comment-delimiter"># </span><span class="org-comment">If you are using postgresql to persist data, uncomment this line to make sure
+</span><span class="org-comment-delimiter"># </span><span class="org-comment">synapse starts after the postgresql service.
+</span><span class="org-variable-name">After</span>=postgresql.service
+
+[<span class="org-type">Service</span>]
+<span class="org-variable-name">Type</span>=notify
+<span class="org-variable-name">NotifyAccess</span>=main
+<span class="org-variable-name">User</span>=root
+<span class="org-variable-name">Group</span>=root
+<span class="org-variable-name">WorkingDirectory</span>=/usr/local/src/matrix-synapse/
+<span class="org-variable-name">ExecStart</span>=/usr/local/src/matrix-synapse/env/bin/python -m synapse.app.homeserver --config-path=/usr/local/src/matrix-synapse/homeserver.yaml
+<span class="org-variable-name">ExecReload</span>=/bin/kill -HUP $MAINPID
+<span class="org-variable-name">Restart</span>=always
+<span class="org-variable-name">RestartSec</span>=3
+<span class="org-variable-name">SyslogIdentifier</span>=matrix-synapse
+
+[<span class="org-type">Install</span>]
+<span class="org-variable-name">WantedBy</span>=matrix-synapse.target
+</code></pre>
+</div>
+
+<p>
+We can now treat <code>matrix-synapse</code> like any other systemd service.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>  systemctl enable matrix-synapse
+  systemctl restart matrix-synapse
+</code></pre>
+</div>
+
+<p>
+Now we can bridge to some 3rd party services!
+</p>
+</div>
+</div>
+<div id="outline-container-org3e386ca" class="outline-3">
+<h3 id="org3e386ca"><span class="section-number-3">2.2.</span> WhatsApp Bridge Installation</h3>
+<div class="outline-text-3" id="text-2-2">
+<p>
+Link our WhatsApp account and our Matrix server. Download the correct prebuilt
+executable for your architecture from the <a href="https://docs.mau.fi/bridges/go/setup.html?bridge=whatsapp#downloading-a-prebuilt-executable-from-ci">WhatsApp Bridge Documentation</a> and
+extract it to <code>/opt/mautrix-whatsapp/</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code><span class="org-comment-delimiter"># </span><span class="org-comment">Create folder if it doesn't exist. Note I am downloading arm64 executable.
+</span><span class="org-type">mkdir</span> /opt/mautrix-whatsapp/
+<span class="org-comment-delimiter"># </span><span class="org-comment">If updating, </span><span class="org-type"><span class="org-comment">make</span></span><span class="org-comment"> sure to 'systemctl stop mautrix-whatsapp'.
+</span><span class="org-type">curl</span> -L -o /opt/mautrix-whatsapp/mautrix-whatsapp https://github.com/mautrix/whatsapp/releases/download/v0.2604.0/mautrix-whatsapp-arm64
+<span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-meta/mautrix-meta https://github.com/mautrix/meta/releases/download/v0.2604.0/mautrix-meta-arm64
+</span><span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-gmessages/mautrix-gmessages https://github.com/mautrix/gmessages/releases/download/v0.2604.0/mautrix-gmessages-arm64
+</span><span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-slack/mautrix-slack https://github.com/mautrix/slack/releases/download/v0.2604.0/mautrix-slack-arm64
+</span><span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-gvoice/mautrix-gvoice https://github.com/mautrix/gvoice/releases/download/v0.2604.0/mautrix-gvoice-arm64
+</span><span class="org-type">cd</span> /opt/mautrix-whatsapp
+<span class="org-comment-delimiter"># </span><span class="org-comment">Grant executable permissiosn to the "mautrix-whatsapp" go executable.
+</span><span class="org-type">chmod</span> +x mautrix-whatsapp
+<span class="org-comment-delimiter"># </span><span class="org-comment">Generate an example config file.
+</span>./mautrix-whatsapp -e
+</code></pre>
+</div>
+
+<p>
+Open <code>config.yaml</code> in your favourite editor and you will have to edit the
+<a href="https://docs.mau.fi/bridges/general/initial-config.html">following options</a> inside that file. Note <code>dbuser</code> and <code>dbpass</code> are the
+same as the postgresql setup you initially performed for <code>matrix-synapse</code>. But
+<code>dbname</code> cannot be <code>synapse</code> as that is used by the homeserver. The <code>dbname</code>
+must be created specifically for <code>mautrix-whatsapp</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code><span class="org-comment-delimiter"># </span><span class="org-comment">Log into the PostgreSQL user.
+</span><span class="org-type">sudo</span> -su postgres
+<span class="org-comment-delimiter"># </span><span class="org-comment">Create a database mautrix-whatsapp
+</span>createdb --encoding=UTF8 --locale=C --template=template0 --owner=synapse mautrix-whatsapp
+</code></pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-yaml"><code>  # For mautrix-meta you will need to specify
+  # network:
+  #    mode: facebook (or instagram)
+  # https://docs.mau.fi/bridges/general/initial-config.html#mautrix-meta
+  homeserver:
+      address: http://localhost:8008
+      domain: matrix.bhw.name
+  appservice:
+      database:
+          # OR type: sqlite3-fk-wal
+          type: postgres
+          # OR uri: file:/var/lib/tuwunel/mautrix-whatsapp-db?_txlock=immediate
+          uri: postgres://dbuser:dbpass@localhost/dbname?sslmode=disable
+  bridge:
+      permissions:
+          "matrix.bhw.name": user
+          "@ben:matrix.bhw.name": admin
+</code></pre>
+</div>
+
+<p>
+Now we can generate an appservice registration file.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Generate the appservice registration file.
+</span>  <span class="org-type">cd</span> /opt/mautrix-whatsapp/
+  ./mautrix-whatsapp -g
+  <span class="org-type">chmod</span> 644 registration.yaml
+</code></pre>
+</div>
+
+<p>
+If one is not using matrix-synapse as a homeserver, then look up how appservices
+are configured on your particular matrix implementation. i.e. <a href="https://matrix-construct.github.io/tuwunel/appservices.html">Appservices -
+Tuwunel One</a>. Edit file at <code>/usr/local/src/matrix-synapse/homeserver.yaml</code> with
+the following contents,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-yaml"><code>  app_service_config_files:
+    - /opt/mautrix-whatsapp/registration.yaml
+    # Any other bridge registrations.
+    #- /opt/mautrix-gmessages/registration.yaml
+    #- /opt/mautrix-meta/registration.yaml
+</code></pre>
+</div>
+
+<p>
+Restart matrix-synapse <code>systemctl restart matrix-synapse</code> to confirm it works.
+Then create a systemd service file at
+<code>/etc/systemd/system/mautrix-whatsapp.service</code>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-conf"><code>  [<span class="org-type">Unit</span>]
+  <span class="org-variable-name">Description</span>=mautrix-whatsapp bridge
+
+  [<span class="org-type">Service</span>]
+  <span class="org-variable-name">Type</span>=exec
+  <span class="org-variable-name">User</span>=root
+  <span class="org-variable-name">WorkingDirectory</span>=/opt/mautrix-whatsapp
+  <span class="org-variable-name">ExecStart</span>=/opt/mautrix-whatsapp/mautrix-whatsapp
+  <span class="org-variable-name">Restart</span>=on-failure
+  <span class="org-variable-name">RestartSec</span>=30s
+
+  [<span class="org-type">Install</span>]
+  <span class="org-variable-name">WantedBy</span>=multi-user.target
+</code></pre>
+</div>
+
+<p>
+Enable and start the <code>mautrix-whatsapp.service</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Will start this service at boot.
+</span>  systemctl enable mautrix-whatsapp.service
+  systemctl start mautrix-whatsapp.service
+  <span class="org-comment-delimiter"># </span><span class="org-comment">When updating bridge, restart matrix-synapse as well
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">systemctl restart matrix-synapse</span>
+</code></pre>
+</div>
+
+<p>
+Login to <a href="https://app.element.io/#/login">https://app.element.io/#/login</a> and refer to the <a href="https://docs.mau.fi/bridges/go/whatsapp/authentication.html">documentation</a> for
+initial setup. In my experience, all mautrix bridges are excellent. After this
+setup tutorial, other bridges such as Meta and Google Messenger are similar. Do
+note that <code>/etc/matrix-synapse/conf.d/bridge-registration.yaml</code> must contain a
+list of all appservice registrations you wish to make on your homeserver. Also
+note that <code>mautrix-meta</code> requires <a href="https://docs.mau.fi/bridges/general/initial-config.html#bridge-specific-mandatory-fields">extra configuration</a>. For <code>mautrix-gvoice</code> you
+should login as with <code>mautrix-meta</code> but copy as cURL (bash) the network XHR
+request, <code>log?format=json&amp;hasfast=true&amp;authuser=0</code>, and paste it to the bot to
+login.
+</p>
+</div>
+</div>
+<div id="outline-container-org8ce44a2" class="outline-3">
+<h3 id="org8ce44a2"><span class="section-number-3">2.3.</span> Conclusion</h3>
+<div class="outline-text-3" id="text-2-3">
+<p>
+Install <a href="https://github.com/alphapapa/ement.el">ement.el</a> and login,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><code>  <span class="org-comment-delimiter">;; </span><span class="org-comment">First login; subsequent logins will used a cached session if
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">ement-save-sessions</span></span><span class="org-comment">' is TRUE. Also run `</span><span class="org-comment"><span class="org-constant">ement-disconnect</span></span><span class="org-comment">'
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">to save login in `</span><span class="org-comment"><span class="org-constant">~/.cache/ement.el</span></span><span class="org-comment">'
+</span>  (<span class="org-constant">ement-connect</span> <span class="org-builtin">:user-id</span> <span class="org-string">"@ben:matrix.bhw.name"</span>
+                 <span class="org-builtin">:password</span>  <span class="org-string">"password"</span>
+                 <span class="org-builtin">:uri-prefix</span> <span class="org-string">"https://matrix.bhw.name"</span>)
+</code></pre>
+</div>
+
+<p>
+My own <a href="../dotemacs.html#ID-20220829T170131.891099">config</a> is available <a href="https://www.bhw.name/assets/blog/dotspacemacs.html">here.</a> Three parting thoughts. I am somewhat
+optimistic about Matrix&rsquo;s longevity <a href="https://element.io/case-studies/bundeswehr">as the German armed forces has adopted the
+standard.</a> Secondly, Emacs users often have to deal with their complex
+configurations falling apart on mobile phones but this is not that case with the
+<a href="https://element.io/download">element client available on android</a>. Last but not least, is my thanks for the
+many hours of love poured in by these open source developers &lt;3.
+</p>
+
+<p>
+References
+</p>
+
+<p>
+<a href="https://docs.vultr.com/create-a-chat-server-using-matrix-synapse-and-element-on-debian-11">Create a Chat Server Using Matrix Synapse and Element on Debian 11 | Vultr Docs</a>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-org8a296db" class="outline-2">
+<h2 id="org8a296db"><span class="section-number-2">3.</span> Email - GMail with Mbsync and Mu4e</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+<a href="https://wiki.archlinux.org/title/isync">Mbsync</a> synchronizes email from your <a href="https://www.cloudflare.com/learning/email-security/what-is-imap/">IMAP</a> server (Gmail/Outlook/<a href="https://proton.me/blog/email-is-your-digital-id">Proton</a>) and
+stores it locally as specified in <code>~/.mbsyncrc</code>. <a href="https://www.djcbsoftware.nl/code/mu/">Mu</a> uses the open source <a href="https://xapian.org/">Xapian</a>
+to index the local email database. Mu4e (Mu for Emacs) provides an user
+interface. <a href="https://wiki.archlinux.org/title/sendmail">Sendmail</a> manages the connection with the remote <a href="https://www.cloudflare.com/learning/email-security/what-is-smtp/">SMTP</a> servers during
+the sending of email, selecting the server according to the email specified in
+the &ldquo;from&rdquo; field of the outgoing mail. One can specify more than one address.
+</p>
+
+<p>
+Operation Analogy (<a href="https://explained-from-first-principles.com/email/%20">detailed explanation</a>):
+</p>
+
+<ol class="org-ol">
+<li>Getting mail (the mail truck filling mailbox) : mbsync</li>
+<li>Indexing and reading mail (inbox tray &amp; your office desk): mu + mu4e</li>
+<li>Sending mail (Dropping envelope off to post office): sendmail</li>
+</ol>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">My workstation environment,
+</span>  uname -a
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Linux bhw-yoga 6.6.87.2-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025 x86_64 GNU/Linux
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">Isync is the name of the program, but mbsync is the name of the binary.
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">See and tangle .mbsyncrc in dotfiles.org.
+</span>  <span class="org-type">sudo</span> apt install mu4e gnutls-bin sendmail isync
+</code></pre>
+</div>
+
+<p>
+<code>dotfiles.org</code> is not public, but here is the relevant excerpt. Please note to
+access the Gmail mail server you need an <a href="https://irreal.org/blog/?p=9501">app password.</a> <code>M-x Woman RET mbsync</code> to
+read isync&rsquo;s manpage to understand what&rsquo;s going on. I do not delete email,
+instead I mark it as read and move it out of my inbox to &ldquo;All mail&rdquo;.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-conf"><code>  IMAPAccount gmail
+  Host imap.gmail.com
+  User myemailaddress@gmail.com
+  Pass p@ssword
+  SSLType IMAPS
+  PipelineDepth 1
+
+  IMAPStore gmail-remote
+  Account gmail
+
+  MaildirStore gmail-local
+  Path /home/ben/project-jerome/email-archive/
+  Inbox /home/ben/project-jerome/email-archive/inbox/
+  SubFolders Verbatim
+
+  Channel gmail
+  Master :gmail-remote:
+  Slave :gmail-local:
+  Patterns * ![Gmail]* !inbox <span class="org-string">"[Gmail]/All Mail"</span>
+  Create Slave
+  Sync PullNew
+  CopyArrivalDate yes
+  SyncState *
+</code></pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Inital sync will take much longer than consequent syncs.
+</span>  mbsync -a -V
+  <span class="org-comment-delimiter"># </span><span class="org-comment">See mu4e manual section 2.4
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">https://www.djcbsoftware.nl/code/mu/mu4e/
+</span>  mu init --maildir=~/project-jerome/email-archive/ --my-address=myemailaddress@gmail.com
+  mu index
+</code></pre>
+</div>
+
+<ul class="org-ul">
+<li class="on"><code>[X]</code> Install the <a href="https://develop.spacemacs.org/layers/+email/mu4e/README.html">mu4e layer</a>. <code>mu4e=installation-path</code> is
+&ldquo;/usr/share/emacs/site-lisp/elpa/mu4e-1.10.8&rdquo;</li>
+<li class="on"><code>[X]</code> Install the <a href="https://www.spacemacs.org/layers/+emacs/org/README.html">org layer</a> (for the included <a href="https://github.com/org-mime/org-mime">org-mime</a> package)</li>
+</ul>
+
+<p>
+For my usage patterns, <a href="https://www.bhw.name/assets/blog/dotspacemacs.html">see heading &ldquo;Mu4e Config&rdquo;.</a> Maybe I&rsquo;ll <a href="https://taoshu.in/net/selfhost-email.html">self-host</a> someday?
+</p>
+</div>
+<div id="outline-container-org30db46b" class="outline-3">
+<h3 id="org30db46b"><span class="section-number-3">3.1.</span> Viewing HTML email in your internet browser</h3>
+<div class="outline-text-3" id="text-3-1">
+<p>
+Microsoft Edge browser disables viewing <code>file://</code> links by <a href="https://textslashplain.com/2021/03/29/per-site-permissions-in-edge/">default</a> for <a href="https://textslashplain.com/2019/10/09/navigating-to-file-urls/">security
+reasons</a>. To <a href="https://textslashplain.com/2020/08/24/managing-edge-via-policy/%20">configure Microsoft Edge</a> to allow this, we must <a href="https://learn.microsoft.com/en-us/deployedge/configure-microsoft-edge%20">download and
+install the Microsoft Edge administrative template</a>. Then we edit the registry
+as shown in the <a href="https://learn.microsoft.com/en-us/deployedge/microsoft-edge-policies#intranetfilelinksenabled">documentation</a>, creating a new regkey at
+<code>Computer\HKEY_LOCAL_MACHINE\SOFTWARE\Policies|Microsoft\Edge</code> and creating a
+new <code>REG_DWORD</code> key <code>IntranetFileLinksEnabled</code> set the data to <code>1</code>. Then we
+press <code>WindowsKey + r</code> and run <code>gpedit.msc</code> to open the &ldquo;Local Group Policy
+Editor&rdquo; and navigate to &ldquo;Computer Configuration/Administrative
+Templates/Microsoft Edge/Content settings/Allow intranet zone file URL links
+from Microsoft Edge to open in Windows File Explorer/&rdquo; and enable it. Last but
+not least, make sure in Windows settings, that <code>Apps/Default Apps/Microsft Edge</code>
+has set the default file types or link types for &ldquo;.html&rdquo;. Lastly we must prepend
+<code>file://///wsl$/Debian/</code> instead of the default <code>file:///</code> to access Debian
+files through Windows.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><code>  (<span class="org-keyword">setf</span> <span class="org-variable-name">browse-url-generic-program</span>  <span class="org-string">"/mnt/c/Windows/System32/cmd.exe"</span>
+        <span class="org-variable-name">browse-url-generic-args</span>     <span class="org-highlight-quoted-quote">'</span>(<span class="org-string">"/c"</span> <span class="org-string">"start"</span>)
+        <span class="org-variable-name">browse-url-browser-function</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">browse-url-generic</span>
+        <span class="org-comment-delimiter">;; </span><span class="org-comment">Needed for `</span><span class="org-comment"><span class="org-constant">mu4e-action-view-in-browser</span></span><span class="org-comment">'
+</span>        <span class="org-variable-name">browse-url-filename-alist</span>
+        <span class="org-highlight-quoted-quote">'</span>((<span class="org-string">"^/</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">ftp@</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">anonymous@</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">?</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">[</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">:/]+</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">:/*"</span> . <span class="org-string">"ftp://\\2/"</span>)
+          (<span class="org-string">"^/</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">[</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">:@/]+@</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">?</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">[</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">:/]+</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">:/*"</span> . <span class="org-string">"ftp://\\1\\2/"</span>)
+          <span class="org-comment-delimiter">;; </span><span class="org-comment">For gnus-article-browse-html-article on Windows Subsystem for Linux.
+</span>          (<span class="org-string">"^/+"</span> . <span class="org-string">"file://///wsl$/Debian/"</span>)))
+</code></pre>
+</div>
+
+<p>
+References
+</p>
+
+<p>
+<a href="https://www.kmjn.org/notes/unix_style_mail_tools.html">Search-oriented tools for Unix-style mail | Mark J. Nelson</a>
+<a href="https://www.youtube.com/watch?v=yZRyEhi4y44">Streamline Your E-mail Management with mu4e - Emacs Mail - YouTube</a>
+<a href="https://www.ict4g.net/adolfo/notes/emacs/reading-imap-mail-with-emacs.html">Reading IMAP email in Emacs</a>
+<a href="https://tushartyagi.com/blog/configure-mu4e-and-msmtp/">Configure mu4e and msmtp - Tushar Tyagi</a>
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-org6d375b6" class="outline-2">
+<h2 id="org6d375b6"><span class="section-number-2">4.</span> Web logs &amp; Web feeds - Org Publish and Elfeed</h2>
+<div class="outline-text-2" id="text-4">
+<p>
+I am aware of two options to read RSS/atom feeds in Emacs. <a href="https://www.emacswiki.org/emacs/GnusRss">GNUS with the nnrss
+backend</a> and <a href="https://github.com/skeeto/elfeed">elfeed</a>. Having used both, I prefer elfeed. If I could wave a magic
+wand, I would make GNUS non-blocking/giving Emacs a concurrency story a la
+Common Lisp. Install the elfeed package or <a href="https://develop.spacemacs.org/layers/+readers/elfeed/README.html">layer</a>. A couple of tips,
+</p>
+
+<ul class="org-ul">
+<li>Convert email newsletters to RSS with <a href="https://kill-the-newsletter.com/">https://kill-the-newsletter.com/</a>.</li>
+<li>Get transcripts of youtube feeds with <a href="https://github.com/karthink/elfeed-tube">elfeed tube</a>.</li>
+</ul>
+
+<p>
+<a href="https://orgmode.org/worg/org-tutorials/org-publish-html-tutorial.html">Org Publish</a> is my preferred software for blogging because it allows my blog
+articles to continue as my part of my personal notes, integrated with my
+<a href="https://en.wikipedia.org/wiki/Personal_knowledge_base">personal knowledge base</a> and my TODO lists. This reduces the publishing friction
+to near zero. For single author blogs, I&rsquo;d say this is the most important factor
+to keep your articles up to date. A little garden on the world wide web you
+curate for the sake of the whole online ecosystem.
+</p>
+
+<p>
+See <a href="https://www.bhw.name/assets/blog/dotspacemacs.html">the &ldquo;Elfeed config&rdquo;, and &ldquo;Ox Publish Config&rdquo; headings for usage</a>.
+</p>
+
+<p>
+I have ordered these subheadings (Instant Messaging &gt; Email &gt; News &amp; Blogs) by
+increasing length of both response time and content. You can imagine that
+various author(s) have created great literature representing the eternal word
+and truths that we spend the rest of our lives communicating with through words
+and actions, though often it takes time to digest these. Emacs, of course, can
+help with that :). A future blog article shall be on just that; how I use Emacs
+to assist in taking notes on books, spaced repetition and concept mapping.
+</p>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<script>
+                              const headers = Array.from( document.querySelectorAll('h2, h3, h4, h5, h6') );
+
+                              headers.forEach( header => {
+                                header.insertAdjacentHTML('afterbegin',
+                                 '<a href="#table-of-contents">&#8689;</a>'
+                                );
+                              });
+                              </script>
+                              <hr/>
+                              <footer>
+                                <div class="copyright-container">
+                                    Comments? Corrections? <a href="https://bhw.name/contact"> Please do reach out.</a><a href="https://bhw.name/assets/blog/atom.xml"> RSS Feed. </a><a href="https://bhw.name/subscribe"> Mailing List. </a><br/>
+                                    Copyright 2021 Benedict H. Wang. <br/>
+                                    Blog content is available under <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"> CC-BY-SA 4.0 </a> unless otherwise noted.<br/>
+                                    Created with <a href="https://www.gnu.org/software/emacs/">Emacs</a> 30.1 (<a href="https://orgmode.org">Org</a> mode 9.8.2) on <a href="https://www.gnu.org">GNU</a>/<a href="https://www.kernel.org/">Linux</a><br/>
+                                </div>
+                              </footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentScriptType="application/ecmascript" contentStyleType="text/css" height="282px" preserveAspectRatio="none" style="width:227px;height:282px;" version="1.1" viewBox="0 0 227 282" width="227px" zoomAndPan="magnify"><defs><filter height="300%" id="fgdco8xv9dnxy" width="300%" x="-1" y="-1"><feGaussianBlur result="blurOut" stdDeviation="2.0"/><feColorMatrix in="blurOut" result="blurOut2" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .4 0"/><feOffset dx="4.0" dy="4.0" in="blurOut2" result="blurOut3"/><feBlend in="SourceGraphic" in2="blurOut3" mode="normal"/></filter></defs><g><rect fill="#FEFECE" filter="url(#fgdco8xv9dnxy)" height="33.9688" style="stroke: #A80036; stroke-width: 1.5;" width="43" x="6" y="8"/><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacingAndGlyphs" textLength="29" x="13" y="21.1387">Alice</text><line style="stroke: #A80036; stroke-width: 1.5;" x1="7" x2="48" y1="25.9688" y2="25.9688"/><rect fill="#FEFECE" filter="url(#fgdco8xv9dnxy)" height="33.9688" style="stroke: #A80036; stroke-width: 1.5;" width="38" x="91.5" y="8"/><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacingAndGlyphs" textLength="24" x="98.5" y="21.1387">Bob</text><line style="stroke: #A80036; stroke-width: 1.5;" x1="92.5" x2="128.5" y1="25.9688" y2="25.9688"/><rect fill="#FEFECE" filter="url(#fgdco8xv9dnxy)" height="33.9688" style="stroke: #A80036; stroke-width: 1.5;" width="46" x="170.5" y="8"/><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacingAndGlyphs" textLength="32" x="177.5" y="21.1387">Chad</text><line style="stroke: #A80036; stroke-width: 1.5;" x1="171.5" x2="215.5" y1="25.9688" y2="25.9688"/><rect fill="#FEFECE" filter="url(#fgdco8xv9dnxy)" height="37.6094" style="stroke: #A80036; stroke-width: 1.5;" width="102" x="59.5" y="119"/><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacingAndGlyphs" textLength="88" x="66.5" y="132.1387">CaddyPort443</text><line style="stroke: #A80036; stroke-width: 1.5;" x1="60.5" x2="160.5" y1="136.9688" y2="136.9688"/><text fill="#000000" font-family="sans-serif" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="70" x="65.5" y="150.251">Debian Server</text><rect fill="#FEFECE" filter="url(#fgdco8xv9dnxy)" height="37.6094" style="stroke: #A80036; stroke-width: 1.5;" width="154" x="33.5" y="234"/><text fill="#000000" font-family="sans-serif" font-size="12" lengthAdjust="spacingAndGlyphs" textLength="140" x="40.5" y="247.1387">HunchentootPort8080</text><line style="stroke: #A80036; stroke-width: 1.5;" x1="34.5" x2="186.5" y1="251.9688" y2="251.9688"/><text fill="#000000" font-family="sans-serif" font-size="10" lengthAdjust="spacingAndGlyphs" textLength="70" x="39.5" y="265.251">Debian Server</text><!--MD5=[e04dfb566ffaa86765efea065fc3f400]
+link Alice to CaddyPort443--><path d="M32.44,42.03 C37.06,55.41 44.84,74.55 55.5,89 C62.74,98.82 72.31,108.04 81.44,115.72 " fill="none" id="Alice-&gt;CaddyPort443" style="stroke: #A80036; stroke-width: 1.0;"/><polygon fill="#A80036" points="85.31,118.92,80.918,110.1046,81.4549,115.736,75.8236,116.2728,85.31,118.92" style="stroke: #A80036; stroke-width: 1.0;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="41" x="56.5" y="85.0669">HTTPS</text><!--MD5=[40c59851420c68f8497e27c119bad49f]
+link Bob to CaddyPort443--><path d="M109.19,42.17 C108.54,50.98 107.82,62.08 107.5,72 C107.05,85.83 107.72,101.31 108.54,113.69 " fill="none" id="Bob-&gt;CaddyPort443" style="stroke: #A80036; stroke-width: 1.0;"/><polygon fill="#A80036" points="108.89,118.79,112.2367,109.5272,108.5327,113.8028,104.2572,110.0988,108.89,118.79" style="stroke: #A80036; stroke-width: 1.0;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="41" x="108.5" y="85.0669">HTTPS</text><!--MD5=[087a01ce4c30636bf73f7bee34c86595]
+link Chad to CaddyPort443--><path d="M184.67,42.07 C177.23,55.14 165.99,73.82 154.5,89 C147.81,97.83 139.8,106.93 132.46,114.8 " fill="none" id="Chad-&gt;CaddyPort443" style="stroke: #A80036; stroke-width: 1.0;"/><polygon fill="#A80036" points="128.91,118.56,137.9911,114.7477,132.3368,114.919,132.1655,109.2647,128.91,118.56" style="stroke: #A80036; stroke-width: 1.0;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="41" x="166.5" y="85.0669">HTTPS</text><!--MD5=[4e034090c0b32ab27dec26b56029c574]
+link CaddyPort443 to HunchentootPort8080--><path d="M110.5,157.16 C110.5,176.6 110.5,207.5 110.5,228.72 " fill="none" id="CaddyPort443-&gt;HunchentootPort8080" style="stroke: #A80036; stroke-width: 1.0;"/><polygon fill="#A80036" points="110.5,233.89,114.5,224.89,110.5,228.89,106.5,224.89,110.5,233.89" style="stroke: #A80036; stroke-width: 1.0;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacingAndGlyphs" textLength="32" x="111.5" y="200.0669">HTTP</text><!--MD5=[adfcb34468e32e384dae1218a28a85b4]
+@startuml
+object Alice
+object Bob
+object Chad
+object CaddyPort443
+CaddyPort443 : Debian Server
+object HunchentootPort8080
+HunchentootPort8080 : Debian Server
+
+Alice  - -> CaddyPort443 : HTTPS
+Bob - -> CaddyPort443 : HTTPS
+Chad - -> CaddyPort443 : HTTPS
+CaddyPort443 - -> HunchentootPort8080 : HTTP
+@enduml
+
+PlantUML version 1.2020.02(Sun Mar 01 05:22:07 EST 2020)
+(GPL source distribution)
+Java Runtime: OpenJDK Runtime Environment
+JVM: OpenJDK 64-Bit Server VM
+Java Version: 17.0.8+7-Debian-1deb12u1
+Operating System: Linux
+Default Encoding: UTF-8
+Language: en
+Country: US
+--></g></svg>

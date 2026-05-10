@@ -1,4 +1,9 @@
+acclimation, ghcr.io/ocicl/acclimation@sha256:f6f7b6782ea4fa53b86f23cf169f06f16a441000e5512955f0ef6ab065adbe4b, acclimation-20251218-9339b92/acclimation.asd
+acclimation-temperature, ghcr.io/ocicl/acclimation@sha256:f6f7b6782ea4fa53b86f23cf169f06f16a441000e5512955f0ef6ab065adbe4b, acclimation-20251218-9339b92/Temperature/acclimation-temperature.asd
+agnostic-lizard, ghcr.io/ocicl/agnostic-lizard@sha256:ba53fa8902631ec0f06f04d0e0ee609a1d01080390bd7d6f133620c26e7961b1, agnostic-lizard-20240503-fe1a1d7/agnostic-lizard.asd
+agnostic-lizard-debugger-prototype, ghcr.io/ocicl/agnostic-lizard@sha256:ba53fa8902631ec0f06f04d0e0ee609a1d01080390bd7d6f133620c26e7961b1, agnostic-lizard-20240503-fe1a1d7/agnostic-lizard-debugger-prototype.asd
 alexandria, ghcr.io/ocicl/alexandria@sha256:e433c2e076ed3bcf8641b97b00192680db2201d305efac9293539dee88c7fbf7, alexandria-20240503-8514d8e/alexandria.asd
+asdf-package-system, ghcr.io/ocicl/asdf-package-system@sha256:dfacc260786f4e9e2aa13a797a7b326b58e08ea5db778421a9985b9c67362df1, asdf-package-system-20240503-61776f2/asdf-package-system.asd
 atomics, ghcr.io/ocicl/atomics@sha256:47645f75191931211547cdcf578a40b24019d58f48c83d93e9055aec79c877fd, atomics-20260218-ce398c4/atomics.asd
 atomics-test, ghcr.io/ocicl/atomics@sha256:47645f75191931211547cdcf578a40b24019d58f48c83d93e9055aec79c877fd, atomics-20260218-ce398c4/atomics-test.asd
 autoload, ghcr.io/ocicl/mgl-pax-bootstrap@sha256:1c15644701ad5b8e441b2724c265c995437052beb52322c447816c3cc17c564a, mgl-pax-20260313-f7f9414/autoload/autoload.asd
@@ -65,6 +70,9 @@ documentation-utils, ghcr.io/ocicl/documentation-utils@sha256:b2a1b3f3bcd1a738af
 dref, ghcr.io/ocicl/mgl-pax-bootstrap@sha256:1c15644701ad5b8e441b2724c265c995437052beb52322c447816c3cc17c564a, mgl-pax-20260313-f7f9414/dref/dref.asd
 dref-test, ghcr.io/ocicl/mgl-pax-bootstrap@sha256:1c15644701ad5b8e441b2724c265c995437052beb52322c447816c3cc17c564a, mgl-pax-20260313-f7f9414/dref/dref-test.asd
 dref-test-package-inferred, ghcr.io/ocicl/mgl-pax-bootstrap@sha256:1c15644701ad5b8e441b2724c265c995437052beb52322c447816c3cc17c564a, mgl-pax-20260313-f7f9414/dref/test/data/dref-test-package-inferred.asd
+eclector, ghcr.io/ocicl/eclector@sha256:94f241b463feffde564d77a17a9d8381fe97d553900dbe36bac0c6a292269c1f, Eclector-20260128-b2b22cd/eclector.asd
+eclector-concrete-syntax-tree, ghcr.io/ocicl/eclector@sha256:94f241b463feffde564d77a17a9d8381fe97d553900dbe36bac0c6a292269c1f, Eclector-20260128-b2b22cd/eclector-concrete-syntax-tree.asd
+eclector.syntax-extensions, ghcr.io/ocicl/eclector@sha256:94f241b463feffde564d77a17a9d8381fe97d553900dbe36bac0c6a292269c1f, Eclector-20260128-b2b22cd/eclector.syntax-extensions.asd
 event-emitter, ghcr.io/ocicl/event-emitter@sha256:dc8a9abdd0ec681dcb611dddfe0b2e037dc60ac3cab6bbffbc438e803f0217bd, event-emitter-20240607-d8bd3d9/event-emitter.asd
 event-emitter-benchmark, ghcr.io/ocicl/event-emitter@sha256:dc8a9abdd0ec681dcb611dddfe0b2e037dc60ac3cab6bbffbc438e803f0217bd, event-emitter-20240607-d8bd3d9/event-emitter-benchmark.asd
 event-emitter-test, ghcr.io/ocicl/event-emitter@sha256:dc8a9abdd0ec681dcb611dddfe0b2e037dc60ac3cab6bbffbc438e803f0217bd, event-emitter-20240607-d8bd3d9/event-emitter-test.asd

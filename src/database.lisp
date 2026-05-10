@@ -9,7 +9,9 @@
   (:export
    #:*database*
    #:*bible-database*
+   #:data-root
    #:database-path
+   #:index-path
 
    #:bible-metadata
    #:book-numbers-of #:chapter-urls-of #:book-urls-of
@@ -50,24 +52,39 @@
   (:documentation
    "Project Isidore database setup and teardown.
 Manages two graph-db (Vivace Graph V3) stores:
-  *BIBLE-DATABASE* — vendored, read-only at runtime, ships in data/graph-db/bible/.
-  *DATABASE*       — general-purpose runtime CRUD store at $PROJECT_ISIDORE_DB
-                     (or $XDG_DATA_HOME/project-isidore/ by default).
+  *BIBLE-DATABASE* — read-only at runtime, lives at /var/local/project-isidore/graph-db/bible/.
+  *DATABASE*       — general-purpose runtime CRUD store at <data-root>/graph-db/.
+Both *DATABASE* and the Montezuma search index resolve relative to a single
+data root (DATA-ROOT): $PROJECT_ISIDORE_DATA, falling back to
+$XDG_DATA_HOME/project-isidore/.
 Defines the persistent vertex schema."))
 
 (in-package #:project-isidore/database)
 
-(defun database-path ()
-  "Return the directory pathname for the general-purpose CRUD graph-db.
-Honors PROJECT_ISIDORE_DB; falls back to $XDG_DATA_HOME/project-isidore/."
-  (let ((env (uiop:getenvp "PROJECT_ISIDORE_DB")))
+(defun data-root ()
+  "Return the directory pathname for project persistent data.
+Honors PROJECT_ISIDORE_DATA; falls back to $XDG_DATA_HOME/project-isidore/.
+Both DATABASE-PATH and INDEX-PATH derive from this so a single env var
+locates everything (e.g. /var/local/project-isidore/ in production)."
+  (let ((env (uiop:getenvp "PROJECT_ISIDORE_DATA")))
     (if env
         (uiop:ensure-directory-pathname env)
         (uiop:xdg-data-home "project-isidore/"))))
 
+(defun database-path ()
+  "Return the directory pathname for the general-purpose CRUD graph-db.
+Lives at <data-root>/graph-db/."
+  (merge-pathnames "graph-db/" (data-root)))
+
+(defun index-path ()
+  "Return the directory pathname for the Montezuma search index.
+Lives at <data-root>/montezuma/."
+  (merge-pathnames "montezuma/" (data-root)))
+
 (defun bible-graph-path ()
-  "Return the directory pathname for the vendored bible graph-db store."
-  (asdf:system-relative-pathname :project-isidore "data/graph-db/bible/"))
+  "Return the directory pathname for the bible graph-db store.
+Same path in development and production."
+  #p"/var/local/project-isidore/graph-db/bible/")
 
 (defun open-or-make-graph (name path)
   "Open the graph at PATH if it has a schema, else create a fresh one.
@@ -305,7 +322,7 @@ Eagerly hydrates the vertex's data alist (see BIBLE-OBJ-WITH-ID)."
 
 (defun reopen-database ()
   "Reopen the general-purpose CRUD graph-db after sb-ext:save-lisp-and-die.
-Re-resolves DATABASE-PATH so PROJECT_ISIDORE_DB takes effect even when
+Re-resolves DATABASE-PATH so PROJECT_ISIDORE_DATA takes effect even when
 the binary was built against a different path."
   (setf *database*
         (open-or-make-graph :isidore-crud (database-path)))

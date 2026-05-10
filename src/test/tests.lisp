@@ -206,6 +206,30 @@ production server."
   (test:true (listp (pi:search-bible "xyzzyplugh99999"))))
 
 ;;; =====================================================================
+;;; resolve-bible-path
+;;; =====================================================================
+
+(test:define-test resolve-bible-path-symbolic-single-verse
+  :description "Symbolic single-verse path resolves to a one-element UID list."
+  :parent master-suite
+  (let ((result (project-isidore/webserver::resolve-bible-path "/bible/matthew-1-2")))
+    (test:true (listp result))
+    (test:is = 1 (length result))
+    (test:is = (pi:get-bible-uid 47 1 2) (first result))))
+
+(test:define-test resolve-bible-path-symbolic-range
+  :description "Symbolic range path resolves to a contiguous UID list."
+  :parent master-suite
+  (let* ((result (project-isidore/webserver::resolve-bible-path
+                  "/bible/genesis-1-1/genesis-1-3"))
+         (start  (pi:get-bible-uid 1 1 1))
+         (end    (pi:get-bible-uid 1 1 3)))
+    (test:true (listp result))
+    (test:is = (1+ (- end start)) (length result))
+    (test:is = start (first result))
+    (test:is = end (car (last result)))))
+
+;;; =====================================================================
 ;;; View pages complete without error
 ;;; =====================================================================
 

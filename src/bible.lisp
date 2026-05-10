@@ -322,7 +322,7 @@ Example:
 
 (defparameter *search-index*
   (make-instance 'search-engine:index
-                 :path (asdf:system-relative-pathname :project-isidore "data/montezuma/")
+                 :path (index-path)
                  :default-field "*"
                  :fields '("b" "c" "v" "t" "f" "x"))
   "Used in `search-bible' to query Bible data. Since `sb-ext:save-lisp-and-die'
@@ -347,11 +347,10 @@ Bible unique ID's and a relevance score "
   " To create an executable binary, MAKE.LISP calls
 `sb-ext:save-lisp-and-die', which closes all open file streams. We open
 `*search-index*', `*bible-database*', and `*database*' again upon application
-start. `reopen-database' re-resolves PROJECT_ISIDORE_DB so a binary built
-locally can run against /var/lib/project-isidore/ on production."
+start. `reopen-database' re-resolves PROJECT_ISIDORE_DATA so a binary built
+locally can run against /var/local/project-isidore/ on production."
   (setf *search-index* (make-instance 'search-engine:index
-                                      :path (asdf:system-relative-pathname
-                                             :project-isidore "data/montezuma/")
+                                      :path (index-path)
                                       :default-field "*"
                                       :fields '("b" "c" "v" "t" "h")))
   (reopen-bible-database)

@@ -32,25 +32,25 @@
                "project-isidore/slack-bot"
                "project-isidore/garmin-org"
                )
-  :in-order-to ((asdf:test-op (asdf:test-op "project-isidore/test")))
+  :in-order-to ((asdf:test-op (asdf:test-op "project-isidore/tests")))
   :build-operation "program-op"
   :build-pathname "../bin/ProjectIsidore"
-  :entry-point "project-isidore:application-toplevel")
+  :entry-point "project-isidore/webserver:application-toplevel")
 
 (register-system-packages "clog" '(:clog-connection :clog-web))
 
-(asdf:defsystem "project-isidore/test"
+(asdf:defsystem "project-isidore/tests"
   :class :package-inferred-system
-  :pathname "src/test"
-  :depends-on ("project-isidore/test/tests"
-               "project-isidore/test/slack-bot-tests"
-               "project-isidore/test/van-booking-tests"
+  :pathname "src/tests"
+  :depends-on ("project-isidore/tests/tests"
+               "project-isidore/tests/slack-bot-tests"
+               "project-isidore/tests/van-booking-tests"
                )
   :perform (asdf:test-op
             (op c)
-            (uiop:symbol-call :parachute :test :project-isidore/test/tests)
-            (uiop:symbol-call :parachute :test :project-isidore/test/slack-bot-tests)
-            (uiop:symbol-call :parachute :test :project-isidore/test/van-booking-tests)
+            (uiop:symbol-call :parachute :test :project-isidore/tests/tests)
+            (uiop:symbol-call :parachute :test :project-isidore/tests/slack-bot-tests)
+            (uiop:symbol-call :parachute :test :project-isidore/tests/van-booking-tests)
             ))
 
 (asdf:defsystem "project-isidore/infra"

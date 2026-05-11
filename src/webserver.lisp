@@ -582,6 +582,27 @@ submission and url-rewrite for shareable URLs."
 
 ;;; Server Lifecycle
 
+(defun wait-for-port-ready (port &key (host "127.0.0.1") (timeout 5.0) (interval 0.05))
+  "Block until something is accepting TCP connections on HOST:PORT, or
+TIMEOUT seconds elapse. Returns T on success, NIL on timeout. CLOG's
+INITIALIZE returns as soon as clack:clackup hands back a handler struct,
+but the underlying hunchentoot acceptor finishes START in a separate
+thread. If TERMINATE-APPLICATION runs before that thread has populated
+HUNCHENTOOT::ACCEPTOR-PROCESS, clack's BT2:DESTROY-THREAD cleanup hits
+UNBOUND-SLOT and crashes the handler thread. Polling here closes that
+window."
+  (let ((deadline (+ (get-internal-real-time)
+                     (* timeout internal-time-units-per-second))))
+    (loop
+      (handler-case
+          (let ((sock (usocket:socket-connect host port)))
+            (usocket:socket-close sock)
+            (return t))
+        (error ()
+          (when (> (get-internal-real-time) deadline)
+            (return nil))
+          (sleep interval))))))
+
 (defun terminate-application (&optional sigint-poll)
   "Stop the web server started by `initialize-application', if it exists. When
 called with a non NIL value for SIGINT-POLL, it will listen for SIGINT (Catch a
@@ -671,6 +692,11 @@ Homepage: https://www.bhw.name/assets/blog/project-isidore-doc.html
 Source code repository: https://gitlab.com/bhw/project-isidore
 
 Navigate to http://localhost:~A to continue... ~%" port)
+  ;; clack:clackup with :use-thread t returns before hunchentoot:start
+  ;; finishes binding the listen socket and acceptor-process. Tests (and
+  ;; any caller that immediately calls terminate-application) need that
+  ;; state set or clack's BT2:DESTROY-THREAD cleanup hits UNBOUND-SLOT.
+  (wait-for-port-ready port)
   (return-from initialize-application t))
 
 (defun application-toplevel ()

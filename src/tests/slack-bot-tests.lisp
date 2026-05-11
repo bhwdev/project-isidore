@@ -102,7 +102,7 @@ tick) are stubbed via FLET shadowing."))
 ;;;
 ;;; Each CRUD test runs against a fresh, temporary rucksack so nothing
 ;;; leaks into ~/.local/share/project-isidore/ (or wherever
-;;; PROJECT_ISIDORE_DB points). WITH-TEMP-DATABASE handles the open,
+;;; PROJECT_ISIDORE_DATA points). WITH-TEMP-DATABASE handles the open,
 ;;; the *database*/*rucksack* rebind, the slack-subscription schema
 ;;; registration, and the teardown.
 
@@ -167,19 +167,22 @@ keep seeing the production graph."
 (define-test database-path-honors-env-var
   :parent slack-bot-suite
   ;; Custom path
-  (let ((saved (uiop:getenvp "PROJECT_ISIDORE_DB")))
+  (let ((saved (uiop:getenvp "PROJECT_ISIDORE_DATA")))
     (unwind-protect
          (progn
-           (setf (uiop:getenv "PROJECT_ISIDORE_DB") "/tmp/pi-env-var-test/")
-           (is equal (uiop:ensure-directory-pathname "/tmp/pi-env-var-test/")
+           (setf (uiop:getenv "PROJECT_ISIDORE_DATA") "/tmp/pi-env-var-test/")
+           (is equal (merge-pathnames
+                      "graph-db/"
+                      (uiop:ensure-directory-pathname "/tmp/pi-env-var-test/"))
                (db:database-path))
-           ;; Empty / unset: XDG default
-           (setf (uiop:getenv "PROJECT_ISIDORE_DB") "")
-           (is equal (uiop:xdg-data-home "project-isidore/")
+           ;; Empty / unset: XDG default + graph-db subdir
+           (setf (uiop:getenv "PROJECT_ISIDORE_DATA") "")
+           (is equal (merge-pathnames "graph-db/"
+                                      (uiop:xdg-data-home "project-isidore/"))
                (db:database-path)))
       (if saved
-          (setf (uiop:getenv "PROJECT_ISIDORE_DB") saved)
-          (setf (uiop:getenv "PROJECT_ISIDORE_DB") "")))))
+          (setf (uiop:getenv "PROJECT_ISIDORE_DATA") saved)
+          (setf (uiop:getenv "PROJECT_ISIDORE_DATA") "")))))
 
 (defun count-bible-objects ()
   "Count BIBLE vertices in DB:*BIBLE-DATABASE*. Binds GRAPH-DB:*GRAPH*
@@ -213,10 +216,11 @@ top-level)."
                     (format nil "/tmp/pi-mkdir-test-~A/" (get-universal-time))))
          (target (uiop:ensure-directory-pathname
                   (merge-pathnames "deeply/nested/subdir/" tmp-root)))
-         (saved (uiop:getenvp "PROJECT_ISIDORE_DB")))
+         (graph-db-dir (merge-pathnames "graph-db/" target))
+         (saved (uiop:getenvp "PROJECT_ISIDORE_DATA")))
     (unwind-protect
          (progn
-           (false (uiop:directory-exists-p target))
+           (false (uiop:directory-exists-p graph-db-dir))
            ;; Close the production graph before pointing the env var at a
            ;; temp dir; otherwise REOPEN-DATABASE swaps it out of GRAPH-DB::
            ;; *GRAPHS* without closing it, leaking fd's, mmaps, and the
@@ -225,21 +229,21 @@ top-level)."
            (when db:*database*
              (let ((graph-db:*graph* db:*database*))
                (graph-db:close-graph db:*database* :snapshot-p nil)))
-           (setf (uiop:getenv "PROJECT_ISIDORE_DB") (namestring target))
+           (setf (uiop:getenv "PROJECT_ISIDORE_DATA") (namestring target))
            (db:reopen-database)
-           (true (uiop:directory-exists-p target))
+           (true (uiop:directory-exists-p graph-db-dir))
            ;; graph-db's MAKE-GRAPH eagerly creates schema.dat and heap.dat
            ;; under the location; a transaction is not required.
            (let ((files (mapcar #'file-namestring
-                                (uiop:directory-files target))))
+                                (uiop:directory-files graph-db-dir))))
              (true (member "heap.dat" files :test #'string=))
              (true (member "schema.dat" files :test #'string=))))
       (when db:*database*
         (let ((graph-db:*graph* db:*database*))
           (graph-db:close-graph db:*database* :snapshot-p nil)))
       (if saved
-          (setf (uiop:getenv "PROJECT_ISIDORE_DB") saved)
-          (setf (uiop:getenv "PROJECT_ISIDORE_DB") ""))
+          (setf (uiop:getenv "PROJECT_ISIDORE_DATA") saved)
+          (setf (uiop:getenv "PROJECT_ISIDORE_DATA") ""))
       (db:reopen-database)
       (when (uiop:directory-exists-p tmp-root)
         (uiop:delete-directory-tree tmp-root :validate (constantly t))))))

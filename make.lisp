@@ -86,9 +86,9 @@
 ;; from that repo into lib/slynk-macrostep/ and add an .asd file.
 (asdf:load-system :slynk)
 
-;; CRUD state lives at runtime under $PROJECT_ISIDORE_DB (or the XDG default
+;; CRUD state lives at runtime under $PROJECT_ISIDORE_DATA (or the XDG default
 ;; $XDG_DATA_HOME/project-isidore/) and is NOT baked into this binary.
-(asdf:load-system "project-isidore/test")
+(asdf:load-system "project-isidore/tests")
 (if (asdf:test-system "project-isidore")
     (progn
       (format t "~&        ====== Build Successful | Deo Gratias ======~%")

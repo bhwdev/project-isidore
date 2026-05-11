@@ -62,10 +62,12 @@ Defines the persistent vertex schema."))
 (in-package #:project-isidore/database)
 
 (defun data-root ()
-  "Return the directory pathname for project persistent data.
+  "Return the directory pathname for project persistent CRUD data.
 Honors PROJECT_ISIDORE_DATA; falls back to $XDG_DATA_HOME/project-isidore/.
-Both DATABASE-PATH and INDEX-PATH derive from this so a single env var
-locates everything (e.g. /var/local/project-isidore/ in production)."
+Used by DATABASE-PATH for the runtime CRUD graph-db. BIBLE-GRAPH-PATH
+and INDEX-PATH point at /var/local/project-isidore/ unconditionally
+because that read-only bible content is shipped at the same path in
+development and production."
   (let ((env (uiop:getenvp "PROJECT_ISIDORE_DATA")))
     (if env
         (uiop:ensure-directory-pathname env)
@@ -78,8 +80,9 @@ Lives at <data-root>/graph-db/."
 
 (defun index-path ()
   "Return the directory pathname for the Montezuma search index.
-Lives at <data-root>/montezuma/."
-  (merge-pathnames "montezuma/" (data-root)))
+Same path in development and production: the index is read-only bible
+content shipped alongside *BIBLE-DATABASE*."
+  #p"/var/local/project-isidore/montezuma/")
 
 (defun bible-graph-path ()
   "Return the directory pathname for the bible graph-db store.

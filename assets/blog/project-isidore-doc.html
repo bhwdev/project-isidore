@@ -1,0 +1,3242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- 2026-05-08 Fri 20:19 -->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Project Isidore Design Notebook</title>
+<meta name="author" content="Site Admin." />
+<meta name="generator" content="Org Mode" />
+
+                      <link rel="stylesheet" type="text/css" href="../global.css"/>
+                      <link rel="stylesheet"
+                            href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.2.0/styles/base16/solarized-light.min.css">
+                      <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.2.0/highlight.min.js" defer></script>
+                      <script>var hlf=function(){Array.prototype.forEach.call(document.querySelectorAll("pre.src"),function(t){var e;e=t.getAttribute("class"),e=e.replace(/src-(w+)/,"src-$1 $1"),console.log(e),t.setAttribute("class",e),hljs.highlightBlock(t)})};addEventListener("DOMContentLoaded",hlf);</script>
+<script>
+  window.MathJax = {
+    tex: {
+      ams: {
+        multlineWidth: '85%'
+      },
+      tags: 'ams',
+      tagSide: 'right',
+      tagIndent: '.8em'
+    },
+    chtml: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    svg: {
+      scale: 1.0,
+      displayAlign: 'center',
+      displayIndent: '0em'
+    },
+    output: {
+      font: 'mathjax-modern',
+      displayOverflow: 'overflow'
+    }
+  };
+</script>
+
+<script
+  id="MathJax-script"
+  async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+</script>
+</head>
+<body>
+<div id="preamble" class="status">
+
+                                    <div class="header header-fixed">
+                                      <div class="navbar container">
+                                        <div class="logo"><a href="/">BHW</a></div>
+                                        <input type="checkbox" id="navbar-toggle" >
+                                        <label for="navbar-toggle"><i></i></label>
+                                        <nav class="menu">
+                                          <ul>
+                                            <li><a href="/about">About</a></li>
+                                            <li><a href="/work">Work</a></li>
+                                            <li><a href="/assets/blog/archive.html">Blog</a></li>
+                                            <li><a href="/contact">Contact</a></li>
+                                          </ul>
+                                        </nav>
+                                      </div>
+                                    </div>
+                                    <h1 class="title">Project Isidore Design Notebook</h1>
+                                    <p class="subtitle">Divus Isidorus Hispalensis ora pro nobis</p> <br/>
+                                    <p class="updated"><a href="/contact#article-history">Updated:</a> 2026-05-08 Fri 20:18</p>
+</div>
+<div id="content" class="content">
+<div class="abstract" id="org45a8498">
+<p>
+
+</p>
+
+<p>
+Project Isidore is a personal website written in <a href="https://en.wikipedia.org/wiki/Lisp_(programming_language)">LISP.</a> This article
+simultaneously serves as project documentation and enables literate programming
+via <a href="https://orgmode.org/worg/org-contrib/babel/">org-babel.</a>
+</p>
+
+</div>
+<p>
+<hr/>
+</p>
+<nav id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#Introduction">1. Introduction</a></li>
+<li><a href="#Common-Lisp-Environment-Setup">2. Common Lisp Environment Setup</a>
+<ul>
+<li><a href="#Literate-Programming">2.1. Literate Programming</a></li>
+</ul>
+</li>
+<li><a href="#Project-Isidore-System-Definition">3. Project Isidore System Definition</a>
+<ul>
+<li><a href="#Libraries-System-dependencies">3.1. Libraries &amp; System dependencies</a></li>
+</ul>
+</li>
+<li><a href="#Org-Publish-Pipeline">4. Org Publish Pipeline</a></li>
+<li><a href="#Development-Operations">5. Development Operations</a>
+<ul>
+<li><a href="#org06ea336">5.1. Continous Integration</a>
+<ul>
+<li><a href="#Testing">5.1.1. Testing</a>
+<ul>
+<li><a href="#Notes-on-Drakma">Notes on Drakma</a></li>
+<li><a href="#orgf34f52c">Notes on CL-SMTP</a></li>
+<li><a href="#Debugging">Debugging</a></li>
+<li><a href="#Logging">Logging</a></li>
+<li><a href="#Generate-Code-Coverage-Report">Generate Code Coverage Report</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a href="#org2029fe9">5.2. Continous Delivery</a></li>
+<li><a href="#orgece3641">5.3. Continous Deployment</a>
+<ul>
+<li><a href="#org3e57f50">5.3.1. Oracle Cloud Infrastructure</a></li>
+</ul>
+</li>
+<li><a href="#Benchmarking-Profiling">5.4. Micro Benchmarks</a>
+<ul>
+<li><a href="#orgbe5b8a4">5.4.1. Standards Compliance</a></li>
+</ul>
+</li>
+<li><a href="#orgc2c3dc6">5.5. Financial Reports</a></li>
+</ul>
+</li>
+<li><a href="#Data-Persistence">6. Data Persistence</a>
+<ul>
+<li><a href="#PostgreSQL">6.1. PostgreSQL</a></li>
+<li><a href="#In-Memory-Datastore">6.2. In-Memory Datastore</a></li>
+<li><a href="#BKNR-Datastore-vs-Rucksack-vs-Postmodern">6.3. BKNR.Datastore vs Rucksack vs Postmodern</a></li>
+</ul>
+</li>
+<li><a href="#org7e4c2f2">7. A Portable Graphical User Interface</a></li>
+<li><a href="#Case-Study-Profiling-and-Performance">8. Case Study: Profiling and Performance</a></li>
+<li><a href="#User-Manual">9. User Manual</a>
+<ul>
+<li><a href="#How-do-I-find-past-versions-of-a-blog-article">9.1. How do I find past versions of a blog article?</a></li>
+<li><a href="#How-do-I-unsubscribe-from-the-mailing-list">9.2. How do I unsubscribe from the mailing list?</a></li>
+<li><a href="#Can-I-visit-this-website-offline">9.3. Can I visit this website offline?</a></li>
+<li><a href="#I-can't-find-what-I'm-looking-for-How-is-the-documentation-organized">9.4. I can&rsquo;t find what I&rsquo;m looking for. How is the documentation organized?</a></li>
+</ul>
+</li>
+<li><a href="#Reference-Manual">10. Reference Manual</a>
+<ul>
+<li><a href="#Generate-Reference-Manual">10.1. Generate Reference Manual</a></li>
+</ul>
+</li>
+<li><a href="#Project-History-Credits">11. Project History &amp; Credits</a></li>
+</ul>
+</div>
+</nav>
+<div id="outline-container-Introduction" class="outline-2">
+<h2 id="Introduction"><span class="section-number-2">1.</span> Introduction</h2>
+<div class="outline-text-2" id="text-Introduction">
+<p>
+<span class="dropcap">W</span>elcome! This is the
+documentation webpage of my personal website. The canonical source code is
+located at <a href="https://gitlab.com/bhw/project-isidore">Ben / Project Isidore · GitLab</a>. For usage, please see the <a href="#User-Manual">user manual</a>
+and the navigation bar located at the top of the website.
+</p>
+
+<ul class="org-ul">
+<li><a href="#Common-Lisp-Environment-Setup">Common Lisp Environment Setup - How to get started with Lisp</a></li>
+<li><a href="#Org-Publish-Pipeline">Org Publish Pipeline Section - How I Blog from Org Mode</a></li>
+<li><a href="#Project-Isidore-System-Definition">High Level Project Overview - How to navigate the source tree</a></li>
+<li><a href="#User-Manual">Project Isidore User Manual - Tutorial &amp; Guides</a></li>
+<li><a href="#Reference-Manual">Project Isidore Reference Manual - For Developers</a></li>
+</ul>
+
+<p>
+Navigation buttons are inserted next to each header to take one back to the
+table of contents.
+</p>
+
+<p>
+Copyright (c) 2021 Benedict H. Wang. Source code is under the <a href="https://www.gnu.org/licenses/agpl-3.0-standalone.html">GNU-AGPL-3.0
+License</a>. Blog content is available under the <a href="https://creativecommons.org/licenses/by-sa/4.0/legalcode">CC-BY-SA 4.0 License</a> unless
+otherwise noted.
+</p>
+</div>
+</div>
+<div id="outline-container-Common-Lisp-Environment-Setup" class="outline-2">
+<h2 id="Common-Lisp-Environment-Setup"><span class="section-number-2">2.</span> Common Lisp Environment Setup</h2>
+<div class="outline-text-2" id="text-Common-Lisp-Environment-Setup">
+<p>
+<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-03-22T16:14:00">[2026-03-22 Sun 16:14]</time></span> &lt;- <a href="../.stversions/cpb.html#ID-6754d0e8-1c8c-43eb-bdc3-0072f9aa4acd">Library of Babel</a>
+<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-03-22T16:14:00">[2026-03-22 Sun 16:14]</time></span> &lt;- <a href="../.stversions/cpb.html#ID-6588253f-4a2e-4a8c-ac23-bcb073e47213">Linux Program Directory</a>
+<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-03-22T16:14:00">[2026-03-22 Sun 16:14]</time></span> &lt;- <a href="../bibtex-notes/seibelPracticalCommonLisp2005.html#ID-031a3b02-b36c-4875-b714-6ff8e9a3978c">Practical Common Lisp</a>
+</p>
+<ul class="org-ul">
+<li><a href="../dotemacs.html#ID-0d5cd091-ec8a-420d-9585-8d6ed856a00c">&lt;&ndash;Common Lisp Config</a></li>
+<li><a href="../bibtex-notes/seibelPracticalCommonLisp2005.html#ID-031a3b02-b36c-4875-b714-6ff8e9a3978c">&lt;&ndash;Practical Common Lisp</a></li>
+<li><a href="../.stversions/cpb.html#ID-6588253f-4a2e-4a8c-ac23-bcb073e47213">&lt;&ndash;Linux Program Directory</a></li>
+<li><a href="https://www.creativetension.co/posts/common-lisp-development-tooling">Common Lisp Development Tooling — creative:tension</a></li>
+</ul>
+
+<blockquote>
+<p>
+He is like to a man building a house, who digged deep and laid the foundation
+upon a rock. And when a flood came, the stream beat vehemently upon that house:
+and it could not shake it: for it was founded on a rock. But he that heareth and
+doth not is like to a man building his house upon the earth without a
+foundation: against which the stream beat vehemently. And immediately it fell:
+and the ruin of that house was great.
+</p>
+
+<p>
+&ndash;Luke 6:48-49
+</p>
+</blockquote>
+
+<p>
+<b><a href="https://lispers.org/">Why lisp?</a></b> There are always more poets than non-poets in the world, or so
+I&rsquo;ve heard.
+</p>
+
+<p>
+Practically speaking, a complete and recent tour of the LISP world for beginners
+has already been written: <a href="https://stevelosh.com/blog/2018/08/a-road-to-common-lisp/">Steve Losh - Intro to Common lisp</a>. Steve Losh
+characterizes the field of web development &ndash; at least in Anno Domini
+2021 &ndash; not as a hamster wheel of backwards incompatibility, but a hamster
+centrifuge. A house of sand, indeed. In technical aspects, <a href="http://www.paulgraham.com/icad.html">Paul Graham&rsquo;s
+writings</a> convey any <a href="http://random-state.net/features-of-common-lisp.html">advantages</a> better than I can.
+</p>
+
+<p>
+Below are the steps I have taken to setup a Common Lisp environment inside Spacemacs.
+</p>
+
+<ul class="org-ul">
+<li>CL the Language = <a href="http://www.lispworks.com/documentation/common-lisp.html">ANSI INCITS 226-1994</a></li>
+<li>CL Implementation = <a href="http://www.sbcl.org/">Steel Bank Common Lisp</a>
+If you&rsquo;ve deep pockets or love reading about the history of Lisp implementations:
+<a href="https://ieeexplore.ieee.org/document/9740557">The History of Franz and Lisp | IEEE Journals &amp; Magazine | IEEE Xplore</a>
+<a href="http://www.lispworks.com/products/myths_and_legends.html">Common Lisp - Myths and Legends</a></li>
+<li>CL Library/Package Manager = <a href="https://www.quicklisp.org/beta/#installation">Quicklisp</a></li>
+<li>CL System Manager/Build Tooling = <a href="https://common-lisp.net/project/asdf/">Another System Definition Facility (comes bundled with SBCL)</a></li>
+<li>CL IDE = <a href="https://www.spacemacs.org/">Spacemacs</a> with <a href="https://joaotavora.github.io/sly/">SLY</a></li>
+
+<li><p>
+Install Steel Bank Common Lisp, a Common Lisp implementation.
+</p>
+
+<p>
+<a href="https://www.cliki.net/Common+Lisp+implementation">Other implementations of Common Lisp the language exist,</a> but SBCL is the
+premier open-source implementation as of this writing.
+</p>
+
+<p>
+Installing SBCL from your Linux distribution&rsquo;s package manager is the most
+straight forward way. On Debian/Ubuntu this is as simple as
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash"><code>  <span class="org-type">sudo</span> apt install sbcl
+</code></pre>
+</div>
+
+<p>
+Downloading and unpacking a binary from <a href="http://www.sbcl.org/getting.html">http://www.sbcl.org/getting.html</a> or
+building from source are options for later discretion. In the shell,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash"><code>  sbcl
+  * (+ 2 3)
+  * (quit)
+</code></pre>
+</div>
+
+<p>
+will produce the startup SBCL banner and REPL, evaluate an expression, and quit.
+</p></li>
+
+<li><p>
+Install Quicklisp - the Common Lisp Package Manager
+</p>
+
+<p>
+In the shell,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash"><code>  <span class="org-type">curl</span> -O https://beta.quicklisp.org/quicklisp.lisp
+  sbcl --load quicklisp.lisp
+  <span class="org-comment-delimiter">## </span><span class="org-comment">Inside the SBCL prompt,
+</span>  (quicklisp-quickstart:install)
+  (ql:add-to-init-file) <span class="org-comment-delimiter"># </span><span class="org-comment">autoload into sbcl initialization
+</span>  (quit)
+</code></pre>
+</div>
+
+<p>
+After loading &ndash; via <code>(ql:quickload :project-name)</code> &ndash; a project, it will be
+stored locally. It will be in a directory similar to:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash"><code>  /home/$<span class="org-variable-name">USER</span>/quicklisp/dists/quicklisp/software/example-project-2020-01-01-git
+</code></pre>
+</div>
+
+<p>
+Also, <code>(ql:where-is-system 'system-name)</code> will return the system&rsquo;s location.
+<code>project-name</code> and <code>system-name</code> are interchangeable here.
+</p>
+
+<p>
+In order to <code>(ql:quickload :your-local-project)</code> Quicklisp looks in
+<code>/home/$USER/quicklisp/local-projects/</code> for said project. You can symlink
+your project if you desire to use some other folder.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash"><code>  <span class="org-type">ln</span> -s /home/$<span class="org-variable-name">USER</span>/quicklisp/local-projects/project-a/ /home/$<span class="org-variable-name">USER</span>/project-a/
+</code></pre>
+</div>
+
+<p>
+Not of primary importance yet is a definitions of what entails a lisp
+<code>package</code> or lisp <code>system</code>. It will explained in proper order during your
+introduction to the language, to be more specific it is covered in <a href="https://gigamonkeys.com/book/programming-in-the-large-packages-and-symbols.html">Peter
+Seibel&rsquo;s excellent pedagogical work, Practical Common Lisp</a> and other
+guides are located <a href="https://github.com/fare/asdf/blob/master/doc/best_practices.md#trivial-system-definition">here</a> and <a href="https://ashok-khanna.medium.com/an-introduction-to-lisp-packages-7a9ee352006e">here.</a> N.B. that <code>(ql:quickload
+  :your-local-project)</code> also calls <code>(asdf:load-system :your-local-project)</code>.
+The difference is <code>(ql:quickload)</code> will download any missing system
+dependencies.
+</p></li>
+
+<li><p>
+Install Spacemacs <code>common-lisp</code> layer - a Common Lisp IDE
+</p>
+
+<p>
+The below steps assume you are already familiar with Spacemacs. Inside
+Spacemacs, <code>SPC-h-SPC RET common-lisp RET</code> and follow the layer README.
+</p>
+
+<p>
+<a href="https://lispcookbook.github.io/cl-cookbook/editor-support.html">For those who are understandably wary of Emacs other IDE options exist.</a> Lisp
+is one of the oldest higher level languages (beaten by FORTRAN by a few
+years). With that rich tradition comes a time where the underlying hardware,
+operating system, and developer tooling were unified under lisp.
+Unfortunately, the closest one can reasonably come today is Emacs, a lisp
+interpreter running on C/UNIX/hardware. Emacs still offers the best-in-class
+experience amongst open-source offerings, but the notorious learning curve of
+Emacs can be tempered with a preset configuration: Spacemacs. <a href="https://www.bhw.name/assets/blog/installation-of-spacemacs.html">For those on a
+Microsoft Windows machine, I have written installation instructions.</a>
+</p></li>
+
+<li><p>
+<b>Optional:</b> Enable goto definition for SBCL primitives
+</p>
+
+<p>
+<a href="http://www.sbcl.org/platform-table.html">Download CL Implementation source files</a> and extract them to the location
+specified by <code>(sb-ext:set-sbcl-source-location)</code>, which is set in your user
+configuration dotfile: <code>/home/$USER/.sbclrc</code>. Add it if not already present,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp"><code>  (sb-ext:set-sbcl-source-location <span class="org-string">"/usr/share/sbcl-source/"</span>)
+</code></pre>
+</div>
+
+<p>
+Now you can use <code>g d</code> to call <code>jump-to-definition</code> to
+goto the raw documentation: the source code.
+</p></li>
+
+<li><p>
+<b>Optional:</b> Enable offline access to the CL HyperSpec language reference
+</p>
+
+<p>
+The full text of the ANSI Common Lisp Standard (1994) <a href="http://www.lispworks.com/documentation/common-lisp.html">is available online in
+HTML form.</a> To have the reference handy offline and to be able to browse it
+within Emacs, first download and extract <a href="https://archive.org/details/common-lisp-hyperspec">the HTML source for HyperSpec
+7.0.tar.gz from the great Internet Archive.</a>
+</p>
+
+<p>
+Then we can configure Emacs to open only HyperSpec links inside the Emacs web
+browser <a href="https://www.gnu.org/software/emacs/manual/html_mono/eww.html">EWW</a> and also inform our Common Lisp IDE of the HyperSpec location.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><code>    (<span class="org-keyword">setf</span> <span class="org-variable-name">common-lisp-hyperspec-root</span> <span class="org-string">"file:///home/$USER/HyperSpec/"</span>)
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">Optionally, execute the HYPERSPEC-LOOKUP function with local variable
+</span>    <span class="org-comment-delimiter">;; </span><span class="org-comment">changes to view HyperSpec links exclusively in EWW.
+</span>    (<span class="org-constant">advice-add</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">hyperspec-lookup</span>
+                <span class="org-builtin">:around</span>
+                (<span class="org-keyword">lambda</span> (orig-fun <span class="org-type">&amp;rest</span> args)
+                  (<span class="org-keyword">setq-local</span> <span class="org-variable-name">browse-url-browser-function</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">eww-browse-url</span>)
+                  (<span class="org-constant">apply</span> orig-fun args)))
+</code></pre>
+</div>
+
+<p>
+Now <code>, h H</code> will call <code>sly-hyperspec-lookup</code> to peruse the symbol at point
+with the HyperSpec. Note the default behavior of <code>sly-hyperspec-lookup</code> is to
+open a web browser at the online HyperSpec.
+</p></li>
+</ul>
+
+<p>
+Newcomers to the language are advised to dive right into the <a href="https://stevelosh.com/blog/2018/08/a-road-to-common-lisp/#s13-a-gentle-introduction">recommended
+reading.</a> Now&rsquo;s a good chance to use org-babel for some note-taking. If you&rsquo;ve
+forked the repo to play around with, <a href="#Project-Isidore-System-Definition">a high-level overview of the project</a> may be
+useful.
+</p>
+</div>
+<div id="outline-container-Literate-Programming" class="outline-3">
+<h3 id="Literate-Programming"><span class="section-number-3">2.1.</span> Literate Programming</h3>
+<div class="outline-text-3" id="text-Literate-Programming">
+<p>
+Lisp was the language for research into artificial intelligence before the AI
+winter. Now the field calls itself machine intelligence. The aim remains much
+like the story of Icarus: to ape the most noble aspect of man, his rational
+nature. Until that is realized, humans will be first and foremost the most
+important audience for any computer language or software. Here is how I setup
+literate programming with lisp.
+</p>
+
+<p>
+You likely heard of <code>org-babel</code>, an extension of org-mode that allows one to
+interleave text and code. It is comparable to a more powerful jupyter
+notebook. Get lisp in org-babel blocks by, adding to your init.el/user-config.el
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><code>     (<span class="org-constant">org-babel-do-load-languages</span>
+      <span class="org-highlight-quoted-quote">'</span><span class="org-variable-name">org-babel-load-languages</span>
+      <span class="org-highlight-quoted-quote">'</span>((lisp . t)))
+</code></pre>
+</div>
+
+<p>
+When evaluating a code block with <code>C-c C-c</code> (<code>, ,</code> in spacemacs), make sure
+to start SLIME first (M-x slime RET).
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp"><code>      (princ <span class="org-string">"Hello World!"</span>)
+</code></pre>
+</div>
+
+<p>
+Some may be familiar with <code>poly-org</code>, a MELPA package which allow multiple
+major modes. Naturally this comes in handy when using literate programming.
+It uses <code>font-lock-mode</code> to turn on the relevant major mode when your cursor
+is inside said code block. This saves you from having to call
+<code>org-edit-special</code> repeatedly.
+</p>
+
+<p>
+Furthermore, for most languages you can only evaluate the
+entire code block. Not so for lisp. <code>M-x slime-compile-defun</code> and <code>M-x
+slime-compile-region</code> do as they say on the tin: compile the specific
+function or highlighted region at cursor. <code>Poly-org</code> breaks these functions
+slightly as they do not treat <code>#+begin_src</code> and <code>#+end_src</code> as the start and
+end-of-file respectively. The following emacs lisp snippet fixes that.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-emacs-lisp"><code>  (<span class="org-keyword">with-eval-after-load</span> <span class="org-string">"poly-org"</span>
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">sly-compile-file sends entire .org file. Narrow to span as done in poly-R
+</span>    <span class="org-comment-delimiter">;; </span><span class="org-comment">https://github.com/polymode/poly-org/issues/25
+</span>    (<span class="org-keyword">when</span> (<span class="org-constant">fboundp</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">advice-add</span>)
+      (<span class="org-constant">advice-add</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">slime-compile-file</span> <span class="org-builtin">:around</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">pm-execute-narrowed-to-span</span>)
+      (<span class="org-constant">advice-add</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">slime-compile-defun</span> <span class="org-builtin">:around</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">pm-execute-narrowed-to-span</span>)
+      (<span class="org-constant">advice-add</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">slime-load-file</span> <span class="org-builtin">:around</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">pm-execute-narrowed-to-span</span>)
+      (<span class="org-constant">advice-add</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">slime-eval-defun</span> <span class="org-builtin">:around</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">pm-execute-narrowed-to-span</span>)
+      (<span class="org-constant">advice-add</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">slime-eval-last-expression</span> <span class="org-builtin">:around</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">pm-execute-narrowed-to-span</span>)
+      (<span class="org-constant">advice-add</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">slime-eval-buffer</span> <span class="org-builtin">:around</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">pm-execute-narrowed-to-span</span>)))
+</code></pre>
+</div>
+
+<p>
+Since we&rsquo;ve already shaved the editor yak up to this point, the last package
+I&rsquo;d like to mention that makes literate programming possible is
+org-tanglesync]]. To &ldquo;tangle&rdquo; a file is, in literate programming parlance, to
+extract just the source code from a document. Then to de-tangle (two-way
+sync) has always been a problem, and traditionally <code>org-babel-detangle</code> has
+relied upon unsightly link comments to do so.
+</p>
+
+<p>
+<code>Org-tanglesync</code> keeps your .git controlled source code and your .org mode
+file in sync. And it does that without any markings or artifacts on the tangled
+code, making collaboration easier. If a more elegant solution to
+de-tangle a file exists out in the wild, please do let me know.
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-Project-Isidore-System-Definition" class="outline-2">
+<h2 id="Project-Isidore-System-Definition"><span class="section-number-2">3.</span> Project Isidore System Definition</h2>
+<div class="outline-text-2" id="text-Project-Isidore-System-Definition">
+<p>
+Bibliographies exist for a written corpus of work. The same sort of metadata is
+needed a code base. In Common Lisp, it is the <code>.asd</code> file.
+</p>
+
+<p>
+Project Isidore follows the common <a href="https://wiki.c2.com/?ModelViewController">Model-view-controller (MVC) design pattern.</a>
+It entails encapsulating data together with its processing (the model) and
+isolating it from the manipulation (the controller) and presentation (the view)
+part that has to be done on a user interface.
+</p>
+
+<p>
+The project follows the <a href="https://common-lisp.net/project/asdf/asdf/The-package_002dinferred_002dsystem-extension.html">ASDF package inferred system</a> style of using <code>defpackage</code>
+forms to specify file inter-dependencies. The entry point of dependency graph is
+<a href="https://gitlab.com/bhw/project-isidore/-/blob/master/src/packages.lisp">packages.lisp</a>. To understand the code base, the files are named after the MVC
+design pattern.
+</p>
+
+<p>
+For an index of symbols, functions and definitions, see the <a href="#Reference-Manual">Reference Manual</a>.
+</p>
+</div>
+<div id="outline-container-Libraries-System-dependencies" class="outline-3">
+<h3 id="Libraries-System-dependencies"><span class="section-number-3">3.1.</span> Libraries &amp; System dependencies</h3>
+<div class="outline-text-3" id="text-Libraries-System-dependencies">
+<ol class="org-ol">
+<li><p>
+Finding new Libraries &amp; Surveying the Ecosystem
+</p>
+
+<p>
+Looking for a library? In addition to <a href="https://quickdocs.org/">online search queries</a>, use command(s)
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp"><code>     (ql:system-apropos <span class="org-builtin">:library</span>) <span class="org-comment">; search for term in quicklisp dist
+</span>     (ql:who-depends-on <span class="org-builtin">:library</span>) <span class="org-comment">; usage in lisp ecosystem
+</span>     (ql-dist:dependency-tree <span class="org-builtin">:library</span>) <span class="org-comment">; number of dependencies upstream
+</span>     <span class="org-comment-delimiter">;; </span><span class="org-comment">git clone https://github.com/varjagg/deptree.git
+</span>     (deptree:deptree <span class="org-string">"hunchentoot"</span>)
+     <span class="org-comment-delimiter">;; </span><span class="org-comment">See quicklisp-stats README for example usage.
+</span>     (ql:quickload <span class="org-string">"quicklisp-stats"</span>) <span class="org-comment">; look at quicklisp download stats
+</span>     (ql:quickload <span class="org-string">"quicksearch"</span>)
+     (qs:? <span class="org-string">"bluetooth"</span> <span class="org-builtin">:du</span> 100)
+     <span class="org-comment-delimiter">;; </span><span class="org-comment">Search for a term across all quicklisp libraries.
+</span>     <span class="org-comment-delimiter">;; </span><span class="org-comment">https://github.com/mmontone/quicklisp-apropos</span>
+</code></pre>
+</div>
+
+<p>
+In addition, look to <a href="https://github.com/sabracrolleton/sabracrolleton.github.io">Sabracrolleton&rsquo;s</a> detailed reviews of Common Lisp
+libraries. Another great hint to library quality is the <a href="https://github.com/quicklisp">Github page for Zach
+Beane,</a> who does the thankless job of maintaining Quicklisp. <a href="https://ultralisp.org/">Ultralisp</a>
+provides a full-text search on docstrings of all symbols of all libraries
+contained within.
+</p>
+
+<p>
+Quicklisp in one respect is less like Javascript&rsquo;s Node Package Manager and
+more like Debian&rsquo;s apt. Zach makes sure that ALL libraries on Quicklisp build
+together. He takes this burden upon himself so the end users might avoid
+<a href="https://en.wikipedia.org/wiki/Dependency_hell">dependency hell</a>.
+</p>
+
+<p>
+<a href="https://gist.github.com/svetlyak40wt/03bc68c820bb3e45bc7871870379c42e">A helper to gather all lisp system&rsquo;s dependencies · GitHub</a>
+</p>
+
+<ul class="org-ul">
+<li><a href="https://www.quicklisp.org/beta/releases.html">Quicklisp beta releases</a></li>
+<li><a href="https://quickref.common-lisp.net/index-per-library.html">Quickref</a></li>
+<li><a href="https://github.com/CodyReichert/awesome-cl">GitHub - CodyReichert/awesome-cl: A curated list of awesome Common Lisp frame&hellip;</a></li>
+<li><a href="https://www.cliki.net/">CLiki: the common lisp wiki</a></li>
+<li><a href="https://github.com/40ants/lisp-project-of-the-day">GitHub - 40ants/lisp-project-of-the-day: Here I&rsquo;ll post notes about Quicklisp&hellip;</a></li>
+<li><a href="https://gist.github.com/digikar99/16066dbf24b8789c969ea58837e0fbef#femlisp-matlisp">A Survey of Simple Vector Addition Performance of the Numerical Computing Lib&hellip;</a></li>
+</ul></li>
+<li><p>
+System Dependency graph
+</p>
+
+<p>
+Call <code>sly-eval-buffer</code> on the following code block to update the graph.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp"><code>     <span class="org-comment-delimiter">;; </span><span class="org-comment">https://40ants.com/lisp-project-of-the-day/2020/05/0063-asdf-viz.html
+</span>     <span class="org-comment-delimiter">;; </span><span class="org-comment">Inside shell "sudo apt install graphviz".
+</span>     (ql:quickload <span class="org-builtin">:cl-dot</span>)
+     <span class="org-comment-delimiter">;; </span><span class="org-comment">Not present in quicklisp, retrieve from https://github.com/guicho271828/asdf-viz
+</span>     (ql:quickload <span class="org-builtin">:asdf-viz</span>)
+     (ql:quickload <span class="org-builtin">:project-isidore</span>) <span class="org-comment">; also loads cl-ppcre.
+</span>     (setf cl-dot:*dot-path* (string-trim '(#\space #\newline) (second (ppcre:split <span class="org-string">" "</span>(nth-value 0 (uiop:run-program <span class="org-string">"whereis -b dot"</span> <span class="org-builtin">:output</span> <span class="org-builtin">:string</span>))))))
+     <span class="org-comment-delimiter">;; </span><span class="org-comment">Tilde char "~" in destination pathname throws an error.
+</span>     (asdf-viz:visualize-asdf-hierarchy (asdf:system-relative-pathname <span class="org-string">"project-isidore"</span> <span class="org-string">"assets/project-isidore-dependency-graph.png"</span>) (list (asdf:find-system <span class="org-builtin">:project-isidore</span>)))
+     <span class="org-comment-delimiter">;; </span><span class="org-comment">"asdf-viz" also can draw class hierarchies and call graphs.</span>
+</code></pre>
+</div>
+
+
+<figure id="org7b7cb5b">
+<img src="../project-isidore-dependency-graph.png" alt="Project Isidore dependency graph">
+
+<figcaption><span class="figure-number">Figure 1: </span>Project Isidore dependency graph</figcaption>
+</figure>
+
+<p>
+Transitive dependencies &amp; Lines of Code from running,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-bash"><code>   <span class="org-type">cd</span> ~/quicklisp/dists/quicklisp/software/
+   <span class="org-type">find</span> . -name <span class="org-string">'*.lisp'</span> | xargs wc -l
+</code></pre>
+</div>
+
+<table>
+
+
+<colgroup>
+<col  class="org-right">
+
+<col  class="org-left">
+
+<col  class="org-right">
+
+<col  class="org-right">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-right">Date</th>
+<th scope="col" class="org-left">Version (Commit)</th>
+<th scope="col" class="org-right"># of Libraries</th>
+<th scope="col" class="org-right">LOC</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-right">2021-11-05</td>
+<td class="org-left">v1.1.0 (7cc0598)</td>
+<td class="org-right">35</td>
+<td class="org-right">251532</td>
+</tr>
+
+<tr>
+<td class="org-right">2021-12-23</td>
+<td class="org-left">v1.2.0 (fd7c9f3)</td>
+<td class="org-right">42</td>
+<td class="org-right">264852</td>
+</tr>
+</tbody>
+</table></li>
+<li>Javascript Dependencies
+<ul class="org-ul">
+<li>Highlight.js 11.2.0
+Upgrade via editing <code>:head</code> under <code>org-publish-project-alist</code>.</li>
+<li>Mathjax 2.7.0
+See <code>C-h v org-html-mathjax-options</code> and <code>org-html-mathjax-template</code>.</li>
+</ul></li>
+<li><p>
+Lisp Web Example Projects &amp; Misc. Resources
+</p>
+
+<p>
+Cool libraries to check out:
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">Library</th>
+<th scope="col" class="org-left">Author</th>
+<th scope="col" class="org-left">Function</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">CL-CSV</td>
+<td class="org-left">Edward Marco Baringer</td>
+<td class="org-left">Spreadsheet</td>
+</tr>
+
+<tr>
+<td class="org-left">CLOG</td>
+<td class="org-left">David Botton</td>
+<td class="org-left">Websockets</td>
+</tr>
+
+<tr>
+<td class="org-left">CL-Unification</td>
+<td class="org-left">Marco Antonetti</td>
+<td class="org-left">Generalized pattern matching</td>
+</tr>
+
+<tr>
+<td class="org-left"><a href="https://tilton.medium.com/the-cells-manifesto-b21ed10329f0">Cells</a></td>
+<td class="org-left">Kenny Tilton</td>
+<td class="org-left">Dataflow (GUI)</td>
+</tr>
+</tbody>
+</table>
+
+<ul class="org-ul">
+<li><a href="https://www.ic.unicamp.br/~meidanis/courses/mc336/problemas-lisp/L-99_Ninety-Nine_Lisp_Problems.html">L-99: Ninety-Nine Lisp Problems</a></li>
+<li><a href="https://cells-gtk.common-lisp.dev/cgtk-primer.html">https://cells-gtk.common-lisp.dev/cgtk-primer.html</a></li>
+<li><a href="https://nullprogram.com/blog/2013/06/10/">https://nullprogram.com/blog/2013/06/10/</a> (WebGPU is the successor to WebGL).</li>
+<li><a href="https://github.com/byulparan/websocket-demo">GitHub - byulparan/websocket-demo: websocket/webgl demo in CommonLisp</a></li>
+<li><a href="https://www.cs.cmu.edu/Groups/AI/html/faqs/lang/lisp/">https://www.cs.cmu.edu/Groups/AI/html/faqs/lang/lisp/</a></li>
+<li><a href="https://gitlab.com/duncan-bayne/heroku-app-clozure-common-lisp">Duncan Bayne / heroku-app-clozure-common-lisp · GitLab</a>.
+Used as a base template. Hence the AGPL License on my own derived work.</li>
+<li><a href="https://github.com/gongzhitaao/orgcss">GitHub - gongzhitaao/orgcss: Simple and clean CSS for Org-exported HTML</a>
+Used as a base template.</li>
+<li><a href="https://gitlab.com/bendersteed/bread-and-roses">bendersteed / bread and roses · GitLab</a></li>
+<li><a href="https://github.com/vindarel/lisp-web-template-productlist">GitHub - vindarel/lisp-web-template-productlist: A web template with Hunchent&hellip;</a></li>
+<li><a href="https://github.com/rajasegar/cl-bootstrap/tree/master/demo">cl-bootstrap/demo at master · rajasegar/cl-bootstrap · GitHub</a></li>
+<li><a href="https://github.com/mtravers/wuwei/#examples">GitHub - mtravers/wuwei: WuWei &ndash; effortless Ajax web UIs from Common Lisp</a></li>
+<li><a href="https://common-lisp.net/">https://common-lisp.net/</a></li>
+<li><a href="https://google.github.io/styleguide/lispguide.xml">https://google.github.io/styleguide/lispguide.xml</a></li>
+<li><a href="https://github.com/cjbarber/ToolsOfTheTrade">Tools of the Trade, from Hacker News. List of SaaS services</a></li>
+<li><a href="https://github.com/255kb/stack-on-a-budget">GitHub - 255kb/stack-on-a-budget: A collection of services with great free ti&hellip;</a></li>
+<li><a href="https://github.com/ripienaar/free-for-dev">GitHub - ripienaar/free-for-dev: A list of SaaS, PaaS and IaaS offerings that&hellip;</a></li>
+<li><a href="https://zaries.wordpress.com/2010/11/09/lisp-web-server-from-scratch-using-hunchentoot-and-nginx/">Lisp Web Server From Scratch using Hunchentoot and Nginx | Zaries&rsquo;s Blog</a></li>
+<li><a href="https://github.com/rongarret/ergolib/tree/master/web">ergolib/web at master · rongarret/ergolib · GitHub</a></li>
+<li><a href="https://github.com/eigenhombre/weeds">GitHub - eigenhombre/weeds: Work in progress porting my blog software to Comm&hellip;</a></li>
+<li><a href="https://github.com/mmontone/cl-forms/">GitHub - mmontone/cl-forms: Web forms handling library for Common lisp</a></li>
+<li><a href="https://old.reddit.com/r/programming/comments/8gc5ef/steel_bank_common_lisp_sbcl_147_released/dybb8es/">lispm comments on Steel Bank Common Lisp (SBCL) 1.4.7 released</a></li>
+<li><a href="https://readevalprint.tumblr.com/post/101841449553/its-alive">READ EVAL PRINT — It&rsquo;s alive! The path from library to web-app.</a></li>
+<li><a href="https://github.com/no-defun-allowed/nqthm">GitHub - no-defun-allowed/nqthm: nqthm - the original(ish) Boyer-Moore theore&hellip;</a></li>
+<li><a href="https://github.com/urweb/urweb">GitHub - urweb/urweb: The Ur/Web programming language</a></li>
+<li><a href="https://old.reddit.com/r/lisp/comments/vo1wes/lisa_a_productionrule_system_for_the_development/">LISA - a production-rule system for the development of Lisp-based Intelligent&hellip;</a></li>
+<li><a href="https://arxiv.org/html/2205.11103">EPTCS 359: ACL2 Theorem Prover and its Applications</a></li>
+<li><a href="https://github.com/hemml/OMGlib">GitHub - hemml/OMGlib: A Common Lisp library to build fully dynamic web inter&hellip;</a></li>
+<li><a href="https://imps.mcmaster.ca/imps-system/README">https://imps.mcmaster.ca/imps-system/README</a></li>
+<li><a href="https://github.com/personal-mirrors/maxima">GitHub - personal-mirrors/maxima: 🔰 Personal hopefully daily updated Maxima m&hellip;</a></li>
+<li><a href="https://git.sr.ht/~jmbr/maxima-interface">~jmbr/maxima-interface - Simple interface between Common Lisp and Maxima - so&hellip;</a></li>
+<li><a href="https://github.com/svspire/YACC-is-dead">GitHub - svspire/YACC-is-dead: YACC is dead for Common Lisp (based on http://&hellip;</a></li>
+<li><a href="https://github.com/lisp/de.setf.resource">GitHub - lisp/de.setf.resource: a CLOS projection for RDF repositories</a></li>
+</ul>
+<p>
+For examples of packaging CL applications to end-users in a portable way,
+</p>
+<ul class="org-ul">
+<li><a href="https://github.com/Shirakumo/kandria">GitHub - Shirakumo/kandria: A post-apocalyptic actionRPG. Now on Steam!</a></li>
+<li><a href="https://www.kylheku.com/tankan/">Tankan — Efficient Kanji Memorization</a> (From Kaz, creator of TXR lang)</li>
+<li><a href="https://github.com/VitoVan/calm">GitHub - VitoVan/calm: Calm down and draw something, in Lisp.</a></li>
+</ul></li>
+</ol>
+</div>
+</div>
+</div>
+<div id="outline-container-Org-Publish-Pipeline" class="outline-2">
+<h2 id="Org-Publish-Pipeline"><span class="section-number-2">4.</span> Org Publish Pipeline</h2>
+<div class="outline-text-2" id="text-Org-Publish-Pipeline">
+<p>
+In the <code>/assets/blog/</code> folder, all <code>HTML</code> files are generated by <code>org-publish</code>.
+<code>archive.html</code> lists all published articles.
+</p>
+
+<p>
+In Spacemacs you will need to enable the <code>org</code> layer. Org Mode comes with Org
+Publish built in. <a href="https://orgmode.org/manual/Publishing.html">Org Publish</a> takes advantage of Org&rsquo;s excellent export
+capabilities to generate not only the HTML but also the sitemap and RSS.
+</p>
+
+<p>
+To publish/update an article:
+</p>
+<ol class="org-ol">
+<li>Prepare draft/existing notes for publishing, move .org file to input folder,
+remove extraneous links, update citations, check formatting etc.</li>
+<li><code>M-x RET org-publish RET blog</code></li>
+<li>Commit and push changes in git</li>
+</ol>
+
+<p>
+Here is configuration for my blog:
+<a href="https://www.bhw.name/assets/blog/dotspacemacs.html#Org-Publish-Config">https://www.bhw.name/assets/blog/dotspacemacs.html#Org-Publish-Config</a>. Other
+exemplars here: <a href="https://old.reddit.com/r/emacs/comments/ng9hyq/good_tutorials_on_orgpublish/">good tutorials on org-publish : emacs</a>, <a href="https://two-wrongs.com/new-and-improved-now-powered-by-org-mode.html">New and Improved:
+Two-Wrongs Now Powered By Org Mode</a>
+</p>
+</div>
+</div>
+<div id="outline-container-Development-Operations" class="outline-2">
+<h2 id="Development-Operations"><span class="section-number-2">5.</span> Development Operations</h2>
+<div class="outline-text-2" id="text-Development-Operations">
+<p>
+Follow industry best practice in <a href="https://www.redhat.com/en/topics/devops/what-is-ci-cd">automating part of development operations.</a> In
+the context of this project, CI/CD is done on the Github Actions platform.
+Cheers to Github for allowing unlimited build limits for open source projects!
+In the following breakdown, I explain how to run the steps on the local machine.
+</p>
+
+<p>
+For the uninitiated, an excellent git porcelain (with spacemacs layer
+integration) is <a href="https://magit.vc">Magit.</a> This, paired with [<a href="#chaconProGit2014">chaconProGit2014</a>], takes care of
+your version control needs.
+</p>
+</div>
+<div id="outline-container-org06ea336" class="outline-3">
+<h3 id="org06ea336"><span class="section-number-3">5.1.</span> Continous Integration</h3>
+<div class="outline-text-3" id="text-5-1">
+<p>
+Some measure of quality assurance through unit, integration and regression
+testing upon commit. This is done in <a href="https://github.com/BenedictHW/project-isidore/blob/master/src/make.lisp">MAKE.LISP</a>, see also <a href="https://github.com/BenedictHW/project-isidore/blob/master/test/tests.lisp">TESTS.LISP</a>.
+</p>
+</div>
+<div id="outline-container-Testing" class="outline-4">
+<h4 id="Testing"><span class="section-number-4">5.1.1.</span> Testing</h4>
+<div class="outline-text-4" id="text-Testing">
+<p>
+<a href="https://www.bhw.name/assets/code-coverage-report/cover-index.html">Project Isidore code coverage report.</a>
+</p>
+
+<p>
+There does exist a detailed evaluation of the many existing Common Lisp testing
+frameworks, the most recent iteration by <a href="https://sabracrolleton.github.io/testing-framework">Sabracrolleton</a>. From this we select
+<code>parachute</code> as our testing framework of choice.
+</p>
+
+<p>
+Project Isidore code aims to be portable Common Lisp within reason. <a href="https://portability.cl/">Common Lisp
+Portability Library Status</a>
+</p>
+</div>
+<div id="outline-container-Notes-on-Drakma" class="outline-5">
+<h5 id="Notes-on-Drakma">Notes on Drakma</h5>
+<div class="outline-text-5" id="text-Notes-on-Drakma">
+<p>
+From: <a href="https://courses.cs.northwestern.edu/325/admin/json-client.php">https://courses.cs.northwestern.edu/325/admin/json-client.php</a>
+</p>
+
+<p>
+Install Drakma
+</p>
+
+<p>
+This should be easy.
+</p>
+
+<p>
+(ql:quickload &ldquo;drakma&rdquo;)
+</p>
+
+<p>
+Using Drakma
+</p>
+
+<p>
+Get data with URLs in Drakma is simple:
+</p>
+
+<p>
+(drakma:http-request url)
+</p>
+
+<p>
+url needs to be a string containing a complete URL. Drakma will send a request
+for that URL to the server indicated, just as a browser or other user client
+would.
+</p>
+
+<p>
+drakma:http-request returns seven values, as Lisp multiple values. If you need
+to save or use values other than the first, use multiple-value-bind or a similar
+form. The values returned, in order, are
+</p>
+
+<p>
+the body of the reply, either a string, when getting HTML or plain text, a
+binary array for images, audio, and JSON, or a file stream, if requested
+using a keyword parameter the HTTP status code an alist of the headers sent
+by the server the URI the reply comes from, which might be different than
+the request when redirects occur the stream the reply was read from a
+boolean indicating whether the stream should be closed the server&rsquo;s status
+text, e.g., &ldquo;OK&rdquo;
+</p>
+</div>
+</div>
+<div id="outline-container-orgf34f52c" class="outline-5">
+<h5 id="orgf34f52c">Notes on CL-SMTP</h5>
+<div class="outline-text-5" id="text-orgf34f52c">
+<p>
+<a href="https://jay.gooby.org/2022/05/06/use-a-basic-gmail-account-to-send-mail-as-with-a-domain-that-uses-cloudflare-email-routing">Use a basic Gmail account to “Send mail as” with a domain that uses Cloudflar&hellip;</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp"><code><span class="org-comment-delimiter">;; </span><span class="org-comment">https://gist.github.com/carboleum/cf03b4c16655f257d96bda8f41f51471
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">Gmail is limited to 500 emails a day.
+</span>(ql:quickload <span class="org-string">"cl-smtp"</span>)
+(<span class="org-keyword">let</span> ((from <span class="org-string">"placeholder@gmail.com"</span>)
+      (to <span class="org-string">"placeholder@gmail.com"</span>)
+      (subject <span class="org-string">"test"</span>)
+      (message <span class="org-string">"Hello ;-) from cl-smtp"</span>)
+      (login <span class="org-string">"placeholder@gmail.com"</span>)
+      <span class="org-comment-delimiter">;; </span><span class="org-comment">Generate an application password via google account settings.
+</span>      <span class="org-comment-delimiter">;; </span><span class="org-comment">Use fly.io secrets for production deployments.
+</span>      (passwd <span class="org-string">"replace-me-with-app-pwd"</span>))
+  (cl-smtp:send-email <span class="org-string">"smtp.gmail.com"</span> from to subject message
+                      <span class="org-builtin">:ssl</span> <span class="org-builtin">:tls</span> <span class="org-builtin">:authentication</span> `(,login ,passwd)))
+</code></pre>
+</div>
+</div>
+</div>
+<div id="outline-container-Debugging" class="outline-5">
+<h5 id="Debugging">Debugging</h5>
+<div class="outline-text-5" id="text-Debugging">
+<p>
+<a href="https://gist.github.com/nikodemus/659495/5461ac5181010bcd3118fa2cd03bc60aaf74d00a#file-sbcl-debugging-notes-txt">From a former maintainer of SBCL, Nikodemus Siivola.</a> The tracing and stickers
+functionality in the SLY IDE is also very useful. Call <code>sly-compile-defun</code> with
+a universal argument C-u to recompile with highest debug settings.
+</p>
+
+<blockquote>
+<ol class="org-ol">
+<li>Test case reduction is an essential skill, no matter the language or the
+environment. It is the art of reducing the code that provokes the issue
+(wrong result, an error, whatever) down to manageable size &ndash; including the
+full call path involved, and environmental issues like Slime vs no Slime, or
+current directory. The smaller the better in general, but it is a balancing
+act: if you can identify the issue using other methods in five minutes, it
+doesn&rsquo;t make sense to spend an hour or two boiling down the test case. &hellip;but
+when other methods are not producing results, and time is dragging on then
+you should consider this.</li>
+
+<li>Defensive programming. Not just coding to protect against errors, but coding
+so that your code is easy to debug. Avoid IGNORE-ERRORS and generally
+swallowing errors silently. Sometimes it is the right thing to do, but the
+more you do it, the harder <b>BREAK-ON-SIGNALS</b> becomes to use when you need
+it. Avoid SAFETY 0 like the plague &ndash; it can hide a multitude of sins. Avoid
+DEBUG 0 &ndash; it doesn&rsquo;t pay. Write PRINT-OBJECT methods for your objects, give
+your objects names to use when printing. Check that slots are bound before
+you use them in your PRINT-OBJECT methods. NEVER use INTERRUPT-THREAD or
+WITH-TIMEOUT unless you really know what you are doing and exactly why I&rsquo;m
+telling you not to use them.</li>
+
+<li>Stop to think. Read the error messages, if any, carefully. Sometimes they&rsquo;re
+no help at all, but sometimes there are nuggets of information in them that a
+casual glance will miss.</li>
+
+<li>Know your environment. (This is what the question was really about, I
+know&hellip;)</li>
+</ol>
+
+<p>
+3.0. M-. is gold. Plain v on a backtrace frame in Slime may also take you places
+if your code has a sufficiently high debug setting, but M-. should work pretty
+much always.
+</p>
+
+<p>
+3.1. The Slime Inspector is one of my primary debugging tools &ndash; but that is
+probably affected by the kind of code I work on, so it might not be the same for
+everyone. Still, you should familiarize yourself with it &ndash; and use the fancy
+one. :)
+</p>
+
+<p>
+3.2. While SBCL backtraces aren&rsquo;t at the moment the pretties ones in the world,
+try to make sense out of them. Just do (error &ldquo;foo&rdquo;) in the REPL, and figure out
+what is going on. Experiment with both the plain SBCL debugger and the fancy
+Slime Debugger before you need to use them for real. They&rsquo;ll feel a lot less
+hostile that way. I&rsquo;ll write advice on interpreting the backtraces at another
+time.
+</p>
+
+<p>
+3.3. Learn about <b>BREAK-ON-SIGNALS</b> and TRACE. Also note the SBCL extensions to TRACE.
+</p>
+
+<p>
+3.4. The stepper isn&rsquo;t really a debugging tool, IMO &ndash; it is a tool for
+understanding control flow, which sometimes helps in debugging &ndash; but if you
+compile your code with DEBUG 3, then (STEP (FOO)) can take you to places.
+</p>
+
+<p>
+3.5. Learn about M-RET (macroexpand) in Slime. Discover what happens if you do
+(SETF <b>PRINT-GENSYM</b> NIL) first, and understand the potential danger there &ndash;
+but also the utility of being easily able to copy-paste the expansion into your
+test case when you&rsquo;re trying to reduce it. (Replacing expansions of macros in
+the COMMON-LISP package is typically pointless, but replacing those from user
+packages can be golden.)
+</p>
+
+<p>
+3.6. If all else fails, do (sb-ext:restrict-compiler-policy &rsquo;safety 3) and
+(sb-ext:restrict-compiler-policy &rsquo;debug 3) and recompile your code. Debugging
+should be easier now. If the error goes away, either (a) you had a type-error or
+similar in SAFETY 0 code that was breaking stuff but is now swallowed by an
+IGNORE-ERRORS or a HANDLER-CASE or (b) you may have found on SBCL bug: compiler
+policy should not generally speaking change codes behaviour &ndash; though there are
+some ANSI mandated things for SAFETY 3, and high DEBUG can inhibit tail-call
+optimizations which, as Schemers know, can matter.
+</p>
+
+<p>
+3.7. DISASSEMBLE isn&rsquo;t normally a debugging tool, but sometimes it can help too.
+Depends on what the issue is.
+</p>
+
+<ol class="org-ol">
+<li>Extensions to printf() debugging. Sometimes this is just the easiest thing.
+No shame in there.</li>
+</ol>
+
+<p>
+4.1. Special variables are nice.
+</p>
+
+<p>
+(LET ((<b>DEBUG</b> :MAGIC)) &hellip;) and elsewhere (WHEN (EQ :MAGIC <b>DEBUG</b>) (PRINT
+(LIST :FOO FOO)))
+</p>
+
+<p>
+Because I&rsquo;m lazy, I tend to use * as the magic variable, so I can also trivially
+set it in the REPL. This allows you to get the debugging output for stuff you
+are interested in only when certain conditions are true. Or you can use it to
+tell which code path the call is coming from, etc.
+</p>
+
+<p>
+4.2. Don&rsquo;t be afraid to add (break &ldquo;foo=~S&rdquo; foo) and similar calls to the code
+you&rsquo;re debugging.
+</p>
+
+<p>
+4.3. SB-DEBUG:BACKTRACE can sometimes be of use.
+</p>
+</blockquote>
+</div>
+</div>
+<div id="outline-container-Logging" class="outline-5">
+<h5 id="Logging">Logging</h5>
+<div class="outline-text-5" id="text-Logging">
+<p>
+Heroku will store your application logs for you. Logging is a step above print
+debugging and can be thought of as &ldquo;live&rdquo; documentation. If you don&rsquo;t have the
+interactivity of the LISP REPL for diagnosis as physician, then you must debug
+through diagnosis as mortician. Good logs are as useful as detailed blood
+stains.
+</p>
+
+<p>
+Edi Weitz 2007-05-11 19:45:03 UTC
+Permalink
+Post by Slava Akhmechet
+</p>
+
+<p>
+I&rsquo;m looking through the Hunchetoot log and occassionally I see the
+</p>
+
+<p>
+couldn&rsquo;t write to #&lt;SB-SYS:FD-STREAM for &ldquo;a
+Connection reset by peer couldn&rsquo;t write to
+#&lt;SB-SYS:FD-STREAM for &rdquo;a Broken pipe
+</p>
+
+<p>
+I don&rsquo;t see any problems in the browser, I only found out about
+these messages because I looked at the log. Can someone think of a
+situation in which these errors would occur without interrupting
+user experience and why?
+</p>
+
+<p>
+The user pressed &ldquo;Stop&rdquo; or went to another website before the page
+(including all images and other stuff) was fully loaded. &ldquo;Broken
+pipe&rdquo; and &ldquo;Connection reset by peer&rdquo; are pretty common error messages
+you&rsquo;ll find (for example) in every Apache logfile - this is nothing
+specific to Hunchentoot or Lisp.
+</p>
+
+<p>
+HTH,
+Edi.
+</p>
+</div>
+</div>
+<div id="outline-container-Generate-Code-Coverage-Report" class="outline-5">
+<h5 id="Generate-Code-Coverage-Report">Generate Code Coverage Report</h5>
+<div class="outline-text-5" id="text-Generate-Code-Coverage-Report">
+<div class="org-src-container">
+<pre class="src src-lisp"><code>   <span class="org-comment-delimiter">;;; </span><span class="org-comment">Generate Code Coverage Report
+</span>   <span class="org-comment-delimiter">;; </span><span class="org-comment">SBCL specific contrib module.
+</span>   (<span class="org-keyword">require</span> <span class="org-constant">:sb-cover</span>)
+   <span class="org-comment-delimiter">;; </span><span class="org-comment">Compiler knob: Turn on generation instrumentation
+</span>   (<span class="org-keyword">declaim</span> (optimize sb-cover:store-coverage-data))
+   <span class="org-comment-delimiter">;; </span><span class="org-comment">Load while ensuring that it's recompiled with the new optimization
+</span>   <span class="org-comment-delimiter">;; </span><span class="org-comment">policy.
+</span>   (asdf:load-system <span class="org-builtin">:project-isidore</span> <span class="org-builtin">:force</span> t)
+   (asdf:test-system <span class="org-builtin">:project-isidore</span>)
+   <span class="org-comment-delimiter">;; </span><span class="org-comment">HTML report output location
+</span>   (sb-cover:report <span class="org-string">"../assets/code-coverage-report/"</span>)
+   (<span class="org-keyword">declaim</span> (optimize (sb-cover:store-coverage-data 0)))
+</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org2029fe9" class="outline-3">
+<h3 id="org2029fe9"><span class="section-number-3">5.2.</span> Continous Delivery</h3>
+<div class="outline-text-3" id="text-5-2">
+<p>
+Building an executable binary for all 3 major operating system platforms on the
+x86-64 architecture. This is done as the final step of <a href="https://gitlab.com/bhw/project-isidore/-/blob/master/make.lisp">MAKE.LISP</a> by calling
+<code>(asdf:make "system-name")</code>. More esoteric architecture/OS pairs will have to
+compile from source, refer to <a href="http://sbcl.org/platform-table.html">the SBCL compiler supported platform table</a>.
+</p>
+
+<p>
+Lisp being amenable to image based development means an executable binary in
+the Lisp world saves the entire global state (the stack is unwound), libraries
+and SBCL runtime included.
+</p>
+</div>
+</div>
+<div id="outline-container-orgece3641" class="outline-3">
+<h3 id="orgece3641"><span class="section-number-3">5.3.</span> Continous Deployment</h3>
+<div class="outline-text-3" id="text-5-3">
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">Commit</th>
+<th scope="col" class="org-left">Company</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">N/A</td>
+<td class="org-left">Heroku</td>
+</tr>
+
+<tr>
+<td class="org-left"><a href="https://gitlab.com/bhw/project-isidore/commit/603da4f0ab28c7e15a1811b96a0640d6ecba0a2a">603da4f</a></td>
+<td class="org-left">Fly.io</td>
+</tr>
+
+<tr>
+<td class="org-left"><a href="https://gitlab.com/bhw/project-isidore/commit/1c7a8e9ba10ae2f5efa05f5ad9ddfc33bf9aa0bd">1c7a8e9</a></td>
+<td class="org-left">Oracle Cloud Infrastructure</td>
+</tr>
+
+<tr>
+<td class="org-left">TBA</td>
+<td class="org-left">Contingency - Hetzner</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+Having to go through initial setup of a new computer dampens the otherwise
+joyous occasion of unwrapping new hardware. The pain is multiplied if it happens
+to be one&rsquo;s job to manage many computers. In its most general form, nerds around
+the world are busy tackling the problem of software <a href="https://en.wikipedia.org/wiki/Reproducibility">reproducibility.</a> NixOS and
+Guix System are the ones currently well-known. I would prefer Guix over NixOS
+myself on account of preferring Guile Scheme over the Nix Expression Language
+(<a href="https://nixos.wiki/wiki/Nix_Expression_Language">self-admittedly designed with the goal of not being a full-featured, general
+purpose language</a>). I was not able to get Guix System (version 1.3.0) working on
+Oracle&rsquo;s aarch64 A1-Flex VMs. Please email me if you have. In the meantime I am
+using and enjoying <a href="https://spwhitton.name/tech/code/consfigurator/">consfigurator</a> for declarative server configuration, at least
+avoiding another Tower of Babel situation.
+</p>
+
+<p>
+Current infrastructure diagram:
+</p>
+
+<p>
+Note to self, <a href="https://specbranch.com/posts/one-big-server/">before scaling</a> this solution <a href="https://groups.csail.mit.edu/tds/papers/Lynch/MIT-LCS-TM-394.pdf">horizontally</a>, consider the <a href="https://www.frankmcsherry.org/assets/COST.pdf">COST</a> of
+doing so.
+</p>
+
+<p>
+Prerequisites:
+</p>
+
+<ul class="org-ul">
+<li><a href="#Introduction">Project Isidore source code.</a></li>
+<li><a href="#Common-Lisp-Environment-Setup">Common Lisp development environment set up.</a></li>
+<li>Basic familiarity with <a href="https://cryptography.io/en/latest/hazmat/primitives/asymmetric/">asymmetric encryption</a>.</li>
+
+<li><p>
+Deploy Project Isidore
+</p>
+
+<p>
+Shell access with Root SSH credentials to a Debian machine is needed. Whether
+this is a physical server or a virtual private server is up to you. I have a
+guided setup on <a href="#org3e57f50">Oracle Cloud Infrastructure</a>.
+</p>
+
+<p>
+Read <a href="https://github.com/BenedictHW/project-isidore/blob/master/src/infrastructure/production.lisp">PRODUCTION.LISP</a> to properly supply SSH credentials and SSL keys.
+</p></li>
+
+<li><p>
+<a href="https://www.digitalocean.com/community/tutorials/an-introduction-to-dns-terminology-components-and-concepts">DNS</a> Resolution - associate domain name with public IP addresses
+</p>
+
+<p>
+Optional: <a href="https://blog.51sec.org/2021/09/enable-ipv6-on-oracle-cloud.html">Enable IPv6 on Oracle Cloud Infrastructure.</a>
+</p>
+
+<p>
+Visitors to our website won&rsquo;t want to key in <a href="http://140.291.294.154:8080">http://140.291.294.154:8080</a>. Our
+Domain Registrar will point <a href="http://my-domain-name.com">http://my-domain-name.com</a> to
+<a href="http://140.291.294.154">http://140.291.294.154</a>. Purchase a domain name if needed.
+</p>
+
+<p>
+Search online for current methods to create a DNS A records (and/or AAAA
+records for IPV6) specific to your Domain Registrar. Port 80 is the default
+port for HTTP traffic, as entering <a href="http://my-domain-name.com">http://my-domain-name.com</a> is equivalent to
+entering <a href="http://my-domain-name.com">http://my-domain-name.com</a>. If you don&rsquo;t want visitors to have to
+key in <a href="http://my-domain-name.com:8080/">http://my-domain-name.com:8080/</a> then either read on, use OCI&rsquo;s docs to
+<a href="https://blogs.oracle.com/cloud-infrastructure/post/http-url-redirect-on-oracle-cloud-infrastructure">redirect a subdomain to a URL with a port number</a>, or configure your web
+server to listen on &ndash; <a href="http://yaws.hyber.org/privbind.yaws">what is on UNIX a privileged port</a> &ndash; 80. Currently I
+have chosen to close port 80 and only have port 443 (default HTTPS port)
+exposed to the public.
+</p></li>
+
+<li><p>
+Developing a remote LISP image
+</p>
+
+<p>
+Of course with the incremental re-defintion in the LISP REPL and our object
+database, <a href="https://cliki.net/Rucksack">Rucksack</a>, having <a href="http://clhs.lisp.se/Body/f_upda_1.htm">update-instance-for-redefined-class</a> it would be
+fun to imagine the flexibility if we could connect a local sly to our
+production LISP image. Doing so gives us great observation capabilities and
+is an cool technique to add to our toolbox. What has by now become the stuff
+of internet legend, Ron Garret&rsquo;s story of <a href="https://flownet.com/ron/RAX2.pdf">Debugging code from 60 million
+miles away</a>, continues to serve as an inspiration.
+</p>
+
+<p>
+<a href="https://joaotavora.github.io/sly/#Setting-up-the-Lisp-image">SLY User Manual, version 1.0.42</a>
+</p>
+
+<p>
+For an example of how this application starts a slynk server see <a href="https://github.com/BenedictHW/project-isidore/commit/da1f7facd6bdfd61d537101ec301b6558834d672">da1f7fa</a>.
+There is no need to allow ingress on OCI&rsquo;s virtual cloud network or in
+firewalld for port 4005. The 4005 ports on both the local and remote machines
+are communicate via SSH port 22. Create the SSH tunnel on the local machine,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>     ssh -L4005:localhost:4005 pi-server
+</code></pre>
+</div>
+
+<p>
+<code>M-x sly-connect RET "localhost" RET 4005 RET</code>.
+</p>
+
+<p>
+I was playing around with connecting sly to a remote LISP image. I wondered
+if slynk:create-server would still work after sbcl:save-lisp-and-die. I mean
+there&rsquo;s no reason to think it wouldn&rsquo;t, but I had to move the
+slynk:create-server form to the toplevel function used by
+sbcl:save-lisp-and-die. Otherwise &ldquo;sudo ss -tulpn | grep LISTEN&rdquo; didn&rsquo;t show
+the open port. Mentioning this if it saves somebody else some time.
+</p></li>
+
+<li><p>
+Crack open a cold one.
+</p>
+
+<p>
+Optional: with the boys.
+</p></li>
+</ul>
+</div>
+<div id="outline-container-org3e57f50" class="outline-4">
+<h4 id="org3e57f50"><span class="section-number-4">5.3.1.</span> Oracle Cloud Infrastructure</h4>
+<div class="outline-text-4" id="text-5-3-1">
+<p>
+Oracle Corporation offers the most generous free tier in cloud computing
+(Infrastructure-as-a-Service) by far as of this writing. Oracle historically has
+had disputes over their stewardship of Open Source software (Java/JVM patent
+issues, MySQL, OpenOffice, and Solaris) and &ndash; with a significant portion of
+their clients being Fortune 500 companies&ndash; you could say that it represents the
+best and worst parts of litigation-happy corporate America. But I&rsquo;m not
+interested in traveling down <i>The Road to Serfdom</i> nor am I interested in
+preaching on the idolatrous love of money. My experience with Oracle Cloud
+Infrastructure (OCI) has thus far been very positive. Thank you Oracle, OCI has
+been great to use. <a href="https://www.oracle.com/ca-en/cloud/free/">Create an account to get started.</a>
+</p>
+
+<p>
+See also:
+</p>
+
+<p>
+<a href="https://medium.com/oracledevs/run-always-free-docker-container-on-oracle-cloud-infrastructure-c88e36b65610">Run Always Free Docker Container on Oracle Cloud Infrastructure | by Lucas Je&hellip;</a>
+</p>
+
+<p>
+<a href="https://abishekmuthian.com/oracle-cloud-free-tier-quirks/">Oracle cloud free tier quirks - The Tallest Dwarf</a>
+</p>
+
+<ol class="org-ol">
+<li><p>
+<a href="https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/launchinginstance.htm">Create a Compute instance</a>
+</p>
+
+<p>
+<a href="https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/importingcustomimagelinux.htm#Importing_Custom_Linux_Images">Bring your own Image</a> - Debian Stable.
+</p>
+
+<p>
+<a href="https://cloud.debian.org/images/cloud/">Download</a> the correct <code>.qcow2</code> file for your system architecture (ARM64 in our
+case). In OCI search for <b>Storage &gt; Object Storage &amp; Archive &gt; Buckets</b>, and
+upload the file into a bucket. Go to <b>Compute &gt; Custom Images</b> and click on
+Import Image. Make sure &ldquo;Paravirtualized Mode&rdquo; is selected. After importing,
+click <b>Edit Details</b> and tick the box for &ldquo;VM.Standard.A1.Flex&rdquo;. <b>Edit Custom
+Image Capabilities</b> to ensure UEFI<sub>64</sub> is preferred and BIOS unchecked. The
+Launch mode should also be set to CUSTOM. Consistent volume naming turned off
+and everything else set to PARAVIRTUALIZED.
+</p>
+
+<p>
+<b>Top left hamburger menu &gt; Compute &gt; Instances &gt; Create Instance</b>
+</p>
+
+<p>
+Select the imported Debian image and a <a href="https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm">shape labeled &ldquo;always free&rdquo;.</a> To
+increase the shape size, click the small triangle icon next to the shape name
+to open a dropdown menu. to After the &ldquo;Image and Shape&rdquo; section is the
+&ldquo;Networking&rdquo; section. The defaults are fine here. Rename if desired and take
+note of the Virtual Cloud Network (VCN) name and subnet name. <a href="https://docs.oracle.com/en/learn/reserved-pub-ip/index.html#introduction">If you would
+like to use a reserved public IP address, then do not assign a public IP at
+this moment.</a> Under the subheading &ldquo;Add SSH keys&rdquo; we can choose to copy and
+paste the contents of a public key. Generate it like so:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>    ssh-keygen -t ed25519 -a 100 -N <span class="org-string">""</span> -C <span class="org-string">"oracle-vm-key"</span> -f ~/.ssh/oracle-vm-key
+</code></pre>
+</div>
+
+<p>
+The file oracle-vm-key contains the private key (-N &ldquo;&rdquo; means no passphrase
+protection). The file oracle-vm-key.pub contains the public key that we will
+give to <a href="https://cloudinit.readthedocs.io/en/latest/">cloud-init</a> by pasting the contents of the public key
+<code>~/.ssh/oracle-vm-key.pub</code> file. Note the ability to specify a custom boot
+volume size. I believe the minimum boot volume size is 47GB. So with the free
+allowance of 200GB it is possible to have 4 VM instances. For now I would
+rather avoid the added complexity of distributed computing. I enlarge the
+boot volume of my one VM to 200GB. After the instance is finished
+provisioning, write down the public IP address assigned to the VM.
+</p></li>
+
+<li><p>
+Setup Root SSH login into the Server
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>   ssh user@host-address -i private-key-file
+</code></pre>
+</div>
+
+<p>
+Replace the host-address with the public IP assigned to the VM. Replace
+private-key-file with a reference to the file that contains the SSH private
+key. &ldquo;opc&rdquo; is the default user for Oracle Linux. For the Debian image, the
+default user would be &ldquo;debian&rdquo;. So in our local shell,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>     ssh debian@140.291.294.154 -i ~/.ssh/oracle-vm-key
+     <span class="org-comment-delimiter"># </span><span class="org-comment">Setup Root SSH access.
+</span>     <span class="org-type">sudo</span> sed -i -e <span class="org-string">'s/#PermitRootLogin prohibit-password/PermitRootLogin prohibit-password/'</span> /etc/ssh/sshd_config
+     <span class="org-type">sudo</span> <span class="org-type">cp</span> -f /home/debian/.ssh/authorized_keys /root/.ssh/authorized_keys
+     <span class="org-type">sudo</span> systemctl restart ssh
+     <span class="org-type">sudo</span> systemctl reboot
+</code></pre>
+</div>
+
+<p>
+Create the file ~/.ssh/config on our local machine if it does not already
+exist and add the following lines to connect more ergonomically with <code>$ ssh
+   oci-a1-flex</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-conf"><code>     Host oci-a1-flex
+       User root
+       HostName 140.291.294.154
+       IdentityFile ~/.ssh/oracle-vm-key
+       ControlPath ~/.ssh/%r@%h:%p
+       ControlMaster auto
+       ControlPersist yes
+</code></pre>
+</div>
+
+<p>
+Optional: connect from <a href="https://www.gnu.org/software/tramp/">Emacs TRAMP.</a>
+</p>
+
+<p>
+Now <code>C-x C-f</code> with the address <code>/ssh:oci-a1-flex:/.</code> ought to work. Popping a
+shell should also just work thanks to the magic of TRAMP.
+</p></li>
+
+<li><p>
+Setup Ingress Rules in Security List to open ports on Virtual Cloud Network.
+</p>
+
+<p>
+We can open the ports we need on our server, but we also need to open said
+ports on the <a href="https://docs.oracle.com/en-us/iaas/Content/Network/Concepts/overview.htm">virtual cloud network level</a>.
+</p>
+
+<p>
+<b>Top left hamburger menu &gt; Networking &gt; Virtual Cloud Networks &gt; VCN-name &gt;
+Subnet-name &gt; Default Security List for VCN-name &gt; Add Ingress Rules</b>
+</p>
+
+<p>
+Example: To allow incoming requests from any IP address to port 443: set
+source CIDR to 0.0.0.0/0 for IPV4 (::/0 for IPV6) and leave Source Port Range
+blank. Destination Port Range is set to 443.
+</p>
+
+<p>
+<b>Caution is required</b> here when exposing our compute instance to the wild,
+wild internet. Oracle ought to and will shutdown any hijacked bot VPSs and
+terminate the accounts. I have also seen at least one email screen capture of
+account termination due to torrenting copyrighted material (while using OCI
+as a VPN). I think it goes without saying that crypto-mining violates some
+end user license agreement. Consult <a href="https://docs.oracle.com/en-us/iaas/Content/Resources/Assets/whitepapers/run-graphical-apps-securely-on-oci.pdf">Oracle&rsquo;s manual</a> to safely run graphical
+applications. While googling &ldquo;oracle cloud caveats&rdquo;, I was led to pay special
+attention to their <a href="https://www.oracle.com/ca-en/cloud/free/faq/">FAQ</a>.
+</p>
+
+<blockquote>
+<p>
+However, if you have more Ampere A1 Compute instances provisioned than are
+available for an Always Free tenancy, <b>all existing Ampere A1 instances are
+disabled and then deleted after 30 days, unless you upgrade to a paid account.</b>
+[emphasis mine] To continue using your existing Arm-based instances as an
+Always Free user, before your trial ends, ensure that your total use of OCPUs
+and memory across all the Ampere A1 Compute instances in your tenancy is
+within the Always Free limit.
+</p>
+</blockquote>
+
+<p>
+You are able to re-create any deleted instances. Still, given the upgrade
+process from a free account to pay-as-you-go relies on further fraud
+prevention through Cybersource, I would not be surprised if a share of user
+woes are unique to the free-tier classification and Oracle&rsquo;s interpretation
+of &ldquo;The Always Free services will continue to be available for unlimited time
+<b>as long as you use the services</b>&rdquo; (Ibid.)
+</p>
+
+<p>
+In my experience of <a href="https://docs.oracle.com/en/cloud/paas/nosql-cloud/csnsd/upgrade-your-free-oracle-cloud-promotion-1.html">upgrading an always free tenancy to pay-as-you-go</a>, you
+can enter your billing details perfectly accurately. I even saw the test
+charge successfully debited and credited to my online banking portal, but
+still the upgrade process failed. I suppose my gmail account was too new and
+had to change my email to my old outlook address in order for the upgrade
+process to complete.
+</p>
+
+<p>
+Perform due diligence, use the features all major cloud services provide to
+prevent going over budget.
+</p>
+
+<p>
+<b>Top left hamburger menu &gt; Billing &amp; Cost Management &gt; Budgets &gt; Create Budget</b>
+</p></li>
+</ol>
+</div>
+</div>
+</div>
+<div id="outline-container-Benchmarking-Profiling" class="outline-3">
+<h3 id="Benchmarking-Profiling"><span class="section-number-3">5.4.</span> Micro Benchmarks</h3>
+<div class="outline-text-3" id="text-Benchmarking-Profiling">
+<p>
+The most likely worse case scenario is a frontpage post to some link aggregate
+website such as <a href="https://old.reddit.com/">Reddit.</a> The number of requests made to the server per client
+obviously varies depending on architecture and workload.
+</p>
+
+<p>
+<a href="https://www.tylermw.com/visualizing-a-reddit-hug-of-death-and-how-to-reddit-proof-your-website-for-pocket-change/">The plural of anecdote is data</a> I hope, so if I&rsquo;m allowed to draw a similarity
+between the application in the above anecdote and my own, I should ballpark for
+around <a href="https://stackexchange.com/performance">300 requests per second.</a> Cloudflare is the star of the story here, and I
+will continue to sing their praises: their CDN allows the caching of my static
+assets.
+</p>
+
+<p>
+I originally spent some time seeing if there was a convenient way to hide
+<code>.html</code> from the URL when serving blog entries. Org-publish generates my static
+blog, and what seemed like a minor annoyance at first proved useful when setting
+up Cloudflare page rules; it took one rule to tell Cloudflare to cache all URL&rsquo;s
+ending in <code>.html</code>. They have a very reasonable usage policy for their CDN (<a href="https://www.cloudflare.com/en-ca/terms/">see
+section 2.8 of their EULA</a>). OCI deserves applause in tandem, for their 10TB
+free data egress. Thank you to abuse-prevention teams in both these companies!
+It makes the homegrown part of the internet possible.
+</p>
+
+<p>
+We use <a href="https://loader.io/">loader.io</a> to benchmark our application.
+</p>
+
+<p>
+15 clients per second for a duration of 1 minute.
+HTTP Resource: <a href="https://www.bhw.name/bible/1-1-1/1-1-31">https://www.bhw.name/bible/1-1-1/1-1-31</a>
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-right">
+
+<col  class="org-right">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">COMMIT</th>
+<th scope="col" class="org-left">OS</th>
+<th scope="col" class="org-left">CPU</th>
+<th scope="col" class="org-left">MEMORY</th>
+<th scope="col" class="org-right">AVG. RESP (ms)</th>
+<th scope="col" class="org-right">AVG. ERR RATE (%)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">4eaaa66</td>
+<td class="org-left">Alpine 3.15</td>
+<td class="org-left">standard-1x</td>
+<td class="org-left">512MB</td>
+<td class="org-right">N/A</td>
+<td class="org-right">N/A</td>
+</tr>
+
+<tr>
+<td class="org-left">cfe3566</td>
+<td class="org-left"><a href="https://github.com/GoogleContainerTools/distroless">Distroless</a></td>
+<td class="org-left">3x share-cpu-1x</td>
+<td class="org-left">3x 256MB</td>
+<td class="org-right">1820</td>
+<td class="org-right">0</td>
+</tr>
+
+<tr>
+<td class="org-left">e557bb5</td>
+<td class="org-left">Debian 11.3</td>
+<td class="org-left">4 OCPU VM.Standard.A1.Flex</td>
+<td class="org-left">24GB</td>
+<td class="org-right">3504</td>
+<td class="org-right">0</td>
+</tr>
+</tbody>
+</table>
+
+
+<p>
+300 clients per second for a duration of 1 minute.
+HTTP Resource: <a href="https://www.bhw.name/about">https://www.bhw.name/about</a>
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-right">
+
+<col  class="org-right">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">COMMIT</th>
+<th scope="col" class="org-left">OS</th>
+<th scope="col" class="org-left">CPU</th>
+<th scope="col" class="org-left">MEMORY</th>
+<th scope="col" class="org-right">AVG. RESP (ms)</th>
+<th scope="col" class="org-right">AVG. ERR RATE (%)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">4eaaa66</td>
+<td class="org-left">Alpine 3.15</td>
+<td class="org-left">standard-1x</td>
+<td class="org-left">512MB</td>
+<td class="org-right">1400.66</td>
+<td class="org-right">6.53</td>
+</tr>
+
+<tr>
+<td class="org-left">cfe3566</td>
+<td class="org-left"><a href="https://github.com/GoogleContainerTools/distroless">Distroless</a></td>
+<td class="org-left">3x share-cpu-1x</td>
+<td class="org-left">3x 256MB</td>
+<td class="org-right">43</td>
+<td class="org-right">0</td>
+</tr>
+
+<tr>
+<td class="org-left">e557bb5</td>
+<td class="org-left">Debian 11.3</td>
+<td class="org-left">4 OCPU VM.Standard.A1.Flex</td>
+<td class="org-left">24GB</td>
+<td class="org-right">43</td>
+<td class="org-right">0</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+300 clients per second for a duration of 1 minute.
+HTTP Resource: <a href="https://www.bhw.name/assets/blog/installation-of-spacemacs.html">https://www.bhw.name/assets/blog/installation-of-spacemacs.html</a>
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-left">
+
+<col  class="org-right">
+
+<col  class="org-right">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">COMMIT</th>
+<th scope="col" class="org-left">OS</th>
+<th scope="col" class="org-left">CPU</th>
+<th scope="col" class="org-left">MEMORY</th>
+<th scope="col" class="org-right">AVG. RESP (ms)</th>
+<th scope="col" class="org-right">AVG. ERR RATE (%)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">4eaaa66</td>
+<td class="org-left">Alpine 3.15</td>
+<td class="org-left">standard-1x</td>
+<td class="org-left">512MB</td>
+<td class="org-right">N/A</td>
+<td class="org-right">N/A</td>
+</tr>
+
+<tr>
+<td class="org-left">cfe3566</td>
+<td class="org-left"><a href="https://github.com/GoogleContainerTools/distroless">Distroless</a></td>
+<td class="org-left">3x share-cpu-1x</td>
+<td class="org-left">3x 256MB</td>
+<td class="org-right">19</td>
+<td class="org-right">0</td>
+</tr>
+
+<tr>
+<td class="org-left">e557bb5</td>
+<td class="org-left">Debian 11.3</td>
+<td class="org-left">4 OCPU VM.Standard.A1.Flex</td>
+<td class="org-left">24GB</td>
+<td class="org-right">37</td>
+<td class="org-right">0</td>
+</tr>
+</tbody>
+</table>
+
+<p>
+For a primer on high performance LISP web servers see <a href="https://fukamachi.hashnode.dev/woo-a-high-performance-common-lisp-web-server">Woo: a high-performance
+Common Lisp web server</a>. It should be pointed out that the hunchentoot listed on
+Woo&rsquo;s benchmark graph is the single threaded version. <a href="https://github.com/fukamachi/woo/blob/master/benchmark.md%20">The multi-threaded version
+benchmarks are more impressive.</a> The article about Woo also fails to mention
+quux-hunchentoot which employs a thread-pooling taskmaster as an extension to
+Hunchentoot.
+</p>
+
+<p>
+These stress tests are run with <code>sudo apt install wrk</code> on OCI&rsquo;s A1 Flex VM&rsquo;s
+with 4 cores and 24GB at commit d0f10c5.
+</p>
+
+<ol class="org-ol">
+<li><p>
+Cl-tbnl-gserver-tmgr
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>     debian@master-instance:~$ wrk -t4 -c100 -d10 <span class="org-string">"http://localhost:8081/about"</span>
+     Running 10s test @ http://localhost:8081/about
+       4 threads and 100 connections
+       Thread Stats   Avg      Stdev     Max   +/- Stdev
+         Latency     2.94ms    2.84ms  43.51ms   90.52%
+         Req/Sec     0.91k   509.03     1.73k    46.00%
+       27146 requests<span class="org-keyword"> in</span> 10.02s, 50.51MB read
+     Requests/sec:   2709.57
+     Transfer/sec:      5.04MB
+
+     debian@master-instance:~$ wrk -t4 -c100 -d10 <span class="org-string">"http://localhost:8081/about"</span>
+     Running 10s test @ http://localhost:8081/about
+       4 threads and 100 connections
+       Thread Stats   Avg      Stdev     Max   +/- Stdev
+         Latency     2.93ms    2.82ms  51.14ms   90.58%
+         Req/Sec     0.91k   660.73     2.08k    64.67%
+       27306 requests<span class="org-keyword"> in</span> 10.02s, 50.81MB read
+     Requests/sec:   2726.07
+     Transfer/sec:      5.07MB
+
+     debian@master-instance:~$ wrk -t4 -c100 -d10 <span class="org-string">"http://localhost:8081/about"</span>
+     Running 10s test @ http://localhost:8081/about
+       4 threads and 100 connections
+       Thread Stats   Avg      Stdev     Max   +/- Stdev
+         Latency     2.92ms    2.82ms  49.55ms   90.39%
+         Req/Sec     1.37k   808.96     2.52k    52.00%
+       27355 requests<span class="org-keyword"> in</span> 10.02s, 50.90MB read
+     Requests/sec:   2731.18
+     Transfer/sec:      5.08MB
+</code></pre>
+</div></li>
+
+<li><p>
+Default multi-threaded Hunchentoot
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>     debian@master-instance:~$ wrk -t4 -c100 -d10 <span class="org-string">"http://localhost:8082/about"</span>
+     Running 10s test @ http://localhost:8082/about
+       4 threads and 100 connections
+       Thread Stats   Avg      Stdev     Max   +/- Stdev
+         Latency    64.00ms  131.31ms   1.95s    92.41%
+         Req/Sec   504.07    391.26     1.67k    71.28%
+       14308 requests<span class="org-keyword"> in</span> 10.05s, 26.62MB read
+       Socket errors: connect 0, read 0, write 0, timeout 36
+     Requests/sec:   1423.18
+     Transfer/sec:      2.65MB
+
+     debian@master-instance:~$ wrk -t4 -c100 -d10 <span class="org-string">"http://localhost:8082/about"</span>
+     Running 10s test @ http://localhost:8082/about
+       4 threads and 100 connections
+       Thread Stats   Avg      Stdev     Max   +/- Stdev
+         Latency    65.20ms  142.16ms   1.96s    93.24%
+         Req/Sec   416.33    321.55     1.55k    69.21%
+       14800 requests<span class="org-keyword"> in</span> 10.08s, 27.54MB read
+       Socket errors: connect 0, read 0, write 0, timeout 40
+     Requests/sec:   1468.68
+     Transfer/sec:      2.73MB
+
+     debian@master-instance:~$ wrk -t4 -c100 -d10 <span class="org-string">"http://localhost:8082/about"</span>
+     Running 10s test @ http://localhost:8082/about
+       4 threads and 100 connections
+       Thread Stats   Avg      Stdev     Max   +/- Stdev
+         Latency    65.67ms  145.15ms   2.00s    93.67%
+         Req/Sec   452.20    421.83     2.00k    74.68%
+       14152 requests<span class="org-keyword"> in</span> 10.06s, 26.33MB read
+       Socket errors: connect 0, read 0, write 0, timeout 35
+     Requests/sec:   1406.08
+     Transfer/sec:      2.62MB
+</code></pre>
+</div></li>
+
+<li><p>
+Clack with Woo and libev-dev
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>     debian@master-instance:~$ wrk -t4 -c100 -d10 <span class="org-string">"http://localhost:8083/about"</span>
+     Running 10s test @ http://localhost:8083/about
+       4 threads and 100 connections
+       Thread Stats   Avg      Stdev     Max   +/- Stdev
+         Latency    43.78ms   29.71ms 221.07ms   88.44%
+         Req/Sec   634.03    234.05     0.91k    77.25%
+       25272 requests<span class="org-keyword"> in</span> 10.02s, 47.02MB read
+     Requests/sec:   2522.89
+     Transfer/sec:      4.69MB
+
+     debian@master-instance:~$ wrk -t4 -c100 -d10 <span class="org-string">"http://localhost:8083/about"</span>
+     Running 10s test @ http://localhost:8083/about
+       4 threads and 100 connections
+       Thread Stats   Avg      Stdev     Max   +/- Stdev
+         Latency    55.64ms   72.08ms 597.50ms   92.30%
+         Req/Sec   630.25    245.64     0.95k    76.80%
+       24364 requests<span class="org-keyword"> in</span> 10.02s, 45.33MB read
+     Requests/sec:   2432.66
+     Transfer/sec:      4.53MB
+
+     debian@master-instance:~$ wrk -t4 -c100 -d10 <span class="org-string">"http://localhost:8083/about"</span>
+     Running 10s test @ http://localhost:8083/about
+       4 threads and 100 connections
+       Thread Stats   Avg      Stdev     Max   +/- Stdev
+         Latency    44.21ms   29.66ms 204.73ms   88.33%
+         Req/Sec   629.64    227.31     0.89k    78.00%
+       25085 requests<span class="org-keyword"> in</span> 10.01s, 46.67MB read
+     Requests/sec:   2505.62
+     Transfer/sec:      4.66MB
+</code></pre>
+</div></li>
+
+<li><p>
+Quux-Hunchentoot Thread Pool
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh"><code>     debian@master-instance:~$ wrk -t4 -c100 -d10 http://localhost:8080/
+     Running 10s test @ http://localhost:8080/
+       4 threads and 100 connections
+       Thread Stats   Avg      Stdev     Max   +/- Stdev
+         Latency     3.34ms    4.82ms 166.69ms   94.11%
+         Req/Sec   820.70    791.93     2.29k    72.15%
+       24371 requests<span class="org-keyword"> in</span> 10.04s, 160.35MB read
+     Requests/sec:   2426.30
+     Transfer/sec:     15.96MB
+     debian@master-instance:~$ wrk -t4 -c100 -d10 http://localhost:8080/
+     Running 10s test @ http://localhost:8080/
+       4 threads and 100 connections
+       Thread Stats   Avg      Stdev     Max   +/- Stdev
+         Latency     3.13ms    2.97ms  43.67ms   93.27%
+         Req/Sec     1.28k   452.76     1.89k    72.50%
+       25593 requests<span class="org-keyword"> in</span> 10.05s, 168.39MB read
+     Requests/sec:   2546.40
+     Transfer/sec:     16.75MB
+     debian@master-instance:~$ wrk -t4 -c100 -d10 http://localhost:8080/about
+     Running 10s test @ http://localhost:8080/about
+       4 threads and 100 connections
+       Thread Stats   Avg      Stdev     Max   +/- Stdev
+         Latency     2.86ms    2.70ms  52.46ms   94.02%
+         Req/Sec     0.94k   653.16     2.06k    64.67%
+       27966 requests<span class="org-keyword"> in</span> 10.04s, 52.09MB read
+     Requests/sec:   2784.27
+     Transfer/sec:      5.19MB
+</code></pre>
+</div></li>
+</ol>
+
+<p>
+Because MAKE.LISP fiddles with compiler knobs in search of performance, a single
+project-isidore@.service in production can reach upwards of 3300 requests per
+second. To improve application resiliency Nginx is used to load balance between 12
+project-isidore processes each at 2GB of RAM. Lastly, of note is the 4GBps
+network bandwidth offered by Oracle Cloud. My bottleneck should be at this
+point the rucksack database, despite offering concurrent transactions.
+</p>
+
+<p>
+So with the bare minimum amount of testing done I can say with confidence that
+my website is well prepared given the restraints on cost, time, and money.
+</p>
+</div>
+<div id="outline-container-orgbe5b8a4" class="outline-4">
+<h4 id="orgbe5b8a4"><span class="section-number-4">5.4.1.</span> Standards Compliance</h4>
+<div class="outline-text-4" id="text-5-4-1">
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-right">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">Test</th>
+<th scope="col" class="org-right">Grade</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left"><a href="https://www.ssllabs.com/ssltest">Qualys SSL</a></td>
+<td class="org-right">A</td>
+</tr>
+
+<tr>
+<td class="org-left"><a href="https://internet.nl/">Internet.nl</a></td>
+<td class="org-right">71%</td>
+</tr>
+
+<tr>
+<td class="org-left"><a href="https://web.dev/measure/">Lighthouse</a></td>
+<td class="org-right">92%</td>
+</tr>
+
+<tr>
+<td class="org-left"><a href="https://www.hardenize.com/">Hardenize</a></td>
+<td class="org-right">&nbsp;</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div id="outline-container-orgc2c3dc6" class="outline-3">
+<h3 id="orgc2c3dc6"><span class="section-number-3">5.5.</span> Financial Reports</h3>
+<div class="outline-text-3" id="text-5-5">
+<p>
+This website is run as a non-profit hobby, for no advertising is or will be
+displayed. Dollar amounts are in CAD. Thank you to <a href="#Project-History-Credits">all patrons</a>.
+</p>
+
+<table>
+
+
+<colgroup>
+<col  class="org-left">
+
+<col  class="org-right">
+
+<col  class="org-right">
+
+<col  class="org-right">
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-left">Income Statement</th>
+<th scope="col" class="org-right">2021</th>
+<th scope="col" class="org-right">2022</th>
+<th scope="col" class="org-right">2023</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-left">Revenue</td>
+<td class="org-right">&nbsp;</td>
+<td class="org-right">&nbsp;</td>
+<td class="org-right">&nbsp;</td>
+</tr>
+</tbody>
+<tbody>
+<tr>
+<td class="org-left">Donations</td>
+<td class="org-right">0.00</td>
+<td class="org-right">0.00</td>
+<td class="org-right">0.00</td>
+</tr>
+</tbody>
+<tbody>
+<tr>
+<td class="org-left">Expenses</td>
+<td class="org-right">&nbsp;</td>
+<td class="org-right">&nbsp;</td>
+<td class="org-right">&nbsp;</td>
+</tr>
+</tbody>
+<tbody>
+<tr>
+<td class="org-left">Domain name</td>
+<td class="org-right">10.10</td>
+<td class="org-right">10.10</td>
+<td class="org-right">10.10</td>
+</tr>
+</tbody>
+<tbody>
+<tr>
+<td class="org-left">Total</td>
+<td class="org-right">10.1</td>
+<td class="org-right">10.1</td>
+<td class="org-right">10.1</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div id="outline-container-Data-Persistence" class="outline-2">
+<h2 id="Data-Persistence"><span class="section-number-2">6.</span> Data Persistence</h2>
+<div class="outline-text-2" id="text-Data-Persistence">
+<p>
+Project Isidore uses <a href="https://www.sqlite.org/whentouse.html">an embedded database</a> (Rucksack) over more typical
+client-server RDBMS&rsquo;s such as PostgreSQL. Extremely heavy read-heavy data or
+whatever data that ought to be cached are stored by the in-memory object
+prevalence model (BKNR.Datastore). <a href="https://blog.wesleyac.com/posts/consider-sqlite">Moore&rsquo;s law has brought us significant
+improvements,</a> and as a result SQLite is a viable choice for this application.
+</p>
+
+<p>
+Key value &gt; multi column &gt; document &gt; relational &gt; graph
+</p>
+
+<p>
+Graph Databases, the Semantic Web and RDF stores have capture my attention.
+In the open source common lisp world,
+</p>
+
+<p>
+Open source is behind, just look at the customer list of awe neptune,
+allegrograph, neo4j etc.
+</p>
+
+<p>
+vivace graph
+de.setf.resource
+</p>
+
+<p>
+<a href="https://www.lassila.org/">https://www.lassila.org/</a> wilbur author, now works for aws neptune.
+</p>
+
+<p>
+project mage and the promise of a prototype OO gui toolkit.
+clog by a rabbi is already a great web gui toolkit
+vivace-graph rivalling neo4j in performance.
+</p>
+
+<p>
+just like XML is a poor, verbose re-implementation of s-expressions, RDF is an equally verbose reimplementation of Prolog clauses.
+</p>
+
+<p>
+<a href="https://people.well.com/user/doctorow/metacrap.htm">https://people.well.com/user/doctorow/metacrap.htm</a>
+</p>
+
+<p>
+&ldquo;The semantic web is the future of the web, and always will be.&rdquo; &ndash; Peter Norvig
+</p>
+
+<p>
+<a href="https://www.youtube.com/watch?v=LNjJTgXujno&amp;t=1257s">https://www.youtube.com/watch?v=LNjJTgXujno&amp;t=1257s</a>
+</p>
+</div>
+<div id="outline-container-PostgreSQL" class="outline-3">
+<h3 id="PostgreSQL"><span class="section-number-3">6.1.</span> PostgreSQL</h3>
+<div class="outline-text-3" id="text-PostgreSQL">
+<p>
+This section is now outdated. I implemented a trivial PostgreSQL mailing list
+but running what amounts to your own mail server that does not have its messages
+marked by the big email providers as spam is most definitely non-trivial. As of
+<a href="https://gitlab.com/bhw/project-isidore/commit/7a4fc5dce7c489e7ba07a6e5d7c3c7cc491fa000">commit 7a4fc5d,</a> I have switched to <a href="https://mailchimp.com/pricing/marketing/">Mailchimp.</a> On production instances, there&rsquo;s a
+savings of 138MB-92.8MB=45.2MB RAM.
+</p>
+
+<p>
+<a href="https://www.postgresql.org/docs/current/tutorial.html">PostgreSQL has very clear and structured documentation.</a> Refer to the
+documentation to install PostgreSQL locally on your computer. Afterwards a good
+introduction to basic Create, Read, Update, Delete (CRUD) operations is here: <a href="https://web.archive.org/web/20211006233739/https://kuomarc.wordpress.com/2012/05/13/12-steps-to-build-and-deploy-common-lisp-in-the-cloud-and-comparing-rails/">12
+Steps to Build and Deploy Common Lisp in the Cloud (and Comparing Rails) |&hellip;</a>
+</p>
+
+<p>
+Documentation on Postmodern is better than your average Common Lisp library.
+Still to supplement the <a href="https://github.com/marijnh/Postmodern">official docs</a> are <a href="https://sites.google.com/site/sabraonthehill/postmodern-examples/postmodern-dao">examples</a> and specifically <a href="https://read-eval-print.blogspot.com/2007/08/common-lisp-postgresql-postmodern.html">examples
+using the Data Access Objects.</a>
+</p>
+
+<ol class="org-ol">
+<li>To start PostgreSQL server process</li>
+</ol>
+<div class="org-src-container">
+<pre class="src src-bash"><code><span class="org-comment-delimiter"># </span><span class="org-comment">Install PostgreSQL.
+</span><span class="org-type">sudo</span> apt install postgresql
+<span class="org-comment-delimiter"># </span><span class="org-comment">Start server process. PostgreSQL defaults to PORT 5432
+</span><span class="org-type">sudo</span> service postgresql start
+<span class="org-comment-delimiter"># </span><span class="org-comment">Login as PostgreSQL Superuser "postgres" via "psql" Client
+</span><span class="org-type">sudo</span> -u postgres psql
+<span class="org-comment-delimiter"># </span><span class="org-comment">Create database "Test"
+</span>createdb test
+<span class="org-comment-delimiter"># </span><span class="org-comment">Delete database "Test"
+</span>dropdb test
+<span class="org-comment-delimiter"># </span><span class="org-comment">Login as superuser to create user for database "Test"
+</span><span class="org-type">sudo</span> -u postgres psql
+<span class="org-comment-delimiter"># </span><span class="org-comment">See defparameter `*local-db-params*' in MODEL.LISP.
+</span>CREATE USER user1 WITH PASSWORD <span class="org-string">'user1'</span>;
+<span class="org-comment-delimiter"># </span><span class="org-comment">Use Shell to login as host: localhost with database: test and user:user1
+</span>psql -h localhost -d test -U user1
+<span class="org-comment-delimiter"># </span><span class="org-comment">Once logged in,
+</span><span class="org-variable-name">test</span>=# select * from tablename;
+</code></pre>
+</div>
+</div>
+</div>
+<div id="outline-container-In-Memory-Datastore" class="outline-3">
+<h3 id="In-Memory-Datastore"><span class="section-number-3">6.2.</span> In-Memory Datastore</h3>
+<div class="outline-text-3" id="text-In-Memory-Datastore">
+<p>
+Design constraints imposed by the current deployment platform, Heroku &amp; Github.
+</p>
+
+<ul class="org-ul">
+<li>Heroku managed PostgreSQL free tier limitations = 10000 rows, 1GB disk capacity.</li>
+<li>Heroku free tier dyno memory (automatic dyno shutdown at 1GB) = 512 MB.</li>
+<li>Heroku free tier slug size = 500 MB.</li>
+<li>Github large file limit = 100MB-2GB.</li>
+</ul>
+
+<p>
+Characteristics of Bible dataset:
+</p>
+
+<ul class="org-ul">
+<li>Read-only data.</li>
+<li>Dataset should be available offline.</li>
+<li>Non-expanding dataset.</li>
+<li>Fits within Heroku free tier dyno memory (18-20MB). Online reports of 80-140mb
+RAM usage by hunchentoot + ironclad.</li>
+<li>Limited developer resources mean instead of programming/debugging in LISP, I
+would need to master a second domain specific programming language: SQL.</li>
+<li>Very cost sensitive (cut me some slack, I&rsquo;m a college student).</li>
+</ul>
+
+<p>
+Object Relational Mappers (ORM) are notoriously hard to get right. It is too bad
+the pure LISP persistence solutions (Allegrocache) remain proprietary. For open
+source solutions, I still think <code>bknr.datastore</code> is among the best for now.
+Rucksack by Arthur Lemmens is also worth playing with, but due to the
+restrictions of the Heroku ephemeral filesystem, the library with the best fit
+for my application would be <code>bknr.datastore</code>.
+</p>
+
+<p>
+Memory-Centric Data Management A Monash Information Services White Paper by Curt
+</p>
+<ol class="org-ol">
+<li>Monash, Ph.D. May, 2006, accessible at <a href="http://www.monash.com/whitepapers.html">http://www.monash.com/whitepapers.html</a></li>
+</ol>
+
+<p>
+See pg 668 of weitzCommonLispRecipes2016 for cookbook recipes on BKNR.DATASTORE.
+</p>
+
+<p>
+<a href="https://medium.com/@paul_83250/object-prevalence-an-in-memory-no-database-solution-to-persistence-a1ebcd1493b0">Object Prevalence : An In-Memory, No-Database Solution to Persistence | by Pa&hellip;</a>
+</p>
+
+<p>
+<a href="https://nicklevine.org/lisp-book/contents/chac.pdf">https://nicklevine.org/lisp-book/contents/chac.pdf</a>
+</p>
+
+<p>
+<a href="https://cl-pdx.com/static/persistence-lemmens.txt">https://cl-pdx.com/static/persistence-lemmens.txt</a>
+</p>
+</div>
+</div>
+<div id="outline-container-BKNR-Datastore-vs-Rucksack-vs-Postmodern" class="outline-3">
+<h3 id="BKNR-Datastore-vs-Rucksack-vs-Postmodern"><span class="section-number-3">6.3.</span> BKNR.Datastore vs Rucksack vs Postmodern</h3>
+<div class="outline-text-3" id="text-BKNR-Datastore-vs-Rucksack-vs-Postmodern">
+<p>
+<a href="https://common-lisp.net/project/rucksack/">Rucksack</a> measurements are listed first, then <a href="https://github.com/hanshuebner/bknr-datastore">BKNR.Datastore.</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text"><code>PROJECT-ISIDORE/VIEWS&gt; (time (get-bible-text 23))
+Evaluation took:
+  0.000 seconds of real time
+  0.000098 seconds of total run time (0.000095 user, 0.000003 system)
+  100.00% CPU
+  228,122 processor cycles
+  0 bytes consed
+
+PROJECT-ISIDORE/VIEWS&gt; (time (get-bible-text 23))
+Evaluation took:
+  0.000 seconds of real time
+  0.000020 seconds of total run time (0.000020 user, 0.000000 system)
+  100.00% CPU
+  36,872 processor cycles
+  0 bytes consed
+
+PROJECT-ISIDORE/VIEWS&gt; (time (bible-page "1-1-1-2-2-2"))
+Evaluation took:
+  0.330 seconds of real time
+  0.328973 seconds of total run time (0.328973 user, 0.000000 system)
+  99.70% CPU
+  821,152,853 processor cycles
+  30,101,264 bytes consed
+
+PROJECT-ISIDORE/VIEWS&gt; (time (bible-page "1-1-1-2-2-2"))
+Evaluation took:
+  0.440 seconds of real time
+  0.441031 seconds of total run time (0.431896 user, 0.009135 system)
+  [ Run times consist of 0.017 seconds GC time, and 0.425 seconds non-GC time. ]
+  100.23% CPU
+  1,098,042,384 processor cycles
+  91,860,080 bytes consed
+
+PROJECT-ISIDORE/VIEWS&gt; (time (bible-page "1-1-1-73-22-21"))
+Evaluation took:
+  8.990 seconds of real time
+  8.998338 seconds of total run time (8.102798 user, 0.895540 system)
+  [ Run times consist of 0.077 seconds GC time, and 8.922 seconds non-GC time. ]
+  100.09% CPU
+  22,446,254,265 processor cycles
+  796,903,104 bytes consed
+
+PROJECT-ISIDORE/VIEWS&gt; (time (bible-page "1-1-1-73-22-21"))
+Evaluation took:
+  0.660 seconds of real time
+  0.659741 seconds of total run time (0.641298 user, 0.018443 system)
+  [ Run times consist of 0.025 seconds GC time, and 0.635 seconds non-GC time. ]
+  100.00% CPU
+  1,641,964,703 processor cycles
+  327,536,880 bytes consed
+</code></pre>
+</div>
+
+<p>
+A sampling of <a href="https://github.com/marijnh/Postmodern">postmodern</a> DAO speeds,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text"><code>PROJECT-ISIDORE/MODEL&gt; (time (friend-email (mailinglist-get 2)))
+Evaluation took:
+  0.010 seconds of real time
+  0.002794 seconds of total run time (0.002794 user, 0.000000 system)
+  30.00% CPU
+  25,589,575 processor cycles
+  32,432 bytes consed
+
+"Bob234@gmail.com"
+</code></pre>
+</div>
+
+<p>
+And a regular SQL query done in postmodern,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text"><code>PROJECT-ISIDORE/MODEL&gt;  (time (pomo:with-connection (db-params) (pomo:query (:select 'email :from 'mailinglist :where (:= 'id 2)) :single)))
+Evaluation took:
+  0.010 seconds of real time
+  0.003089 seconds of total run time (0.003089 user, 0.000000 system)
+  30.00% CPU
+  24,084,690 processor cycles
+  16,368 bytes consed
+
+"Bob234@gmail.com"
+1 (1 bit, #x1, #o1, #b1)
+</code></pre>
+</div>
+
+<p>
+A sampling of <a href="https://common-lisp.net/project/cl-sqlite/">cl-sqlite</a> with the in-memory database,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text"><code>SQLITE&gt;
+(time (execute-single *db* "select id from users where user_name = ?" "dvk"))
+Evaluation took:
+  0.000 seconds of real time
+  0.000047 seconds of total run time (0.000045 user, 0.000002 system)
+  100.00% CPU
+  108,448 processor cycles
+  0 bytes consed
+
+2 (2 bits, #x2, #o2, #b10)
+</code></pre>
+</div>
+
+<p>
+and with a regular disk based database,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text"><code>SQLITE&gt; (time (execute-single *dba* "select id from users where user_name = ?" "dvk"))
+Evaluation took:
+  0.000 seconds of real time
+  0.000085 seconds of total run time (0.000081 user, 0.000004 system)
+  100.00% CPU
+  196,908 processor cycles
+  0 bytes consed
+
+2 (2 bits, #x2, #o2, #b10)
+</code></pre>
+</div>
+
+<p>
+For this admittedly shallow testing, BKNR.Datastore and Rucksack perform
+admirably! <a href="https://github.com/phoe/quicklisp-stats">Quicklisp-stats</a> shows BKNR.Datastore is still in use, with the most
+recent example being a <a href="https://lisp-journey.gitlab.io/blog/lisp-interview-screenshotbot/">startup by an ex-Facebook engineer.</a> The most recent
+mention I can find of Rucksack is by <a href="https://european-lisp-symposium.org/static/2020/lawson-slides.pdf">Ravenpack, at ELS2020.</a>
+</p>
+
+<p>
+The quicklisp download stats for Rucksack show an 200% increase (from NIL &gt;
+223/239) around the months of January and February. I find it plausible that
+Ravenpack, who does data analysis for the financial sector, have their engineers
+repull all libraries from quicklisp once per year; I have noticed same patterns
+for some other libraries.
+</p>
+
+<p>
+BKNR.Datastore is the reason I am able to structure the Tabular Douay Rheims in
+the way that I have. Any disk based solution would have been too slow, forcing
+me to cache the pages or store them as static files. Many thanks to Hans Hubner,
+the author of said library. And yes, <a href="https://common-lisp.net/project/cl-store/">cl-store</a> or simple serialization would have
+sufficed for my use case but I&rsquo;ll take Edmund Weitz&rsquo;s word when he recommends
+BKNR.Datastore over cl-store in his ebib:weitzCommonLispRecipes2016.
+</p>
+
+<p>
+The question of ORM&rsquo;s comes up again. As of the current writing, I am aware of a
+handful of options.
+</p>
+
+<p>
+<a href="https://common-lisp.net/project/elephant/">Elephant</a> - interfaces to the C databases (Berkeley DB, PostgreSQL) most likely
+bitrotted, perhaps the author got hired to work on allegrocache? Quicklisp-stats
+show 35 downloads total for the past 2 years.
+</p>
+
+<p>
+<a href="http://clsql.kpe.io/">CLSQL</a> - by far the greatest number of backends supported, with the necessary
+compromises that suggests. Tradition extends back many years, shares ideas with
+<a href="http://www.lispworks.com/documentation/sql-tutorial/">CommonSQL</a> and has a SOLID track record. Packaged for Debian. Great
+documentation.
+</p>
+
+<p>
+<a href="https://common-lisp.net/project/cl-perec/index-old.shtml">Hu.dwim.perec</a> - Originally started as a fork of CLSQL. Greatly extends the ORM
+capabilities and is kept up to date: I think mostly by one person, Levente
+Mészáros. This is one of the libraries that show almost exact same download
+patterns as Rucksack. So what&rsquo;s the catch? Very little documentation. You will
+have to dive deep into a bunch of hu.dwim.* packages and look at tests. Pretty
+much pulls in the entire hu.dwim.* ecosystem with it when downloaded from
+quicklisp. With great power comes&hellip;
+</p>
+
+<p>
+<a href="https://github.com/fukamachi/mito">Mito</a> - Fukamachi-ware. Similar download stats to CLSQL. Very young project,
+started in 2016. Also see <a href="https://github.com/eudoxia0/crane/">Crane,</a> the stats show close to zero usage though.
+</p>
+
+<p>
+If one is willing to make the trade-off of SQL for object persistence, then as
+far as I know there are really only two pure lisp options. I say &ldquo;only&rdquo; but I&rsquo;m
+not aware of any other language with libraries comparable to the ones below.
+</p>
+
+<p>
+Rucksack (open source) - as mentioned earlier, authored by hacker Arthur Lemmens
+(worked at Ravenbrook). Small, written in portable lisp, possessing performance
+that isn&rsquo;t bad at all, a real gem of a project. The mailing lists of Elephant
+and Rucksack show some attempt made to combine the ideas of Rucksack into a pure
+lisp backend for Elephant. Rucksack also shows a lack of recent updates, but
+unlike Elephant, has users to this day. Ain&rsquo;t it beautiful how the stability of
+the language shines through the library? Don&rsquo;t let the date of the last commit
+turn you away. Give it a shot, look at the talk-eclm2006.txt file under the
+/docs folder.
+</p>
+
+<p>
+<a href="https://franz.com/products/allegrocache/">Allegrocache</a> (proprietary, Franz Inc.) - what Rucksack could have been if you
+threw a bunch of money at the problem. Tightly integrated with the rest of the
+Allegro CL ecosystem. You do get what you pay for in this case. I have heard
+they have great support too. Allegrocache was originally based on ObjectStore
+(Dan Weinreb of Symbolics fame + others). <a href="https://web.archive.org/web/20110715000000*/https://www.danweinreb.org/blog/object-oriented-database-management-systems-succeeded">Dan does a fair job at defending
+object oriented database management systems here.</a> I would like to point out that
+<a href="https://www.youtube.com/watch?v=MplVyKN0lHg">Glenn D. House of 2Is (DoD contractor) testifies (21:30)</a> to the conclusions
+found in Prechault and Garret when comparing Lisp v. Java v. C/C++. <a href="https://github.com/GrammaTech/sel">Grammatech
+is also a DARPA funded shop that uses Common Lisp.</a> I would also be remiss if I
+did not mention the <a href="https://github.com/clasp-developers/clasp/releases/tag/1.0.0">recent milestone of CLASP</a> (Common Lisp implementation with
+C++ interop) version 1.0. The geriatric IP of Symbolics is still closed source;
+rumor is there are still legacy DoD contracts and that <a href="https://stacks.stanford.edu/file/druid:pv219hc9300/pv219hc9300.pdf">American Express&rsquo;s fraud
+detection used to</a> (up until the mid 2000&rsquo;s?) use Open Genera.
+</p>
+
+<p>
+Jacobs, J. H., M. R. Swanson, and R. R. Kessler. Persistence is Hard, Then You
+Die! or Compiler and Runtime Support for a Persistent Common Lisp. Technical
+report, Center for Software Science, University of Utah, 1994. UUCS-94*
+004, 1994.
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-org7e4c2f2" class="outline-2">
+<h2 id="org7e4c2f2"><span class="section-number-2">7.</span> A Portable Graphical User Interface</h2>
+<div class="outline-text-2" id="text-7">
+<p>
+Good proprietary solutions exist: <a href="http://www.lispworks.com/documentation/lw60/CAPUG-U/html/capiuser-u.htm">Lispworks&rsquo; CAPI</a> and <a href="https://franz.com/support/documentation/10.1/doc/cgide.htm">Allegro CL&rsquo;s Common
+Graphics</a>. Heck, even a <a href="https://www.cliki.net/CLIM">GUI standard</a> with heritage dating back to Symbolics&rsquo;
+Lisp machines exists. There is a <a href="https://github.com/McCLIM/McCLIM">free software implementation</a> of said standard.
+If your constraints are open-source, cross-platform portability, and limited
+developer time, then currently only one practical option remains: web browsers.
+<a href="https://news.ycombinator.com/item?id=26265999">An informal but historical</a> look at the evolution of Graphical User Interfaces
+(GUI) in the context of web applications shows us the high rate of change,
+depicting a field is still in its infancy.
+</p>
+
+<blockquote>
+<p>
+Second, HTML over WebSockets is nice, but what is better is reactive data
+binding over the socket. Let the browser maintain a DOM tree that templates over
+a JSON object, then reactive-ly update and it&rsquo;s an amazing experience. You have
+minimal data transfer, and minimal rendering updates. There is a great deal of
+power in having your UI be a stateless function over a giant JSON object.
+</p>
+
+<ul class="org-ul">
+<li>Mathgladiator</li>
+</ul>
+</blockquote>
+
+<p>
+Why a JSON object? Why not a CLOS object? Why <a href="http://www.adama-lang.org/">Mathgladiator&rsquo;s DSL</a> when Lisp
+makes it (too) easy to create a more fitting DSL?
+</p>
+
+<blockquote>
+<p>
+This seems like X Windows protocol over HTTPS with JSON as the wire encoding.
+</p>
+
+<p>
+It&rsquo;s sad to think how much effort is spent reimplementing technologies because
+the IPv4 address space wasn&rsquo;t large enough.
+</p>
+
+<p>
+If IP address space were larger, we wouldn&rsquo;t have needed to rely on Network
+Address Translation (NAT). NAT became a poor-man&rsquo;s firewall and effectively
+blocked peer-to-peer connections making it difficult to host a server at home.
+This incentivized early ISPs to offer only asymmetric connections that pushed
+users towards a consumer-only service that crippled early Internet protocols.
+With the World Wide Web being &ldquo;the&rdquo; reason people got on to the Internet in the
+first place, early NAT-enabled routers focused only on HTTP tunneling, so
+completed protocols that required inbound connections were finally killed off.
+</p>
+
+<p>
+Who would have thought that a small IP address space could result in a mass
+protocol extinction event from which only HTTP and HTML would survive&hellip;.
+</p>
+
+<ul class="org-ul">
+<li>c-linkage</li>
+</ul>
+</blockquote>
+
+<p>
+An understanding from <a href="https://explained-from-first-principles.com/internet/#network-address-translation">first principles</a>. If the problem can be solved with a
+stateless protocol, then <a href="https://github.com/joaotavora/snooze">RESTful HTTP is beautiful.</a> To (ab)use the <b>HyperText</b>
+transfer protocol for anything drastically more complex than linked text
+documents, when there is state to be managed, when a duplex connection is
+needed, is folly. It leads to the sort of accidental complexity that plagues
+current web development. Pick the right application layer protocol for the right
+problem.
+</p>
+
+<blockquote>
+<p>
+If we pull our heads out of our behinds and look at the broader trends in e.g.
+the gaming industry, the trend is fully interactive applications rendered in
+your browser using WASM. All the big cloud companies and several gaming
+companies are doing that currently. They completely engineered away the browser
+limitations of only being able to run javascript and only being able to render
+DOM trees. That API was painful to deal with 20 years ago and it has not
+improved a whole lot. 20 years ago remote UI was painful. Now you can play the
+latest games at 60 fps on a cheap chrome book, ipad, or even a phone.
+</p>
+
+<p>
+[&hellip;]
+</p>
+
+<p>
+Not saying that this is the future. But we seem stuck in a lot of abstractions
+and constraints imposed on us in the late nineties when Brendan Eich et al.
+gobbled together a scripting language in a hurry and HTTP 1.1 was frozen in time
+until SPDY became a thing only a few years ago. Most of the past 20 years is
+just increasingly more sophisticated hacks to work around andundo all of that.
+</p>
+
+<p>
+[&hellip;]
+</p>
+
+<p>
+We had graphical tools for clicking together UI in the nineties (Delphi, Visual
+Basic, JBuilder, etc.). That stuff worked great. OK, it resulted in a lot of
+ugly and unusable applications. But then most SAAS browser applications that
+replaced them aren&rsquo;t a whole lot better or less painful to deal with.
+</p>
+
+<ul class="org-ul">
+<li>jillesvangurp</li>
+</ul>
+</blockquote>
+
+<p>
+Mr. Eich did a fair job considering the timeframe and the political pressure he
+was under, for the man himself admits he was hired with the promise of &ldquo;<a href="https://brendaneich.com/2008/04/popularity/">scheme
+in the browser</a>&rdquo;. But a stream cannot rise higher than its source. Common Lisp
+has its warts too, but I know which language I prefer to have fun in. In my
+dreamworld, the proprietary solutions would be my first choice. Lacking that,
+perhaps <a href="https://soi-disant.srht.site/entries/back-to-space.html">SBCL will target WebAssembly</a> one day, or <a href="https://github.com/McCLIM/McCLIM">McCLIM</a> and <a href="https://project-mage.org/all-else-is-not-enough">Project Mage</a> will
+duke it out. But until that day comes, it&rsquo;s not all bad in Lispland. As Rabbi
+Botton comments himself on the thread, in the Common Lisp world we have <a href="https://github.com/rabbibotton/clog">CLOG</a> to
+recapture some of the 90&rsquo;s Delphi magic I was too young to have ever
+experienced. <a href="https://github.com/unpoly/unpoly">Unpoly</a> deserves a mention if one needs HTTP and a language-agnostic
+framework for a not-too-complex web application.
+</p>
+
+<p>
+In doing research for the selection of a portable GUI, scaling is often
+mentioned as a challenge to this approach. Keeping an open socket is also bound
+to use more power as well. However, as a solo developer/dilettante, the
+developer experience and productivity it offers is unparalleled. I better get to
+learning how to dance in CLOGs!
+</p>
+
+<p>
+<a href="https://www.cs.umd.edu/~ben/goldenrules.html">Ben Shneiderman</a>
+</p>
+</div>
+</div>
+<div id="outline-container-Case-Study-Profiling-and-Performance" class="outline-2">
+<h2 id="Case-Study-Profiling-and-Performance"><span class="section-number-2">8.</span> Case Study: Profiling and Performance</h2>
+<div class="outline-text-2" id="text-Case-Study-Profiling-and-Performance">
+<p>
+A through treatment of the generalities of optimization in Common Lisp can be
+found in weitzCommonLispRecipes2016 pages 503-560. Dr. Weitz testifies that lisp
+(SBCL) can confidently reach within a 5x ballpark of C. Less, obviously, if
+there are many fixnums. SBCL compiler contributor Paul Khuong has also testified
+to a ballpark of 3x within C. Of course, squabbling over language performance is
+time better spent on data structures and algorithms, but to have a ballpark
+estimate is good to know. Python and Ruby for example, are magnitudes slower
+than Lisp. Ballpark of 20x and 40x respectively. For a dynamically typed, high
+level language, Lisp performs admirably. Especially striking is the non-leaky
+abstraction and degree of control provided to the programmer at read, compile
+and runtime; see the &ldquo;disassemble&rdquo; function and runtime compilation tricks.
+</p>
+
+<p>
+Lastly, Professor Scott Fahlman, one of the original designers of Common Lisp,
+<a href="https://www.quora.com/How-does-Commom-Lisp-compare-to-C-C-Java-and-Haskell-performance-wise-not-developer-time-Assume-Clozure-compiler-for-Common-Lisp-GCC-for-C-C-and-GHC-for-Haskell%20">weighs in on his experience circa 2020.</a>
+</p>
+
+<blockquote>
+<p>
+Short answer: I don’t know about the Clozure compiler, but the compiler used in
+the open-source CMU Common Lisp (CMU CL) system produces code that is is very
+close in performance to C a little faster for some benchmarks, a little slower
+for others.
+</p>
+
+<p>
+But there are some things a Common Lisp user needs to understand in order to get
+that performance. Basically, you need to declare the types of variables and
+arguments carefully, and you should not do a lot of dynamic storage allocation
+(“consing”) in performance critical inner loops usually just 10% or 20% of your
+total system.
+</p>
+
+<p>
+(Steel Bank Common Lisp (SBCL) is essentially the same as CMU CL in terms of the
+performance of compiled code. The CMU CL open-source community split in two in
+December 1999 as a result of some disagreements about design and philosophy, and
+one branch was renamed SBCL. I believe that the parts of the compiler concerned
+with optimization have not changed much. I currently prefer SBCL for my work on
+the Scone knowledge-base system and other things.)
+</p>
+
+<p>
+The Java compilers I know about produce code that is considerably slower than
+CMU CL and SBCL. I don’t know much about Haskell performance. C++ is similar to
+C in performance if you use it like C; I believe that if you make heavy use of
+the object-oriented features it is considerably slower.
+</p>
+
+<p>
+Longer answer, for nerds: I was one of the core designers of Common Lisp. (We
+were sometimes referred to in those days as the “Gang of Five”.) I wrote what I
+believe was the first Common Lisp compiler (drawing heavily on the design of
+earlier compilers for Maclisp and Lisp Machine Lisp).
+</p>
+
+<p>
+For many years I ran the CMU Common Lisp project. As part of that project, we
+developed a public-domain Common Lisp runtime that became the basis for a number
+of commercial Common Lisp implementation, adapted and supported by various large
+companies for their own machines.
+</p>
+
+<p>
+David B. McDonald, in my group, spent something like four years developing a
+very highly optimizing compiler for Common Lisp. We called this the “Python”
+compiler, which caused some confusion when the Python programming language
+became popular more than a decade later. No relation.
+</p>
+
+<p>
+(I proposed that we name our compiler “Python” because a python the snake eats a
+whole pig, then goes under a bush for several weeks to sleep. The pig makes its
+way slowly through the snake’s internal pipelines, ultimately emerging as a very
+compact pellet. Which is pretty much what compilers do, to one degree or
+another.)
+</p>
+
+<p>
+At the time the early 1980s I was starting to work on programs for implementing
+(or simulating) artificial neural nets. These needed very efficient
+floating-point arithmetic and vector operations, and I wanted to be sure that we
+could efficiently program these things in CMU Common Lisp. But at the time,
+Common Lisp had the reputation of being really awful at floating point a
+straightforward implementation would constantly be allocating “boxed”
+floating-point numbers that had to be garbage-collected later.
+</p>
+
+<p>
+So Dave McDonald labored mightily over type inference and non-consing ways to
+handle floating point, and he got the job done. I wrote some neural-net programs
+in CMU CL, they were later translated into C for wider distribution (by an
+undergrad coding wizard who really knew what he was doing). The two versions
+were very close in runtime. When DARPA pulled the plug on support for Common
+Lisp development, CMU Common Lisp became an open-source project with a different
+set of developers/maintainers. Both our runtime and our “Python” compiler are
+part of that distribution (and of SBCL), though of course there has been some
+evolution since then.
+</p>
+
+<p>
+What programmers need to know to get good performance in Common Lisp: People
+speak of Lisp as a “dynamically typed” language. I think it is more correct to
+call it (at least for the CMU CL implementation) an “optionally strongly typed”
+language. The philosophy is this: Programmers can say as much or as little as
+they like about the type of an argument or value. Whatever you say had better be
+true you can tell the compiler to trust the declarations or to be suspicious.
+The more precisely you specify what the entity is, the more likely it will be
+that the compiler can do some clever optimization based on what you told it.
+</p>
+
+<p>
+So, for example, you could say just “number” or “integer” or “integer between 0
+and 1024” or “prime number between 0 and 1024”. If you use a very general
+declaration, the code will work, but it will have to do some runtime
+type-checking to see what kind of number it is dealing with. It must be ready to
+deal with some of the exotic number-types that Common Lisp supports:
+infinite-precisions integers (“bignums”), ratios of integers, imaginary numbers,
+several levels of floating-point precision, and so on. There is a special, very
+compact and efficient format that can be used for small integers, but it can
+only be used if you tell the compiler what to expect.
+</p>
+
+<p>
+The same is true of things other than integers: There are several array formats.
+You can specify what size/shape data to expect, or you can wait and see what
+someone hands you at runtime. When you get into object-oriented programming, you
+can tell the system what to expect (and it can figure out more internal
+data-types via type inference), or you can wait and see what you get and do a
+runtime type-dispatch to find the proper method to use. That takes time.
+</p>
+
+<p>
+So, if you want good performance in Common Lisp, especially for arithmetic and
+array operations, you have to declare the types as precisely as you can. Then
+the compiler will do its magic.
+</p>
+
+<p>
+Flash forward: Sometime around 2001, I was working for IBM Research (on leave
+for a while from CMU long story…) and my project was to implement an early
+version of what became (after several restarts) my Scone knowledge-base system.
+At the time, the prevalent language in IBM Research was Java, and I knew that it
+would be hard to interest the IBM people in my system if I did it in Lisp. So I
+started out doing it in Java.
+</p>
+
+<p>
+This system had essentially no arithmetic in it, but did a lot of
+pointer-chasing off into main memory, a lot of boolean operations, and had a few
+very intensive inner loops where it spent all its time. Common Lisp was clearly
+the right tool for this job, but I worked hard on the Java version. Finally, for
+reasons too complicated to go into here, I decided that I could no longer stand
+programming the system in Java some very important facilities were missing,
+especially the Lisp macro system so I decided to port the half-done system to
+Common Lisp. (As predicted, IBM then lost interest, and I returned to CMU.)
+</p>
+
+<p>
+The performance-critical inner loops had already been programmed at that time,
+so I was able to compare the performance of the Lisp and Java versions. The Lisp
+version was about 3X faster. Part of that difference was because I was a very
+good Lisp programmer, and rather new at Java, though I had talked to Java
+experts about how to get good performance for code like mine. So some of the
+performance difference was experience, but mostly it was because at the time
+(and I think still today) Java did not do a lot of object-type inference at
+compile time. So pretty much every function call was a type-dispatch to find the
+right method, and that was slow.
+</p>
+
+<p>
+There wasn’t a good way around this inefficiency except by writing the
+performance-critical code as long linear stretches of code with no function
+calls. And without a good macro system, that was much too tedious.
+</p>
+</blockquote>
+
+<p>
+What follows is an amateur recording of my struggles, useful to jog my memory in
+the future when working with the SBCL statistical profiler. I had a pretty good
+idea the function call that needed to be profiled, but if it was a foreign
+system, I would try a library like <a href="https://gitlab.common-lisp.net/dkochmanski/metering">Daniel Kochmański / metering · GitLab</a>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp"><code>  <span class="org-comment-delimiter">;; </span><span class="org-comment">Load project into image.
+</span>  (ql:quickload <span class="org-builtin">:project-isidore</span>)
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">Load SBCL's statisical profiler.
+</span>  (<span class="org-keyword">require</span> <span class="org-constant">:sb-sprof</span>)
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">Includes COMMON LISP USER package symbols as defined in the Hyperspec.
+</span>  (sb-sprof:profile-call-counts <span class="org-string">"CL-USER"</span>)
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">Profile and output both graph and flat formats.
+</span>  (<span class="org-keyword">sb-sprof:with-profiling</span> (<span class="org-builtin">:max-samples</span> 5000
+                            <span class="org-builtin">:report</span> <span class="org-builtin">:graph</span>
+                            <span class="org-builtin">:loop</span> t
+                            <span class="org-builtin">:show-progress</span> t)
+    (project-isidore:bible-page <span class="org-string">"1-1-1-3-3-3"</span>))
+</code></pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-text"><code>           Self        Total        Cumul
+  Nr  Count     %  Count     %  Count     %    Calls  Function
+------------------------------------------------------------------------
+   1   2004  40.1   2004  40.1   2004  40.1        -  EQUALP
+   2    299   6.0   1054  21.1   2303  46.1        -  (SB-PCL::EMF SB-MOP:SLOT-VALUE-USING-CLASS)
+   3    205   4.1    205   4.1   2508  50.2        -  (LAMBDA (SB-PCL::.ARG0.) :IN "SYS:SRC;PCL;DLISP3.LISP")
+   4    193   3.9    443   8.9   2701  54.0        -  (SB-PCL::FAST-METHOD BKNR.SKIP-LIST:SL-CURSOR-NEXT (BKNR.SKIP-LIST:SKIP-LIST-CURSOR))
+   5    190   3.8   3896  77.9   2891  57.8        -  REMOVE-IF-NOT
+   6    177   3.5    212   4.2   3068  61.4        -  COPY-LIST
+   7    165   3.3    165   3.3   3233  64.7        -  (LAMBDA (SB-PCL::.ARG0.) :IN "SYS:SRC;PCL;BRAID.LISP")
+   8    157   3.1    157   3.1   3390  67.8        -  (LAMBDA (SB-PCL::.ARG0.) :IN "SYS:SRC;PCL;PRECOM2.LISP")
+   9    143   2.9    143   2.9   3533  70.7        -  foreign function syscall
+  10    141   2.8    141   2.8   3674  73.5        -  SB-KERNEL:TWO-ARG-STRING-EQUAL
+  11    134   2.7    134   2.7   3808  76.2        -  (LAMBDA (CLASS SB-KERNEL:INSTANCE SB-PCL::SLOTD) :IN SB-PCL::MAKE-OPTIMIZED-STD-SLOT-VALUE-USING-CLASS-METHOD-FUNCTION)
+  12    121   2.4    121   2.4   3929  78.6        -  (LAMBDA (SB-KERNEL:INSTANCE) :IN SB-PCL::GET-ACCESSOR-FROM-SVUC-METHOD-FUNCTION)
+  13    110   2.2    110   2.2   4039  80.8        -  (LAMBDA (SB-PCL::.ARG0.) :IN "SYS:SRC;PCL;BRAID.LISP")
+</code></pre>
+</div>
+
+<p>
+<code>Self</code> is how much time was spent doing work directly in that function. <code>Total</code>
+is how much time was spent in that function, and in the functions it called. As
+this is my own code, I know that REMOVE-IF-NOT calls EQUALP in a lot of
+functions. But it can also be a probable hypothesis from just this data alone.
+<code>Cumul</code> is obviously the additive results of the <code>Self</code> column. I have cut it
+off at 80% in light of the Pareto principle. The hypothesis can be confirmed
+from looking at the graph formatted portion of the profiler output, pasted
+below.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text"><code>------------------------------------------------------------------------
+  3840  76.8                   PROJECT-ISIDORE/MODEL:GET-BIBLE-UID [99]
+    44   0.9                   REMOVE-IF-NOT [5]
+    55   1.1                   PROJECT-ISIDORE/MODEL:GET-HAYDOCK-TEXT [96]
+   190   3.8   3896  77.9   REMOVE-IF-NOT [5]
+     1   0.0                   (LAMBDA (PROJECT-ISIDORE/MODEL::X) :IN PROJECT-ISIDORE/MODEL::FILTER-LIST-BY-VERSE) [114]
+     1   0.0                   (SB-PCL::EMF SB-MOP:SLOT-VALUE-USING-CLASS) [2]
+     1   0.0                   (LAMBDA (SB-PCL::.ARG0.) :IN "SYS:SRC;PCL;DLISP3.LISP") [3]
+     1   0.0                   foreign function alloc_list [29]
+    43   0.9                   (LAMBDA (PROJECT-ISIDORE/MODEL::X) :IN PROJECT-ISIDORE/MODEL::FILTER-LIST-BY-CHAPTER) [30]
+   140   2.8                   SB-KERNEL:TWO-ARG-STRING-EQUAL [10]
+  1421  28.4                   (LAMBDA (PROJECT-ISIDORE/MODEL::X) :IN PROJECT-ISIDORE/MODEL::FILTER-LIST-BY-BOOK) [17]
+  2004  40.1                   EQUALP [1]
+    44   0.9                   REMOVE-IF-NOT [5]
+    47   0.9                   (LAMBDA (PROJECT-ISIDORE/MODEL::X) :IN PROJECT-ISIDORE/MODEL:GET-HAYDOCK-TEXT) [38]
+------------------------------------------------------------------------
+</code></pre>
+</div>
+
+<p>
+GET-BIBLE-UID is expected to take up a large portion of function calls based on
+my design choices and some back of the napkin math. The profiler has confirmed
+the information. Let&rsquo;s see if we can&rsquo;t optimize this particular function further.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp"><code>(time (project-isidore:bible-page <span class="org-string">"1-1-1-3-3-3"</span>))
+</code></pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-text"><code>Evaluation took:
+  64.490 seconds of real time
+  64.673257 seconds of total run time (64.032109 user, 0.641148 system)
+  [ Run times consist of 2.276 seconds GC time, and 62.398 seconds non-GC time. ]
+  100.28% CPU
+  160,990,605,382 processor cycles
+  16,089,927,136 bytes consed
+</code></pre>
+</div>
+
+<p>
+Replacing <code>equalp</code> with <code>eql</code> in places where appropriate in the file
+<code>model.lisp</code> . For the best explanation on the different equality predicates in
+Common Lisp, see <a href="https://eli.thegreenplace.net/2004/08/08/equality-in-lisp">Equality in Lisp - Eli Bendersky&rsquo;s website</a>.
+</p>
+
+<blockquote>
+<p>
+Lisp&rsquo;s equality operators are:
+</p>
+
+<p>
+= compares only numbers, regardless of type.
+</p>
+
+<p>
+eq compares symbols. Two objects are eq if they are actually the same object in memory. Don&rsquo;t use it for numbers and characters.
+</p>
+
+<p>
+eql compares symbols similarly to eq, numbers (type sensitive) and characters (case sensitive)
+</p>
+
+<p>
+equal compares more general objects. Two objects are equal if they are eql, strings of eql characters, bit vectors of the same contents, or lists of equal objects. For anything else, eq is used.
+</p>
+
+<p>
+equalp is like equal, just more advanced. Comparison of numbers is type insensitive. Comparison of chars and strings is case insensitive. Lists, hashes, arrays and structures are equalp if their members are equalp. For anything else, eq is used.
+</p>
+</blockquote>
+
+<div class="org-src-container">
+<pre class="src src-text"><code>Evaluation took:
+  74.060 seconds of real time
+  74.232869 seconds of total run time (73.519834 user, 0.713035 system)
+  [ Run times consist of 2.961 seconds GC time, and 71.272 seconds non-GC time. ]
+  100.23% CPU
+  184,855,087,325 processor cycles
+  16,089,928,160 bytes consed
+</code></pre>
+</div>
+
+<p>
+Would you look at that. Worse performance as a result of going from a more
+general equality predicate to a more specific equality predicate. I&rsquo;m guessing
+SBCL does some fancy optimization tricks here.
+</p>
+
+<p>
+From Edmund Weitz on <a href="https://comp.lang.lisp.narkive.com/ZPm0wG3j/string-equal-equalp">string-equal/equalp</a>
+</p>
+<blockquote>
+<p>
+I would assume that on most implementations STRING-EQUAL is a bit
+faster (given the right optimization declarations) because it &ldquo;knows&rdquo;
+that its arguments are strings. It&rsquo;s most likely a micro-optimization
+that&rsquo;s only noticable in tight loops.
+</p>
+
+<p>
+It can also be self-documenting to use STRING-EQUAL because the reader
+of your code then knows that you expect both of its arguments to be
+strings.
+</p>
+</blockquote>
+
+<p>
+Therefore switching EQUALP to STRING-EQUAL in FILTER-LIST-BY-BOOK gives me
+the following speedup.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text"><code>Evaluation took:
+  69.390 seconds of real time
+  69.608650 seconds of total run time (68.808030 user, 0.800620 system)
+  [ Run times consist of 2.482 seconds GC time, and 67.127 seconds non-GC time. ]
+  100.32% CPU
+  173,202,179,865 processor cycles
+  16,089,928,912 bytes consed
+</code></pre>
+</div>
+
+<p>
+Going back a few steps and using = instead of <code>eql</code> doesn&rsquo;t result in anything
+significant at all.
+</p>
+
+<p>
+I decided to replace the functional approach of REMOVE-IF-NOT with the LOOP DSL.
+<a href="https://stackoverflow.com/questions/40789987/iterate-through-a-list-and-check-each-element-with-your-own-condition">loops - Iterate through a list and check each element with your own condition&hellip;</a>
+This surprisingly did nothing.
+</p>
+
+<p>
+Instead of going through the same list three times and collecting one item at a
+time, I decided to remove the nested loops and go through the same list once but
+collect three items. This was more due to my unfamiliarity with loop keywords.
+Good speedup results.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text"><code>Evaluation took:
+  14.960 seconds of real time
+  15.014469 seconds of total run time (14.824816 user, 0.189653 system)
+  [ Run times consist of 0.963 seconds GC time, and 14.052 seconds non-GC time. ]
+  100.36% CPU
+  37,334,905,433 processor cycles
+  6,407,417,456 bytes consed
+</code></pre>
+</div>
+
+<p>
+Removing some list copying in the filter and get-bible-uid functions yielded:
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text"><code>Evaluation took:
+  13.300 seconds of real time
+  13.353905 seconds of total run time (13.183019 user, 0.170886 system)
+  [ Run times consist of 0.731 seconds GC time, and 12.623 seconds non-GC time. ]
+  100.41% CPU
+  33,191,116,692 processor cycles
+  6,406,945,232 bytes consed
+</code></pre>
+</div>
+
+<p>
+Proving once again that I am careless and forgetful, the following change
+resulted in a 133x speedup. I believe this function was coded when
+<code>bknr.datastore:store-objects-with-class</code> was the only external function I was
+familiar with in <code>bknr.datastore</code> and I was ignorant of
+<code>bknr.datastore:store-object-with-id</code>. Prior to the change, every single time
+<code>get-haydock-text</code> was called, it would iterate through all 35817 verses of the
+bible to find one instance of haydock-text. Another concrete example to read the
+manual of whatever library I am using.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-lisp"><code>(<span class="org-keyword">defun</span> <span class="org-function-name">get-haydock-text</span> (bible-uid)
+  <span class="org-doc">"Returns a string if bible-uid is valid else return NIL.
+The bible-uid can be found by calling `</span><span class="org-doc"><span class="org-constant">get-bible-uid</span></span><span class="org-doc">' with valid arguments."</span>
+  (<span class="org-keyword">let</span> ((cpylist (remove-if-not
+                  (<span class="org-keyword">lambda</span> (x)
+                    (and x
+                         (equalp
+                          bible-uid
+                          (slot-value x 'bknr.datastore::id))))
+                  (copy-list
+                   (bknr.datastore:store-objects-with-class
+                    'bible)))))
+    (<span class="org-keyword">if</span> (slot-boundp (car cpylist) 'haydock-text)
+        (slot-value (car cpylist) 'haydock-text)
+        (format t <span class="org-string">"GET-HAYDOCK-TEXT called with invalid bible-uid ~a"</span> bible-uid))))
+</code></pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-lisp"><code>(<span class="org-keyword">defun</span> <span class="org-function-name">get-haydock-text</span> (bible-uid)
+  <span class="org-doc">"Returns a string if bible-uid is valid else return NIL.
+The bible-uid can be found by calling `</span><span class="org-doc"><span class="org-constant">get-bible-uid</span></span><span class="org-doc">' with valid arguments."</span>
+    (<span class="org-keyword">if</span> (slot-boundp (bknr.datastore:store-object-with-id bible-uid) 'haydock-text)
+        (slot-value (bknr.datastore:store-object-with-id bible-uid) 'haydock-text)
+        (format t <span class="org-string">"GET-HAYDOCK-TEXT called with invalid bible-uid ~a"</span> bible-uid)))
+</code></pre>
+</div>
+
+<div class="org-src-container">
+<pre class="src src-text"><code>Evaluation took:
+  0.100 seconds of real time
+  0.107482 seconds of total run time (0.097531 user, 0.009951 system)
+  [ Run times consist of 0.007 seconds GC time, and 0.101 seconds non-GC time. ]
+  107.00% CPU
+  267,219,700 processor cycles
+  40,850,160 bytes consed
+</code></pre>
+</div>
+
+<p>
+I admit this was less of an exercise in speeding up Common Lisp and more of
+a demonstration of human frailty.
+</p>
+
+<p>
+Looking through the git log for commits of type &ldquo;Perf&rdquo; shows further optimization
+commits I have done. Current result for version 1.2.1,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text"><code>Evaluation took:
+  0.010 seconds of real time
+  0.011488 seconds of total run time (0.011127 user, 0.000361 system)
+  110.00% CPU
+  28,639,406 processor cycles
+  10,191,536 bytes consed
+</code></pre>
+</div>
+
+<p>
+After the addition of regex generated cross-references in version 1.2.2,
+</p>
+
+<div class="org-src-container">
+<pre class="src src-text"><code>Evaluation took:
+  0.840 seconds of real time
+  0.833305 seconds of total run time (0.813444 user, 0.019861 system)
+  [ Run times consist of 0.002 seconds GC time, and 0.832 seconds non-GC time. ]
+  99.17% CPU
+  2,078,095,375 processor cycles
+  80,577,968 bytes consed
+</code></pre>
+</div>
+</div>
+</div>
+<div id="outline-container-User-Manual" class="outline-2">
+<h2 id="User-Manual"><span class="section-number-2">9.</span> User Manual</h2>
+<div class="outline-text-2" id="text-User-Manual">
+</div>
+<div id="outline-container-How-do-I-find-past-versions-of-a-blog-article" class="outline-3">
+<h3 id="How-do-I-find-past-versions-of-a-blog-article"><span class="section-number-3">9.1.</span> How do I find past versions of a blog article?</h3>
+<div class="outline-text-3" id="text-How-do-I-find-past-versions-of-a-blog-article">
+<p>
+To view the entire revision history of an article, find and click the article
+title on <a href="https://gitlab.com/bhw/project-isidore/tree/master/assets/blog">the repository&rsquo;s blog subfolder.</a> Then click on the <code>History</code> button to
+view specific, atomic changes. Inputting the article URL into <a href="https://archive.org/web/">the Internet
+Wayback Machine</a> is also an option.
+</p>
+</div>
+</div>
+<div id="outline-container-How-do-I-unsubscribe-from-the-mailing-list" class="outline-3">
+<h3 id="How-do-I-unsubscribe-from-the-mailing-list"><span class="section-number-3">9.2.</span> How do I unsubscribe from the mailing list?</h3>
+<div class="outline-text-3" id="text-How-do-I-unsubscribe-from-the-mailing-list">
+<p>
+To remove an email address from the mailing list, fill out and submit the form
+on the <a href="https://www.bhw.name/unsubscribe">unsubscribe page.</a> To resubscribe, visit <a href="https://www.bhw.name/subscribe">https://www.bhw.name/subscribe.</a>
+</p>
+</div>
+</div>
+<div id="outline-container-Can-I-visit-this-website-offline" class="outline-3">
+<h3 id="Can-I-visit-this-website-offline"><span class="section-number-3">9.3.</span> Can I visit this website offline?</h3>
+<div class="outline-text-3" id="text-Can-I-visit-this-website-offline">
+<p>
+To access the website offline, download the appropriate executable
+from the project release page. <a href="https://gitlab.com/bhw/project-isidore/-/releases">Releases · Ben / Project Isidore · GitLab</a>
+</p>
+
+<p>
+Find the appropriate exectuable matching both your computer&rsquo;s processor
+architecture and the operating system. Currently only the x86-64 architecture is
+supported on Ubuntu, MacOS and Windows operating systems.
+</p>
+
+<p>
+Project Isidore does not offer signed binaries for MacOS, therefore you will
+have to manually execute the unsigned binaries. Please see
+<a href="https://lapcatsoftware.com/articles/unsigned.html">https://lapcatsoftware.com/articles/unsigned.html</a> for more details.
+</p>
+
+<p>
+An audit of the source code can be done at any time. Please see the <a href="#Introduction">source
+repository</a> as well as the <a href="#Libraries-System-dependencies">third party dependencies.</a>
+</p>
+
+<p>
+Be advised that the program consumes around 50MB of RAM when used by a single
+user locally. Please understand the executable is provided AS IS, WITHOUT
+WARRANTY. See the provided COPYING.txt included in the download.
+</p>
+</div>
+</div>
+<div id="outline-container-I-can't-find-what-I'm-looking-for-How-is-the-documentation-organized" class="outline-3">
+<h3 id="I-can't-find-what-I'm-looking-for-How-is-the-documentation-organized"><span class="section-number-3">9.4.</span> I can&rsquo;t find what I&rsquo;m looking for. How is the documentation organized?</h3>
+<div class="outline-text-3" id="text-I-can't-find-what-I'm-looking-for-How-is-the-documentation-organized">
+<p>
+The documentation is organized according to the best practices outlined here:
+<a href="https://documentation.divio.com/">The documentation system — divio.</a>
+</p>
+
+<p>
+The closest thing to a tutorial as understood by the divio documentation system
+ought to be the development quickstart <a href="https://gitlab.com/bhw/project-isidore/-/blob/master/README.org">(present in the README.org)</a> or embedded
+as close as possible to the end-user interface. How-to guides are meant to be
+placed here in the user manual. The Reference is auto-generated with the help of
+<a href="#Generate-Reference-Manual">the Declt system</a>. The Explanation is this Design Notebook blog article and git
+commit messages.
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-Reference-Manual" class="outline-2">
+<h2 id="Reference-Manual"><span class="section-number-2">10.</span> Reference Manual</h2>
+<div class="outline-text-2" id="text-Reference-Manual">
+<p>
+Reference manuals are technical descriptions of Project Isidore&rsquo;s internal
+artifact architecture and how to operate it. For end users, please see the <a href="#User-Manual">User
+Manual</a>.
+</p>
+
+<p>
+<a href="https://www.bhw.name/assets/reference-manual.html">The Project Isidore Reference Manual</a> is complete with cross-references to ASDF
+component dependencies, parents and children, classes&rsquo; direct methods, super and
+subclasses, slot readers and writers, setf expanders access and update functions
+etc. The reference manual also includes exhaustive and multiple-entry indexes
+for every documented item.
+</p>
+
+<ul class="org-ul">
+<li>System components (modules and files)</li>
+<li>Packages</li>
+<li><a href="http://www.lispworks.com/documentation/HyperSpec/Body/11_aaba.htm">Exported and internal definitions of</a>
+<ul class="org-ul">
+<li>Constants</li>
+<li>Special variables</li>
+<li>Symbol macros</li>
+<li>Macros</li>
+<li>Setf expanders</li>
+<li>Compiler macros</li>
+<li>Functions</li>
+<li>Generic functions</li>
+<li>Generic methods,</li>
+<li>Method combinations,</li>
+<li>Conditions</li>
+<li>Structures</li>
+<li>Classes</li>
+<li>Types</li>
+</ul></li>
+</ul>
+
+<p>
+With all that being said, when the boundary between user and developer is
+crossed, it makes much more sense to clone the source code and explore it in
+your LISP IDE. Auto generated manuals may be slightly more useful in LISP than
+other languages, thanks to the excellent introspection capabilities of SBCL and
+ASDF, but still are largely only useful for index generation.
+</p>
+</div>
+<div id="outline-container-Generate-Reference-Manual" class="outline-3">
+<h3 id="Generate-Reference-Manual"><span class="section-number-3">10.1.</span> Generate Reference Manual</h3>
+<div class="outline-text-3" id="text-Generate-Reference-Manual">
+<p>
+The <a href="https://github.com/didierverna/declt">Declt Common Lisp library</a> is used generate the reference manual in <code>.texi</code>
+texinfo format. <a href="https://www.gnu.org/software/texinfo/manual/texinfo/texinfo.html">GNU Texinfo</a> is able to convert a single <code>.texi</code> source file into
+online HTML format, PDF documentation as well as others. On a high level, Declt
+uses ASDF and SBCL contrib <code>sb-introspect</code> to query and extract documentation
+strings, lambda lists, slot type, allocation and initialization arguments, and
+definition source files. It requires no special architecture choices in a
+system, other than to conform to ASDF conventions. Beyond that, writing clear
+docstrings where the opportunity arises will yield great results.
+</p>
+
+<p>
+<code>generate-doc.lisp</code> script is run by a git pre-commit hook. Upon every commit,
+it will regenerate the reference manual and include changes into the commit.
+<code>pre-commit</code> is originally located at
+<code>/project-isidore/.git/hooks/pre-commit.sample</code>.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-sh" id="org2dea715"><code>  <span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/sh
+</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Generate updated manual. SBCL must be installed. See documentation for
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">environment setup
+</span>  sbcl --load /home/ben/quicklisp/local-projects/project-isidore/src/generate-doc.lisp
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Add updated manual.html to commit
+</span>  <span class="org-type">git</span> add /home/ben/quicklisp/local-projects/project-isidore/assets/reference-manual.html
+</code></pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-Project-History-Credits" class="outline-2">
+<h2 id="Project-History-Credits"><span class="section-number-2">11.</span> Project History &amp; Credits</h2>
+<div class="outline-text-2" id="text-Project-History-Credits">
+<p>
+This website would not be possible without,
+</p>
+
+<ul class="org-ul">
+<li>Wonderful family and friends</li>
+<li>(<a href="https://github.com/doomemacs/doomemacs/graphs/contributors">Doom</a>)<a href="https://www.gnu.org/software/emacs/manual/html_node/emacs/Acknowledgments.html">Emacs Community</a></li>
+<li><a href="#Libraries-System-dependencies">Common Lisp Community</a></li>
+<li><a href="https://contributors.debian.org/">GNU/Linux Debian Community</a></li>
+<li><a href="https://about.gitlab.com/company/stewardship/">GitLab</a>, <a href="https://porkbun.com/about">Porkbun</a>, <a href="https://www.oracle.com/ca-en/cloud/">Oracle Cloud Infrastructure</a></li>
+</ul>
+
+<p>
+From the bottom of my heart, thank you!
+</p>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<script>
+                              const headers = Array.from( document.querySelectorAll('h2, h3, h4, h5, h6') );
+
+                              headers.forEach( header => {
+                                header.insertAdjacentHTML('afterbegin',
+                                 '<a href="#table-of-contents">&#8689;</a>'
+                                );
+                              });
+                              </script>
+                              <hr/>
+                              <footer>
+                                <div class="copyright-container">
+                                    Comments? Corrections? <a href="https://bhw.name/contact"> Please do reach out.</a><a href="https://bhw.name/assets/blog/atom.xml"> RSS Feed. </a><a href="https://bhw.name/subscribe"> Mailing List. </a><br/>
+                                    Copyright 2021 Benedict H. Wang. <br/>
+                                    Blog content is available under <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"> CC-BY-SA 4.0 </a> unless otherwise noted.<br/>
+                                    Created with <a href="https://www.gnu.org/software/emacs/">Emacs</a> 30.1 (<a href="https://orgmode.org">Org</a> mode 9.8.2) on <a href="https://www.gnu.org">GNU</a>/<a href="https://www.kernel.org/">Linux</a><br/>
+                                </div>
+                              </footer>
+</div>
+</body>
+</html>

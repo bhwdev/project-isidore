@@ -1,7 +1,7 @@
 ;;;; SPDX-FileCopyrightText: 2026  Ben H. W.<foss@bhw.name>
 ;;;; SPDX-License-Identifier: AGPL-3.0-or-later
 
-(uiop:define-package #:project-isidore/test/slack-bot-tests
+(uiop:define-package #:project-isidore/tests/slack-bot-tests
   (:use #:common-lisp #:parachute)
   (:local-nicknames (#:sb #:project-isidore/slack-bot)
                     (#:db #:project-isidore/database))
@@ -14,7 +14,7 @@ reset) and rucksack-backed subscription CRUD. Handlers that would hit
 the Slack API or Google Sheets (cmd-book, cmd-view, full scheduler
 tick) are stubbed via FLET shadowing."))
 
-(in-package #:project-isidore/test/slack-bot-tests)
+(in-package #:project-isidore/tests/slack-bot-tests)
 
 (define-test slack-bot-suite
   :description "Slack bot unit tests.")
@@ -145,7 +145,7 @@ keep seeing the production graph."
 (define-test subscription-add-upsert-remove
   :parent slack-bot-suite
   (with-temp-database
-    (db:add-slack-subscription +test-user-id+ "BW")
+      (db:add-slack-subscription +test-user-id+ "BW")
     (is equal '(("BW"))
         (mapcar (lambda (s) (list (cdr s)))
                 (remove-if-not
@@ -201,7 +201,7 @@ top-level)."
   ;; object count before and after a subscription round-trip.
   (let ((bible-count-before (count-bible-objects)))
     (with-temp-database
-      (db:add-slack-subscription +test-user-id+ "BW")
+        (db:add-slack-subscription +test-user-id+ "BW")
       (db:remove-slack-subscription +test-user-id+))
     (let ((bible-count-after (count-bible-objects)))
       (is = bible-count-before bible-count-after)
@@ -265,23 +265,23 @@ top-level)."
 (define-test cmd-subscribe-happy-path
   :parent slack-bot-suite
   (with-temp-database
-    (let ((reply (sb::cmd-subscribe
-                  (make-params "user_id" +test-user-id+
-                               "text" "please use BW thanks"))))
-      (true (search "BW" reply))
-      (true (search +test-user-id+
-                    (format nil "~{~A~%~}"
-                            (mapcar #'car (db:all-slack-subscriptions))))))))
+      (let ((reply (sb::cmd-subscribe
+                    (make-params "user_id" +test-user-id+
+                                 "text" "please use BW thanks"))))
+        (true (search "BW" reply))
+        (true (search +test-user-id+
+                      (format nil "~{~A~%~}"
+                              (mapcar #'car (db:all-slack-subscriptions))))))))
 
 (define-test cmd-unsubscribe-when-not-subscribed
   :parent slack-bot-suite
   (with-temp-database
-    (let ((reply (sb::cmd-unsubscribe (make-params "user_id" +test-user-id+))))
-      (true (search "not subscribed" reply)))))
+      (let ((reply (sb::cmd-unsubscribe (make-params "user_id" +test-user-id+))))
+        (true (search "not subscribed" reply)))))
 
 (define-test cmd-unsubscribe-after-subscribe
   :parent slack-bot-suite
   (with-temp-database
-    (sb::cmd-subscribe (make-params "user_id" +test-user-id+ "text" "BW"))
+      (sb::cmd-subscribe (make-params "user_id" +test-user-id+ "text" "BW"))
     (let ((reply (sb::cmd-unsubscribe (make-params "user_id" +test-user-id+))))
       (true (search "Unsubscribed" reply)))))

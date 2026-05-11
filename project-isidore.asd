@@ -27,8 +27,7 @@
   :source-control (:git "https://gitlab.com/bhw/project-isidore.git")
   :class :package-inferred-system
   :pathname "src"
-  :depends-on ("graph-db"
-               "project-isidore/packages"
+  :depends-on ("project-isidore/webserver"
                "project-isidore/van-booking"
                "project-isidore/slack-bot"
                "project-isidore/garmin-org"
@@ -38,14 +37,12 @@
   :build-pathname "../bin/ProjectIsidore"
   :entry-point "project-isidore:application-toplevel")
 
-(register-system-packages "project-isidore/packages" '(:project-isidore))
 (register-system-packages "clog" '(:clog-connection :clog-web))
 
 (asdf:defsystem "project-isidore/test"
   :class :package-inferred-system
   :pathname "src/test"
-  :depends-on ("fxml"
-               "project-isidore/test/tests"
+  :depends-on ("project-isidore/test/tests"
                "project-isidore/test/slack-bot-tests"
                "project-isidore/test/van-booking-tests"
                )

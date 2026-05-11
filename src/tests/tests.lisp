@@ -1,7 +1,7 @@
 ;;;; SPDX-FileCopyrightText: 2021  Ben H. W.<foss@bhw.name>
 ;;;; SPDX-License-Identifier: AGPL-3.0-or-later
 
-(uiop:define-package #:project-isidore/test/tests
+(uiop:define-package #:project-isidore/tests/tests
   (:use #:common-lisp #:series)
   (:local-nicknames
    (#:pi          #:project-isidore)
@@ -18,7 +18,7 @@ CL-USER> (asdf:test-system \"project-isidore\")
 
 The test suite is run prior to the build process. See MAKE.LISP."))
 
-(in-package #:project-isidore/test/tests)
+(in-package #:project-isidore/tests/tests)
 
 (test:define-test master-suite
   :description "The master suite of all Project Isidore tests")
@@ -31,10 +31,10 @@ hunchentoot thread. We select port 3510 as port(s) 8080-8091 will be busy on the
 production server."
   :parent master-suite
   (test:skip-on
-      (win32) "Hunchentoot has poor Microsoft Windows support."
-    (test:true (progn
-                 (pi:initialize-application :port 3510)
-                 (pi:terminate-application)))))
+   (win32) "Hunchentoot has poor Microsoft Windows support."
+   (test:true (progn
+                (pi:initialize-application :port 3510)
+                (pi:terminate-application)))))
 
 (test:define-test is-production-server-status-200
   :description "As per Heroku documentation: 'Whenever your app experiences an
@@ -228,11 +228,3 @@ production server."
     (test:is = (1+ (- end start)) (length result))
     (test:is = start (first result))
     (test:is = end (car (last result)))))
-
-;;; =====================================================================
-;;; View pages complete without error
-;;; =====================================================================
-
-;;; Static page and error page tests removed — page rendering is now done via
-;;; CLOG WebSocket handlers which require a browser connection to test.
-;;; Integration testing should be done by navigating to the pages in a browser.

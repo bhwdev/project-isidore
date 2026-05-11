@@ -4,7 +4,6 @@
 ;; Load this file inside a shell to build a standalone executable binary,
 
 ;; To use your local .sbclrc which possibly contains the ocicl-runtime load,
-
 ;; "$ sbcl --load /path/to/this/file.lisp"
 
 ;; Bypass any SBCL Initialization Files on Production deployments with,
@@ -13,10 +12,13 @@
 ;; "$ sbcl --dynamic-space-size 2048 --control-stack-size 4 --no-userinit
 ;; --no-sysinit --load /path/to/this/file.lisp"
 
-(in-package #:cl-user) ; The buildpack requires cl-user package space.
+(in-package #:cl-user)
+
 ;; See weitzCommonLispRecipes2016, page 102.
 (setf *read-default-float-format* 'double-float)
+
 #+sbcl (require :sb-posix) ; This is needed for "(uiop:getenv)".
+
 (require "asdf") ; The recommended way from the manual to load bundled ASDF.
 
 (format t "~%~&        ====== MAKE.LISP ======~%")
@@ -34,9 +36,9 @@
 ;;; See ASDF manual section 4.1 Configuring ASDF to find your systems.
 
 ;; Upgrade > ASDF 3.3.5 to use package local nicknames with package inferred
-;; systems. See commit bf210b8.
+;; systems.
 (load (make-pathname :directory (append *build-dir* '("lib"))
-                     :defaults "upgrade-asdf.lisp"))
+                     :defaults "asdf.lisp"))
 (provide "asdf")
 
 ;; sbcl --script bypasses .sbclrc, so load ocicl-runtime explicitly. The
@@ -84,18 +86,15 @@
 ;; from that repo into lib/slynk-macrostep/ and add an .asd file.
 (asdf:load-system :slynk)
 
-;; Runtime state (CRUD graph-db + Montezuma search index) lives under
-;; $PROJECT_ISIDORE_DATA (or the XDG default $XDG_DATA_HOME/project-isidore/)
-;; and is NOT baked into this binary.
+;; CRUD state lives at runtime under $PROJECT_ISIDORE_DB (or the XDG default
+;; $XDG_DATA_HOME/project-isidore/) and is NOT baked into this binary.
 (asdf:load-system "project-isidore/test")
 (if (asdf:test-system "project-isidore")
     (progn
       (format t "~&        ====== Build Successful | Deo Gratias ======~%")
       (format t "~&        ====== END OF MAKE.LISP ======~%")
-      ;; SBCL refuses to save a core with multiple threads running. Without
-      ;; qlot's lparallel progress UI this should be a no-op, but graph-db /
-      ;; hunchentoot / slack-bot test setup may still spawn workers worth
-      ;; defending against.
+      ;; SBCL refuses to save a core with multiple threads running. graph-db /
+      ;; hunchentoot / slack-bot test setup may still spawn workers.
       (let ((main (bordeaux-threads:current-thread)))
         (dolist (th (bordeaux-threads:all-threads))
           (unless (eq th main)

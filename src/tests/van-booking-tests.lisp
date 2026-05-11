@@ -1,13 +1,13 @@
 ;;;; SPDX-FileCopyrightText: 2021  Ben H. W.<foss@bhw.name>
 ;;;; SPDX-License-Identifier: AGPL-3.0-or-later
 
-(uiop:define-package #:project-isidore/test/van-booking-tests
+(uiop:define-package #:project-isidore/tests/van-booking-tests
   (:use #:common-lisp #:parachute #:project-isidore/van-booking)
   (:local-nicknames (#:vb #:project-isidore/van-booking))
   (:documentation
    ""))
 
-(in-package #:project-isidore/test/van-booking-tests)
+(in-package #:project-isidore/tests/van-booking-tests)
 
 ;;; --- Helper: build fake spreadsheet rows ---
 
@@ -454,12 +454,12 @@
 
 (define-test book-natural-tests
 
-  (define-test format-time-12h
-      (is string= "12:00 am" (vb::format-time-12h 0 0))
-    (is string= "12:00 pm" (vb::format-time-12h 12 0))
-    (is string= "7:00 pm"  (vb::format-time-12h 19 0))
-    (is string= "11:30 am" (vb::format-time-12h 11 30))
-    (is string= "1:05 pm"  (vb::format-time-12h 13 5)))
+    (define-test format-time-12h
+        (is string= "12:00 am" (vb::format-time-12h 0 0))
+      (is string= "12:00 pm" (vb::format-time-12h 12 0))
+      (is string= "7:00 pm"  (vb::format-time-12h 19 0))
+      (is string= "11:30 am" (vb::format-time-12h 11 30))
+      (is string= "1:05 pm"  (vb::format-time-12h 13 5)))
 
   (define-test parse-passenger-initials
       (is equal '("CG" "BW") (vb::parse-passenger-initials "CG and BW"))
@@ -1122,13 +1122,13 @@
                                   '(:dgh (("BW" "CG" "GG") ("BW" "CG" "GG")))))
                (sheet (make-test-sheet block)))
           (call-with-mock-read-range sheet
-            (lambda ()
-              (let ((result (remind-driver "BW" "April 22")))
-                (true (search "BW is the driver" result))
-                (true (search "X location" result))
-                (true (search "12:00 pm" result))
-                (true (search "CG, GG are passengers" result))))))
-)
+                                     (lambda ()
+                                       (let ((result (remind-driver "BW" "April 22")))
+                                         (true (search "BW is the driver" result))
+                                         (true (search "X location" result))
+                                         (true (search "12:00 pm" result))
+                                         (true (search "CG, GG are passengers" result))))))
+      )
   (define-test single-other-passenger-grammar
       (let* ((day-str (vb::format-booking-day (chronicity:parse "April 22")))
              (block (make-block (format nil "~A           ~A" day-str day-str)
@@ -1137,10 +1137,10 @@
                                 '(:dgh (("BW" "CG") ("BW" "CG")))))
              (sheet (make-test-sheet block)))
         (call-with-mock-read-range sheet
-          (lambda ()
-            (let ((result (remind-driver "BW" "April 22")))
-              (true (search "CG is a passenger" result))
-              (false (search "are passengers" result)))))))
+                                   (lambda ()
+                                     (let ((result (remind-driver "BW" "April 22")))
+                                       (true (search "CG is a passenger" result))
+                                       (false (search "are passengers" result)))))))
 
   (define-test no-other-passengers-clause
       (let* ((day-str (vb::format-booking-day (chronicity:parse "April 22")))
@@ -1150,9 +1150,9 @@
                                 '(:dgh (("BW") ("BW")))))
              (sheet (make-test-sheet block)))
         (call-with-mock-read-range sheet
-          (lambda ()
-            (let ((result (remind-driver "BW" "April 22")))
-              (true (search "with no other passengers" result)))))))
+                                   (lambda ()
+                                     (let ((result (remind-driver "BW" "April 22")))
+                                       (true (search "with no other passengers" result)))))))
 
   (define-test multiple-trips-same-day
       (let* ((day-str (vb::format-booking-day (chronicity:parse "April 22")))
@@ -1166,13 +1166,13 @@
                              '(:lgh (("BW" "CG") ("BW" "CG")))))
              (sheet (make-test-sheet b1 b2)))
         (call-with-mock-read-range sheet
-          (lambda ()
-            (let ((result (remind-driver "BW" "April 22")))
-              (true (search "SHMS" result))
-              (true (search "Shrine" result))
-              (true (search "12:35 pm" result))
-              (true (search "5:35 pm" result))
-              (true (search "CG is a passenger" result)))))))
+                                   (lambda ()
+                                     (let ((result (remind-driver "BW" "April 22")))
+                                       (true (search "SHMS" result))
+                                       (true (search "Shrine" result))
+                                       (true (search "12:35 pm" result))
+                                       (true (search "5:35 pm" result))
+                                       (true (search "CG is a passenger" result)))))))
 
   (define-test driver-not-first-is-not-driver
       (let* ((day-str (vb::format-booking-day (chronicity:parse "April 22")))
@@ -1182,10 +1182,10 @@
                                 '(:dgh (("MM" "BW") ("MM" "BW")))))
              (sheet (make-test-sheet block)))
         (call-with-mock-read-range sheet
-          (lambda ()
-            (let ((result (remind-driver "BW" "April 22")))
-              (true (search "BW is not driving" result))
-              (true (search day-str result)))))))
+                                   (lambda ()
+                                     (let ((result (remind-driver "BW" "April 22")))
+                                       (true (search "BW is not driving" result))
+                                       (true (search day-str result)))))))
 
   (define-test driver-match-case-insensitive
       (let* ((day-str (vb::format-booking-day (chronicity:parse "April 22")))
@@ -1195,9 +1195,9 @@
                                 '(:dgh (("BW") ("BW")))))
              (sheet (make-test-sheet block)))
         (call-with-mock-read-range sheet
-          (lambda ()
-            (let ((result (remind-driver "bw" "April 22")))
-              (true (search "bw is the driver" result)))))))
+                                   (lambda ()
+                                     (let ((result (remind-driver "bw" "April 22")))
+                                       (true (search "bw is the driver" result)))))))
 
   (define-test no-sheet-covers-day
       (let ((called nil))
@@ -1246,11 +1246,11 @@
             (vb::trip-date-key (make-trip :day "Monday April 20")))
         (is = (+ (* year 10000) 1225)
             (vb::trip-date-key (make-trip :day "Friday December 25"))))
-      ;; Blank day → NIL
-      (false (vb::trip-date-key (make-trip :day "")))
-      (false (vb::trip-date-key (make-trip :day nil)))
-      ;; Unparseable → NIL (graceful failure)
-      (false (vb::trip-date-key (make-trip :day "garbage words here"))))
+    ;; Blank day → NIL
+    (false (vb::trip-date-key (make-trip :day "")))
+    (false (vb::trip-date-key (make-trip :day nil)))
+    ;; Unparseable → NIL (graceful failure)
+    (false (vb::trip-date-key (make-trip :day "garbage words here"))))
 
   (define-test find-week-sheets-in-range
       (let ((year (chronicity:year-of (chronicity:parse "today"))))
@@ -1274,45 +1274,45 @@
 
   (define-test format-short-date
       (is string= "Mon Apr 20" (vb::format-short-date "Monday April 20"))
-      (is string= "Thu Jan 1"  (vb::format-short-date "Thursday January 1"))
-      ;; Fallback on unparseable
-      (is string= "garbage" (vb::format-short-date "garbage")))
+    (is string= "Thu Jan 1"  (vb::format-short-date "Thursday January 1"))
+    ;; Fallback on unparseable
+    (is string= "garbage" (vb::format-short-date "garbage")))
 
   (define-test vehicle-priority
       (is = 0 (vb::vehicle-priority :dgh))
-      (is = 1 (vb::vehicle-priority :lgh))
-      (is = 2 (vb::vehicle-priority :chevy))
-      (is = 3 (vb::vehicle-priority :personal))
-      ;; unknown vehicle sinks to bottom
-      (true (> (vb::vehicle-priority :bogus) 100)))
+    (is = 1 (vb::vehicle-priority :lgh))
+    (is = 2 (vb::vehicle-priority :chevy))
+    (is = 3 (vb::vehicle-priority :personal))
+    ;; unknown vehicle sinks to bottom
+    (true (> (vb::vehicle-priority :bogus) 100)))
 
   (define-test departure-minutes
       (is = (+ (* 8 60) 35)   (vb::departure-minutes "8:35 am"))
-      (is = (+ (* 12 60) 35)  (vb::departure-minutes "12:35 pm"))
-      (is = (* 17 60)         (vb::departure-minutes "5:00 pm"))
-      (is = 0                 (vb::departure-minutes ""))
-      (is = 0                 (vb::departure-minutes nil))
-      ;; garbage → 0 (sort-safe default)
-      (is = 0                 (vb::departure-minutes "not a time"))
-      ;; ordering property: am < pm regardless of lexical order
-      (true (< (vb::departure-minutes "8:35 am")
-               (vb::departure-minutes "12:35 pm")))
-      (true (< (vb::departure-minutes "12:35 pm")
-               (vb::departure-minutes "5:35 pm"))))
+    (is = (+ (* 12 60) 35)  (vb::departure-minutes "12:35 pm"))
+    (is = (* 17 60)         (vb::departure-minutes "5:00 pm"))
+    (is = 0                 (vb::departure-minutes ""))
+    (is = 0                 (vb::departure-minutes nil))
+    ;; garbage → 0 (sort-safe default)
+    (is = 0                 (vb::departure-minutes "not a time"))
+    ;; ordering property: am < pm regardless of lexical order
+    (true (< (vb::departure-minutes "8:35 am")
+             (vb::departure-minutes "12:35 pm")))
+    (true (< (vb::departure-minutes "12:35 pm")
+             (vb::departure-minutes "5:35 pm"))))
 
   (define-test truncate-cell
       (is string= "hello"     (vb::truncate-cell "hello" 10))
-      (is string= "hello"     (vb::truncate-cell "hello" 5))
-      (is string= "hel..."    (vb::truncate-cell "hello world" 6))
-      (is string= ""          (vb::truncate-cell "" 5))
-      (is string= ""          (vb::truncate-cell nil 5)))
+    (is string= "hello"     (vb::truncate-cell "hello" 5))
+    (is string= "hel..."    (vb::truncate-cell "hello world" 6))
+    (is string= ""          (vb::truncate-cell "" 5))
+    (is string= ""          (vb::truncate-cell nil 5)))
 
   (define-test booked-trip-p
       (true (vb::booked-trip-p (make-trip :destination "SHMS" :departure "")))
-      (true (vb::booked-trip-p (make-trip :destination "" :departure "8 am")))
-      (true (vb::booked-trip-p (make-trip :destination "SHMS" :departure "8 am")))
-      (false (vb::booked-trip-p (make-trip :destination "" :departure "")))
-      (false (vb::booked-trip-p (make-trip :destination nil :departure nil))))
+    (true (vb::booked-trip-p (make-trip :destination "" :departure "8 am")))
+    (true (vb::booked-trip-p (make-trip :destination "SHMS" :departure "8 am")))
+    (false (vb::booked-trip-p (make-trip :destination "" :departure "")))
+    (false (vb::booked-trip-p (make-trip :destination nil :departure nil))))
 
   (define-test format-schedule-table-shape
       (let* ((trips (list (make-trip :day "Monday April 20" :vehicle :dgh
@@ -1369,9 +1369,9 @@
         (when covered
           (let ((sheet (make-test-sheet)))
             (call-with-mock-read-range sheet
-              (lambda ()
-                (let ((out (view-schedule)))
-                  (true (search "No trips scheduled" out)))))))))
+                                       (lambda ()
+                                         (let ((out (view-schedule)))
+                                           (true (search "No trips scheduled" out)))))))))
 
   (define-test view-schedule-renders-trips
       (let* ((day-str (vb::format-booking-day (chronicity:parse "April 22")))
@@ -1381,13 +1381,13 @@
                                 '(:dgh (("MM" "DM") ("MM" "DM")))))
              (sheet (make-test-sheet block)))
         (call-with-mock-read-range sheet
-          (lambda ()
-            (let ((out (view-schedule "April 22")))
-              (true (search "SHMS" out))
-              (true (search "8:35 am" out))
-              (true (search "DGH" out))
-              (true (search "MM, DM" out))
-              (true (search "Date" out)))))))
+                                   (lambda ()
+                                     (let ((out (view-schedule "April 22")))
+                                       (true (search "SHMS" out))
+                                       (true (search "8:35 am" out))
+                                       (true (search "DGH" out))
+                                       (true (search "MM, DM" out))
+                                       (true (search "Date" out)))))))
 
   (define-test view-schedule-no-sheet
       ;; Date out of any configured week → informative message, no fetch.
@@ -1419,13 +1419,13 @@
                                   :lgh (("DM") ("DM")))))
              (sheet (make-test-sheet block)))
         (call-with-mock-read-range sheet
-          (lambda ()
-            (let* ((out (view-schedule "April 22"))
-                   (morning-pos (search "Morning" out))
-                   (afternoon-pos (search "Afternoon" out)))
-              (true morning-pos)
-              (true afternoon-pos)
-              (true (< morning-pos afternoon-pos))))))))
+                                   (lambda ()
+                                     (let* ((out (view-schedule "April 22"))
+                                            (morning-pos (search "Morning" out))
+                                            (afternoon-pos (search "Afternoon" out)))
+                                       (true morning-pos)
+                                       (true afternoon-pos)
+                                       (true (< morning-pos afternoon-pos))))))))
 
 (define-test vb-tests
     (test 'utilities)

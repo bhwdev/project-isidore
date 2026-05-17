@@ -3,7 +3,7 @@
 (in-package :cl-user)
 
 (consfigurator:defpackage-consfig :project-isidore/infra
-  (:use #:common-lisp #:consfigurator)
+    (:use #:common-lisp #:consfigurator)
   (:export #:oci-a1-flex))
 
 (in-package :project-isidore/infra)
@@ -33,7 +33,7 @@ the local machine in ~/.ssh/config."
   (systemd:restarted "firewalld")
   (git:pulled "https://gitlab.com/bhw/project-isidore.git"
               (pathname "/usr/local/src/project-isidore/"))
-  (apt:installed "sbcl" "curl")
+  (apt:installed "sbcl" "sbcl-source" "curl")
   ;; ocicl (https://github.com/ocicl/ocicl) — OCI-registry-backed Common Lisp
   ;; system distribution. Replaces quicklisp + ultralisp + qlot. The signing
   ;; key path follows Debian trixie convention (Signed-By in the deb822 file

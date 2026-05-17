@@ -11,25 +11,18 @@
 ;; See weitzCommonLispRecipes2016, page 102.
 (setf *read-default-float-format* 'double-float)
 
-#+sbcl (require :sb-posix) ; This is needed for "(uiop:getenv)".
-
 (require "asdf") ; load Utilities for Implementation-and OS-Portability.
 
 (format t "~%~&        ====== MAKE.LISP ======~%")
-;; I also like to live dangerously.
 (declaim (optimize (safety 2) (speed 3) (space 0) (debug 0) (compilation-speed 0)))
 
-;;; I. ASDF & OCICL CONFIGURATION
-;;; See ASDF manual section 4.1 Configuring ASDF to find your systems.
-
-;; sbcl --script bypasses .sbclrc, so load ocicl-runtime explicitly.
-(let ((runtime (or (uiop:getenvp "OCICL_RUNTIME")
-                   (merge-pathnames ".local/share/ocicl/ocicl-runtime.lisp"
-                                    (user-homedir-pathname)))))
-  (unless (probe-file runtime)
-    (error "ocicl-runtime.lisp not found at ~A. Run 'ocicl setup' first."
-           runtime))
-  (load runtime))
+;;; I. OCICL CONFIGURATION
+;; sbcl --no-userinit does not call .sbclrc, so load ocicl-runtime explicitly.
+#-ocicl
+(when (probe-file #P"~/.local/share/ocicl/ocicl-runtime.lisp")
+  (load #P"~/.local/share/ocicl/ocicl-runtime.lisp"))
+(asdf:initialize-source-registry
+ (list :source-registry (list :directory (uiop:getcwd)) :inherit-configuration))
 
 ;;; II. ENVIRONMENT VARIABLES
 (defvar *build-dir* (if (uiop:getenvp "BUILD_DIR")
@@ -38,19 +31,7 @@
                         ;; /home/$USER/common-lisp/project-isidore/
                         (pathname-directory (uiop:getcwd))))
 
-;; Project source tree only. :ignore-inherited-configuration keeps the
-;; user's ~/.config/common-lisp/source-registry.conf.d/ entries (e.g. the
-;; quicklisp/ultralisp tree contributions installed by qlot/quicklisp) out
-;; of the registry, so they don't shadow ocicl's resolution. ocicl-runtime
-;; hooks into asdf:*system-definition-search-functions* (a separate list
-;; that survives this call), so missing systems still fall through to it
-;; for fetching, which gets recorded in ocicl.csv for reproducibility.
-(asdf:initialize-source-registry
- `(:source-registry
-   (:tree ,(make-pathname :directory *build-dir*))
-   :ignore-inherited-configuration))
-
-;;; II. BUILDING
+;;; III. BUILDING
 ;; Caddy is used for SSL Termination and as a Reverse Proxy.
 (push :hunchentoot-no-ssl *features*)
 ;; Whitespace to enhance readability in logs.

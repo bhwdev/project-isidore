@@ -168,6 +168,7 @@ rfc2388, ghcr.io/ocicl/rfc2388@sha256:4190f6eb36b3b2f53def6eff56b44e76edf4086ada
 serapeum, ghcr.io/ocicl/serapeum@sha256:c2d9623e8e48fa4befe99435c3c22e3470bb07bd09e4de1d04b8ebc8eca0ab2f, serapeum-20260510-c4dcbb6/serapeum.asd
 series, ghcr.io/ocicl/series@sha256:11c6af9dac4ed96e3636685590948cd23e88a177003626363f9ce9bcfafb7e73, series-20240503-da9061b/series.asd
 sha1, ghcr.io/ocicl/sha1@sha256:d332af205bf3b5db2bdf8ea6df9f5127627343ce19bc313d00cfa2d80a5fb404, sha1-20240503-be8b1b1/sha1.asd
+slynk, ghcr.io/ocicl/slynk@sha256:3571fd2a8da88873460baae3185e7b94c80699f2c3ac6dfe675180e9f246a41c, sly-20251214-b01993c/slynk/slynk.asd
 smart-buffer, ghcr.io/ocicl/smart-buffer@sha256:b8d194f5881c415fd7f0099b88dfd9e2158405c2966de15c716b155a364bf0f7, smart-buffer-20240503-619759d/smart-buffer.asd
 smart-buffer-test, ghcr.io/ocicl/smart-buffer@sha256:b8d194f5881c415fd7f0099b88dfd9e2158405c2966de15c716b155a364bf0f7, smart-buffer-20240503-619759d/smart-buffer-test.asd
 social-shopping, ghcr.io/ocicl/graph-db@sha256:bab36370ad70c8b87d09282fba25bfd76a3f3f34c2814d9790de2ee67c4fbfcf, graph-db-20251026-0859c36/demo/social-shopping.asd

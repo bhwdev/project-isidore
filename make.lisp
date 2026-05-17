@@ -3,13 +3,7 @@
 
 ;; Load this file inside a shell to build a standalone executable binary,
 
-;; To use your local .sbclrc which possibly contains the ocicl-runtime load,
-;; "$ sbcl --load /path/to/this/file.lisp"
-
-;; Bypass any SBCL Initialization Files on Production deployments with,
-;; http://www.sbcl.org/manual/#Command-Line-Options
-
-;; "$ sbcl --dynamic-space-size 2048 --control-stack-size 4 --no-userinit
+;; "$ sbcl --dynamic-space-size '8Gb' --control-stack-size '16Mb' --no-userinit
 ;; --no-sysinit --load /path/to/this/file.lisp"
 
 (in-package #:cl-user)
@@ -19,7 +13,7 @@
 
 #+sbcl (require :sb-posix) ; This is needed for "(uiop:getenv)".
 
-(require "asdf") ; The recommended way from the manual to load bundled ASDF.
+(require "asdf") ; load Utilities for Implementation-and OS-Portability.
 
 (format t "~%~&        ====== MAKE.LISP ======~%")
 ;; I also like to live dangerously.
@@ -28,14 +22,7 @@
 ;;; I. ASDF & OCICL CONFIGURATION
 ;;; See ASDF manual section 4.1 Configuring ASDF to find your systems.
 
-;; sbcl --script bypasses .sbclrc, so load ocicl-runtime explicitly. The
-;; runtime upgrades the bundled ASDF (>= 3.3.5, needed for package local
-;; nicknames with package-inferred systems) from its own asdf.lisp and
-;; hooks ASDF's missing-component handler so any subsequent
-;; (asdf:load-system ...) auto-fetches dependencies from ghcr.io as needed,
-;; recording digest-pinned references in ./ocicl.csv (committed alongside
-;; the source). Override the default location with the OCICL_RUNTIME env
-;; var if your install lives elsewhere.
+;; sbcl --script bypasses .sbclrc, so load ocicl-runtime explicitly.
 (let ((runtime (or (uiop:getenvp "OCICL_RUNTIME")
                    (merge-pathnames ".local/share/ocicl/ocicl-runtime.lisp"
                                     (user-homedir-pathname)))))
@@ -63,7 +50,7 @@
    (:tree ,(make-pathname :directory *build-dir*))
    :ignore-inherited-configuration))
 
-;;; III. BUILDING
+;;; II. BUILDING
 ;; Caddy is used for SSL Termination and as a Reverse Proxy.
 (push :hunchentoot-no-ssl *features*)
 ;; Whitespace to enhance readability in logs.

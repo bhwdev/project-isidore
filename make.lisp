@@ -25,24 +25,13 @@
 ;; I also like to live dangerously.
 (declaim (optimize (safety 2) (speed 3) (space 0) (debug 0) (compilation-speed 0)))
 
-;;; I. ENVIRONMENT VARIABLES
-(defvar *build-dir* (if (uiop:getenvp "BUILD_DIR")
-                        (pathname-directory (pathname (concatenate 'string (uiop:getenv "BUILD_DIR") "/")))
-                        ;; Local BUILD_DIR should be similar to
-                        ;; /home/$USER/common-lisp/project-isidore/
-                        (pathname-directory (uiop:getcwd))))
-
-;;; II. ASDF & OCICL CONFIGURATION
+;;; I. ASDF & OCICL CONFIGURATION
 ;;; See ASDF manual section 4.1 Configuring ASDF to find your systems.
 
-;; Upgrade > ASDF 3.3.5 to use package local nicknames with package inferred
-;; systems.
-(load (make-pathname :directory (append *build-dir* '("lib"))
-                     :defaults "asdf.lisp"))
-(provide "asdf")
-
 ;; sbcl --script bypasses .sbclrc, so load ocicl-runtime explicitly. The
-;; runtime hooks ASDF's missing-component handler so any subsequent
+;; runtime upgrades the bundled ASDF (>= 3.3.5, needed for package local
+;; nicknames with package-inferred systems) from its own asdf.lisp and
+;; hooks ASDF's missing-component handler so any subsequent
 ;; (asdf:load-system ...) auto-fetches dependencies from ghcr.io as needed,
 ;; recording digest-pinned references in ./ocicl.csv (committed alongside
 ;; the source). Override the default location with the OCICL_RUNTIME env
@@ -54,6 +43,13 @@
     (error "ocicl-runtime.lisp not found at ~A. Run 'ocicl setup' first."
            runtime))
   (load runtime))
+
+;;; II. ENVIRONMENT VARIABLES
+(defvar *build-dir* (if (uiop:getenvp "BUILD_DIR")
+                        (pathname-directory (pathname (concatenate 'string (uiop:getenv "BUILD_DIR") "/")))
+                        ;; Local BUILD_DIR should be similar to
+                        ;; /home/$USER/common-lisp/project-isidore/
+                        (pathname-directory (uiop:getcwd))))
 
 ;; Project source tree only. :ignore-inherited-configuration keeps the
 ;; user's ~/.config/common-lisp/source-registry.conf.d/ entries (e.g. the

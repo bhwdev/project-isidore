@@ -5,6 +5,7 @@
   ;; http://fare.tunes.org/files/asdf3/asdf3-2014.html#(part._.Package_.Upgrade)
   (:mix #:common-lisp #:series #:alexandria #:serapeum)
   (:mix-reexport #:clog #:clog-web #:hunchentoot)
+  (:import-from #:ironclad)
   (:local-nicknames
    (#:conn      #:clog-connection)
    (#:bible     #:project-isidore/bible)
@@ -32,6 +33,17 @@ boot-function and set-on-new-window.
 
 (defvar *server* nil
   "Non-NIL when the CLOG web server is running.")
+
+;; Override CLOG-CONNECTION::RANDOM-HEX-STRING. Upstream's POSIX path uses
+;; cl-isaac's RAND32, which unconditionally DECFs an (UNSIGNED-BYTE 32)
+;; struct slot before checking for zero. With (SAFETY 2) from make.lisp, the
+;; slot writer signals a TYPE-ERROR on the underflow, wedging the PRNG --
+;; every subsequent call retraps, so CLOG can no longer mint connection IDs
+;; and fresh browser sessions never receive the bootstrap frame. CLOG's own
+;; Windows branch already uses ironclad; we extend that to all platforms.
+(defun conn::random-hex-string ()
+  "Generate a cryptographic 128-bit random hex string for connection IDs."
+  (ironclad:byte-array-to-hex-string (ironclad:random-data 16)))
 
 ;;; Page Layout Helpers
 

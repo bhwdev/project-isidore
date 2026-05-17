@@ -16,26 +16,34 @@
 (format t "~%~&        ====== MAKE.LISP ======~%")
 (declaim (optimize (safety 2) (speed 3) (space 0) (debug 0) (compilation-speed 0)))
 
-;;; I. OCICL CONFIGURATION
+;;; I. ASDF & OCICL CONFIGURATION
 ;; sbcl --no-userinit does not call .sbclrc, so load ocicl-runtime explicitly.
+;; Also ensure ~/.local/bin is on PATH: ocicl-runtime spawns the `ocicl`
+;; binary to install missing systems, and non-interactive shells (ssh,
+;; systemd) do not inherit ~/.local/bin from .profile / .bashrc.
+(let* ((home (uiop:getenv "HOME"))
+       (local-bin (and home (concatenate 'string home "/.local/bin")))
+       (path (or (uiop:getenv "PATH") "")))
+  (when (and local-bin
+             (probe-file (concatenate 'string local-bin "/ocicl"))
+             (not (search local-bin path)))
+    (setf (uiop:getenv "PATH") (concatenate 'string local-bin ":" path))))
 #-ocicl
 (when (probe-file #P"~/.local/share/ocicl/ocicl-runtime.lisp")
   (load #P"~/.local/share/ocicl/ocicl-runtime.lisp"))
-(asdf:initialize-source-registry
- (list :source-registry (list :directory (uiop:getcwd)) :inherit-configuration))
 
 ;;; II. ENVIRONMENT VARIABLES
-(defvar *build-dir* (if (uiop:getenvp "BUILD_DIR")
-                        (pathname-directory (pathname (concatenate 'string (uiop:getenv "BUILD_DIR") "/")))
-                        ;; Local BUILD_DIR should be similar to
-                        ;; /home/$USER/common-lisp/project-isidore/
-                        (pathname-directory (uiop:getcwd))))
+(defvar *project-dir*
+  (make-pathname :defaults (or *load-pathname* (uiop:getcwd))
+                 :name nil :type nil :version nil))
+(asdf:initialize-source-registry
+ (list :source-registry (list :directory *project-dir*) :inherit-configuration))
 
 ;;; III. BUILDING
 ;; Caddy is used for SSL Termination and as a Reverse Proxy.
 (push :hunchentoot-no-ssl *features*)
 ;; Whitespace to enhance readability in logs.
-(format t "~&        *BUILD-DIR* = ~a" (make-pathname :directory *build-dir*))
+(format t "~&        *PROJECT-DIR* = ~a" (make-pathname :directory *project-dir*))
 (format t "~&        COMMON-LISP-ENV = ~a:~a (Provided ASDF version ~a) on ~a~%"
         (lisp-implementation-type) (lisp-implementation-version)
         (asdf:asdf-version) (machine-type))
@@ -64,6 +72,19 @@
           (unless (eq th main)
             (ignore-errors (bordeaux-threads:destroy-thread th)))))
       (sleep 0.5)
+      ;; Strip ocicl-runtime's ASDF searcher before save-lisp-and-die. At
+      ;; runtime, asdf:system-relative-pathname re-locates :project-isidore
+      ;; via the search functions; if the searcher falls through to ocicl,
+      ;; it spawns the `ocicl` binary to install — fatal under systemd where
+      ;; ~/.local/bin is not on PATH. The saved image needs no further
+      ;; system installation; all dependencies are already loaded.
+      (when (find-package :ocicl-runtime)
+        (let ((searcher (find-symbol "SYSTEM-DEFINITION-SEARCHER"
+                                     :ocicl-runtime)))
+          (when searcher
+            (setf asdf:*system-definition-search-functions*
+                  (remove searcher
+                          asdf:*system-definition-search-functions*)))))
       (asdf:make "project-isidore") ; see "project-isidore.asd" for more.
       ;; SBCL's `save-lisp-and-die' kills the lisp process at the end.
       ;; However this behaviour is implementation dependent. This command

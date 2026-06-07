@@ -14,11 +14,11 @@
   "Declarative Configuration for Production Server. To deploy to production run
 locally in the listener,
 
-CL-USER> (ql:quickload \"project-isidore/infra\")
+CL-USER> (asdf:load-system \"project-isidore/infra\")
 CL-USER> (project-isidore/infra:oci-a1-flex)
 
-NOTE that if (ql:quickload \"consfigurator\") fails with CFFI unable to find C
-libraries, locally sudo apt install packages listed in
+NOTE that if (asdf:load-system \"consfigurator\") fails with CFFI unable to find
+C libraries, locally apt install packages listed in
 `consfigurator.property.package:+consfigurator-system-dependencies+'.
 
 One piece of information is unique to this host: remote root SSH login access on
@@ -31,24 +31,10 @@ the local machine in ~/.ssh/config."
   (cmd:single "firewall-cmd --permanent --add-service=https")
   (cmd:single "firewall-cmd --reload")
   (systemd:restarted "firewalld")
+  (apt:installed "sbcl" "sbcl-source" "git")
+  (cmd:single "git reset --hard master")
   (git:pulled "https://gitlab.com/bhw/project-isidore.git"
               (pathname "/usr/local/src/project-isidore/"))
-  (apt:installed "sbcl" "sbcl-source" "curl")
-  ;; ocicl (https://github.com/ocicl/ocicl) — OCI-registry-backed Common Lisp
-  ;; system distribution. Replaces quicklisp + ultralisp + qlot. The signing
-  ;; key path follows Debian trixie convention (Signed-By in the deb822 file
-  ;; pointing to /usr/share/keyrings/, not the deprecated apt-key flow).
-  (cmd:single
-   "test -f /usr/share/keyrings/ocicl-archive-keyring.asc || curl -fsSL https://ocicl.github.io/ocicl/deb-repo/ocicl-archive-keyring.gpg -o /usr/share/keyrings/ocicl-archive-keyring.asc")
-  (apt:additional-sources "ocicl"
-                          "Types: deb
-URIs: https://ocicl.github.io/ocicl/deb-repo
-Suites: stable
-Components: main
-Signed-By: /usr/share/keyrings/ocicl-archive-keyring.asc")
-  (apt:installed "ocicl")
-  ;; Mandatory: writes /root/.local/share/ocicl/ocicl-runtime.lisp, which
-  ;; make.lisp loads (since sbcl --script bypasses .sbclrc). Idempotent.
   (cmd:single "ocicl setup")
   ;; Dependency pinning lives in ocicl.csv at the project root, brought in by
   ;; the git:pulled step above. make.lisp loads ocicl-runtime; ocicl auto-fetches

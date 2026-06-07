@@ -11,16 +11,32 @@
 ;; See weitzCommonLispRecipes2016, page 102.
 (setf *read-default-float-format* 'double-float)
 
-(require "asdf") ; load Utilities for Implementation-and OS-Portability.
+;;; I. ASDF & OCICL CONFIGURATION
+;; This file is loaded with `sbcl --no-userinit --no-sysinit`, which skips
+;; .sbclrc, so configure ASDF + ocicl explicitly here.
+;;
+;; project-isidore and its dependencies are vendored locally via ocicl
+;; (project-isidore/ocicl.csv + project-isidore/ocicl/). For a clean,
+;; deterministic build, pin CL_SOURCE_REGISTRY to this project's directory
+;; *before* (require "asdf"): otherwise ASDF's built-in default scans
+;; ~/common-lisp/ recursively and, finding duplicate .asd files vendored by
+;; sibling ocicl projects, warns on every build (and may pick their copies).
+;; project-isidore.asd is found via this single non-recursive entry;
+;; third-party deps resolve through ocicl's searcher (loaded below).
+(defvar *project-dir*
+  (make-pathname :defaults (truename (or *load-pathname* *default-pathname-defaults*))
+                 :name nil :type nil :version nil))
+(require :sb-posix)
+(sb-posix:setenv "CL_SOURCE_REGISTRY" (namestring *project-dir*) 1)
+
+(require "asdf") ; load Utilities for Implementation- and OS-Portability.
 
 (format t "~%~&        ====== MAKE.LISP ======~%")
 (declaim (optimize (safety 2) (speed 3) (space 0) (debug 0) (compilation-speed 0)))
 
-;;; I. ASDF & OCICL CONFIGURATION
-;; sbcl --no-userinit does not call .sbclrc, so load ocicl-runtime explicitly.
-;; Also ensure ~/.local/bin is on PATH: ocicl-runtime spawns the `ocicl`
-;; binary to install missing systems, and non-interactive shells (ssh,
-;; systemd) do not inherit ~/.local/bin from .profile / .bashrc.
+;; Ensure ~/.local/bin is on PATH: ocicl-runtime spawns the `ocicl` binary to
+;; install missing systems, and non-interactive shells (ssh, systemd) do not
+;; inherit ~/.local/bin from .profile / .bashrc.
 (let* ((home (uiop:getenv "HOME"))
        (local-bin (and home (concatenate 'string home "/.local/bin")))
        (path (or (uiop:getenv "PATH") "")))
@@ -28,18 +44,18 @@
              (probe-file (concatenate 'string local-bin "/ocicl"))
              (not (search local-bin path)))
     (setf (uiop:getenv "PATH") (concatenate 'string local-bin ":" path))))
+
+;; ocicl resolves local systems by walking up from the current working
+;; directory for ocicl.csv, so build from this project's directory regardless
+;; of where the script was invoked.
+(uiop:chdir *project-dir*)
+(setf *default-pathname-defaults* *project-dir*)
+
 #-ocicl
 (when (probe-file #P"~/.local/share/ocicl/ocicl-runtime.lisp")
   (load #P"~/.local/share/ocicl/ocicl-runtime.lisp"))
 
-;;; II. ENVIRONMENT VARIABLES
-(defvar *project-dir*
-  (make-pathname :defaults (or *load-pathname* (uiop:getcwd))
-                 :name nil :type nil :version nil))
-(asdf:initialize-source-registry
- (list :source-registry (list :directory *project-dir*) :inherit-configuration))
-
-;;; III. BUILDING
+;;; II. BUILDING
 ;; Caddy is used for SSL Termination and as a Reverse Proxy.
 (push :hunchentoot-no-ssl *features*)
 ;; Whitespace to enhance readability in logs.

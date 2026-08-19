@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- 2026-05-08 Fri 20:24 -->
+<!-- 2026-08-18 Tue 21:41 -->
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Communication Setup in Emacs</title>
@@ -12,7 +12,7 @@
                       <link rel="stylesheet"
                             href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.2.0/styles/base16/solarized-light.min.css">
                       <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.2.0/highlight.min.js" defer></script>
-                      <script>var hlf=function(){Array.prototype.forEach.call(document.querySelectorAll("pre.src"),function(t){var e;e=t.getAttribute("class"),e=e.replace(/src-(w+)/,"src-$1 $1"),console.log(e),t.setAttribute("class",e),hljs.highlightBlock(t)})};addEventListener("DOMContentLoaded",hlf);</script>
+                      <script>var hlf=function(){Array.prototype.forEach.call(document.querySelectorAll("pre.src"),function(t){var e;e=t.getAttribute("class"),e=e.replace(/src-(\w+)/,"src-$1 $1"),t.setAttribute("class",e),hljs.highlightElement(t)})};addEventListener("DOMContentLoaded",hlf);</script>
 </head>
 <body>
 <div id="preamble" class="status">
@@ -34,10 +34,10 @@
                                     </div>
                                     <h1 class="title">Communication Setup in Emacs</h1>
                                     <p class="subtitle">Much ink has been spilled on&hellip;how best to spill ink?</p> <br/>
-                                    <p class="updated"><a href="/contact#article-history">Updated:</a> 2026-05-01 Fri 09:45</p>
+                                    <p class="updated"><a href="/contact#article-history">Updated:</a> 2026-07-22 Wed 14:43</p>
 </div>
 <div id="content" class="content">
-<div class="abstract" id="orgcaba505">
+<div class="abstract" id="orgbe5ae20">
 <p>
 
 </p>
@@ -62,30 +62,30 @@ superiority, no presumption.” &ndash; C.S. Lewis
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
 <li><a href="#Introduction">1. Introduction</a></li>
-<li><a href="#org4905f1d">2. Instant Messaging - Meta with Matrix and Ement</a>
+<li><a href="#org303fe23">2. Instant Messaging - Meta with Matrix and Ement</a>
 <ul>
-<li><a href="#orgdad3207">2.1. Matrix-synapse server Installation</a></li>
-<li><a href="#org3e386ca">2.2. WhatsApp Bridge Installation</a></li>
-<li><a href="#org8ce44a2">2.3. Conclusion</a></li>
+<li><a href="#orgc0dc882">2.1. Tuwunel server Installation</a></li>
+<li><a href="#org14f7226">2.2. WhatsApp Bridge Installation</a></li>
+<li><a href="#org370790a">2.3. Conclusion</a></li>
 </ul>
 </li>
-<li><a href="#org8a296db">3. Email - GMail with Mbsync and Mu4e</a>
+<li><a href="#org7071233">3. Email - GMail with Mbsync and Mu4e</a>
 <ul>
-<li><a href="#org30db46b">3.1. Viewing HTML email in your internet browser</a></li>
+<li><a href="#org4648f18">3.1. Viewing HTML email in your internet browser</a></li>
 </ul>
 </li>
-<li><a href="#org6d375b6">4. Web logs &amp; Web feeds - Org Publish and Elfeed</a></li>
+<li><a href="#org61eba82">4. Web logs &amp; Web feeds - Org Publish and Elfeed</a></li>
 </ul>
 </div>
 </nav>
 <p>
-<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-04-07T15:47:00">[2026-04-07 Tue 15:47]</time></span> &lt;- <a href="../dotemacs.html#ID-20220829T170201.833199">Elfeed Config</a>
-<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-04-07T15:47:00">[2026-04-07 Tue 15:47]</time></span> &lt;- <a href="../dotemacs.html#ID-20220829T170149.630909">Email Config</a>
-<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-04-07T15:47:00">[2026-04-07 Tue 15:47]</time></span> &lt;- <a href="../dotemacs.html#ID-20220829T170131.891099">Ement Config</a>
-<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-04-07T15:47:00">[2026-04-07 Tue 15:47]</time></span> &lt;- <a href="../.stversions/cpb.html#ID-4a9ea0cd-0b3a-4e9e-9236-dfe3b917fd50">GNU Emacs</a>
+<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-04-07T15:47:00">[2026-04-07 Tue 15:47]</time></span> &lt;- <a href="dotemacs.html#ID-20220829T170201.833199">Elfeed Config</a>
+<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-04-07T15:47:00">[2026-04-07 Tue 15:47]</time></span> &lt;- <a href="dotemacs.html#ID-20220829T170149.630909">Email Config</a>
+<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-04-07T15:47:00">[2026-04-07 Tue 15:47]</time></span> &lt;- <a href="dotemacs.html#ID-20220829T170131.891099">Ement Config</a>
+<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-04-07T15:47:00">[2026-04-07 Tue 15:47]</time></span> &lt;- <a href="../cpb.html#ID-4a9ea0cd-0b3a-4e9e-9236-dfe3b917fd50">GNU Emacs</a>
 </p>
 <ul class="org-ul">
-<li><a href="../.stversions/cpb.html#ID-4a9ea0cd-0b3a-4e9e-9236-dfe3b917fd50">&lt;&ndash;GNU Emacs</a></li>
+<li><a href="../cpb.html#ID-4a9ea0cd-0b3a-4e9e-9236-dfe3b917fd50">&lt;&ndash;GNU Emacs</a></li>
 </ul>
 <div id="outline-container-Introduction" class="outline-2">
 <h2 id="Introduction"><span class="section-number-2">1.</span> Introduction</h2>
@@ -99,8 +99,8 @@ Workflow configuration specific to myself is relegated to my dotfiles.
 </p>
 </div>
 </div>
-<div id="outline-container-org4905f1d" class="outline-2">
-<h2 id="org4905f1d"><span class="section-number-2">2.</span> Instant Messaging - Meta with Matrix and Ement</h2>
+<div id="outline-container-org303fe23" class="outline-2">
+<h2 id="org303fe23"><span class="section-number-2">2.</span> Instant Messaging - Meta with Matrix and Ement</h2>
 <div class="outline-text-2" id="text-2">
 <p>
 <a href="https://matrix.org/docs/matrix-concepts/elements-of-matrix/">Matrix</a> is a protocol for secure, decentralized real time communication in a
@@ -117,14 +117,14 @@ similar fashion as Email. Three options exist:
 Options 1. and 2. can be <a href="https://matrix.org/ecosystem/bridges/">bridged to third party services</a> at your convenience
 while 3. has no bridging capabilities as of this writing. The focus of this
 article is option 1. although 2. <a href="https://www.reddit.com/r/emacs/comments/1crerbh/access_signalwhatsapp_messages_with_ement_via/">could be possible</a> to use with <a href="https://github.com/alphapapa/ement.el">Ement.el.</a> I am
-living the dream with Facebook messenger, WhatsApp and SMS bridged onto a
-self-hosted Matrix server. A server that has Emacs as the client on my computer
+living the dream with Facebook Messenger, WhatsApp, Slack, Discord, Google
+Voice and SMS (Google Messages) bridged onto a self-hosted Matrix server. A server that has Emacs as the client on my computer
 and <a href="https://element.io/download">element</a> on mobile. The whole process shouldn&rsquo;t take you more than 1 hour. My
 own notes follow, hope that helps.
 </p>
 </div>
-<div id="outline-container-orgdad3207" class="outline-3">
-<h3 id="orgdad3207"><span class="section-number-3">2.1.</span> Matrix-synapse server Installation</h3>
+<div id="outline-container-orgc0dc882" class="outline-3">
+<h3 id="orgc0dc882"><span class="section-number-3">2.1.</span> Tuwunel server Installation</h3>
 <div class="outline-text-3" id="text-2-1">
 <p>
 Prerequisites:
@@ -137,108 +137,70 @@ Prerequisites:
 </ul>
 
 <p>
-I am installing the Synapse (as of writing, v1.135.0) implementation of the
-Matrix protocol on Debian 13. Replace all instances of <code>matrix.bhw.name</code> with
-your domain name <code>matrix.example.com</code>. Matrix-synapse is not currently packaged
-for Debian 13 but was for Debian 12, therefore I am building from source. For a
-simpler Debian 12 version of this article see <a href="https://gitlab.com/bhw/project-isidore/-/blob/2f4d9517352862d21b4e19267f9bc91642859712/assets/blog/communication-setup-in-emacs.html">commit 2f4d9517</a>. The steps
-outlined here are only what&rsquo;s required for a single user to self-host a
-matrix-synapse server with user defined <a href="https://matrix.org/ecosystem/bridges/">bridges</a>. Look to <a href="https://docs.vultr.com/create-a-chat-server-using-matrix-synapse-and-element-on-debian-11">this tutorial</a> if you
-would like to add features like voice/video calling and to self-host the client
-as well.
+I am installing the <a href="https://github.com/matrix-construct/tuwunel">Tuwunel</a> (as of writing, v1.7.0) implementation of the
+Matrix protocol on Debian 13. Tuwunel, the official successor to conduwuit, is
+a single Rust binary with an embedded RocksDB database and prebuilt <code>.deb</code>
+packages; compared to my old matrix-synapse deployment there is no Python
+virtualenv and no PostgreSQL to administer. Do note that automatic migration
+from Synapse is <a href="https://github.com/matrix-construct/tuwunel">planned but not yet supported</a>, so I started with a fresh
+database. Replace all instances of <code>matrix.bhw.name</code> with your domain name
+<code>matrix.example.com</code>. For the older matrix-synapse versions of this article
+see <a href="https://gitlab.com/bhw/project-isidore/-/blob/2f4d9517352862d21b4e19267f9bc91642859712/assets/blog/communication-setup-in-emacs.html">commit 2f4d9517</a> (Debian 12, distribution package) or <a href="https://gitlab.com/bhw/project-isidore/-/blob/befe72fb930420716cca3f58c3f3a5dd66f2e3f6/assets/blog/communication-setup-in-emacs.html">commit befe72fb</a>
+(Debian 13, building from source). The steps outlined here are only what&rsquo;s
+required for a single user to self-host a tuwunel server with user defined
+<a href="https://matrix.org/ecosystem/bridges/">bridges</a>. Voice/video calling via MatrixRTC and LiveKit is supported by
+tuwunel but out of scope for this article.
 </p>
 
 <div class="org-src-container">
 <pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">My server environment,
 </span>  uname -a
-  <span class="org-comment-delimiter"># </span><span class="org-comment">Linux oci-a1-flex 6.12.38+deb13-cloud-arm64 #1 SMP Debian 6.12.38-1 (2025-07-16) aarch64 GNU/Linux
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">On the server machine,
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">https://element-hq.github.io/synapse/latest/setup/installation.html#platform-specific-prerequisites
-</span>  <span class="org-type">sudo</span> apt install build-essential python3-dev libffi-dev <span class="org-sh-escaped-newline">\</span>
-       python3-pip python3-setuptools sqlite3 <span class="org-sh-escaped-newline">\</span>
-       libssl-dev virtualenv libjpeg-dev libxslt1-dev
-  <span class="org-type">mkdir</span> -p /usr/local/src/matrix-synapse
-  <span class="org-type">cd</span> /usr/local/src/matrix-synapse
-  virtualenv -p python3 /usr/local/src/matrix-synapse/env
-  <span class="org-builtin">source</span> /usr/local/src/matrix-synapse/env/bin/activate
-  pip install --upgrade pip
-  pip install --upgrade setuptools
-  <span class="org-comment-delimiter"># </span><span class="org-comment">PostgreSQL database adapter for Python.
-</span>  pip install psycopg2-binary
-  pip install matrix-synapse
-  python -m synapse.app.homeserver <span class="org-sh-escaped-newline">\</span>
-         --server-name matrix.bhw.name <span class="org-sh-escaped-newline">\</span>
-         --config-path /usr/local/src/matrix-synapse/homeserver.yaml <span class="org-sh-escaped-newline">\</span>
-         --generate-config <span class="org-sh-escaped-newline">\</span>
-         --report-stats=yes
-  <span class="org-comment-delimiter"># </span><span class="org-comment">Set up PostgreSQL Database.
-</span>  <span class="org-type">sudo</span> apt install postgresql
-  <span class="org-comment-delimiter"># </span><span class="org-comment">Log into the PostgreSQL user.
-</span>  <span class="org-type">sudo</span> -su postgres
-  <span class="org-comment-delimiter"># </span><span class="org-comment">Create a user synapse and a database synapse for PostgreSQL.
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">Remember the password in the next step.
-</span>  createuser --pwprompt synapse
-  createdb --encoding=UTF8 --locale=C --template=template0 --owner=synapse synapse
-  <span class="org-comment-delimiter"># </span><span class="org-comment">Leave the postgres account.
-</span>  <span class="org-keyword">exit</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Linux oci-a1-flex 6.12.90+deb13.1-cloud-arm64 #1 SMP Debian 6.12.90-2 (2026-05-27) aarch64 GNU/Linux
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">On the server machine, download the prebuilt .deb from
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">https://github.com/matrix-construct/tuwunel/releases
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">Note I am downloading the aarch64 (arm64) build.
+</span>  <span class="org-type">curl</span> -L -O https://github.com/matrix-construct/tuwunel/releases/download/v1.7.0/v1.7.0-release-all-aarch64-v8-linux-gnu-tuwunel.deb
+  <span class="org-type">sudo</span> apt install ./v1.7.0-release-all-aarch64-v8-linux-gnu-tuwunel.deb
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Upgrading tuwunel later is the same, download the newer .deb and
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">apt install it again. An apt repository is also available,
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">https://matrix-construct.github.io/tuwunel/deploying/debian.html</span>
 </code></pre>
 </div>
 
 <p>
-<code>/usr/local/src/matrix-synapse/homeserver.yaml</code> is where we configure our
-matrix-synapse server. Please read through it, and if you are going to copy
-paste it, the minimal changes needed are to the <code>server_name</code> and <code>database</code>
-configurations.
+The package ships a hardened systemd unit, creates a <code>tuwunel</code> system user and
+stores its embedded RocksDB database under <code>/var/lib/tuwunel/</code>; there is no
+hand-written service file and no PostgreSQL setup as matrix-synapse required.
+<code>/etc/tuwunel/tuwunel.toml</code> is where we configure our tuwunel server. Please
+read through it, and if you are going to copy paste it, the minimal change
+needed is to <code>server_name</code>. Registration is enabled with a token only long
+enough to create our user below.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-conf"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Configuration file for Synapse.
+<pre class="src src-conf"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Configuration file for Tuwunel.
 </span>  <span class="org-comment-delimiter">#</span><span class="org-comment">
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">This is a YAML file: see [1] for a quick introduction. Note in particular
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">that *indentation is important*: all the elements of a list or dictionary
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">should have the same indentation.
-</span>  <span class="org-comment-delimiter">#</span><span class="org-comment">
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">[1] https://docs.ansible.com/ansible/latest/reference_appendices/YAMLSyntax.html
-</span>  <span class="org-comment-delimiter">#</span><span class="org-comment">
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">For more information on how to configure Synapse, including a complete accounting of
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">each option, go to docs/usage/configuration/config_documentation.md or
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">https://element-hq.github.io/synapse/latest/usage/configuration/config_documentation.html
-</span>  server_name: <span class="org-string">"matrix.bhw.name"</span>
-  pid_file: /usr/local/src/matrix-synapse/homeserver.pid
-  listeners:
-    - port: 8008
-      tls: false
-      type: http
-      x_forwarded: true
-      bind_addresses: [<span class="org-string">'::1'</span>, <span class="org-string">'127.0.0.1'</span>]
-      resources:
-        - names: [client, federation]
-          compress: false
-  presence:
-    enabled: false
-  database:
-    name: psycopg2
-    args:
-      user: synapse
-      password: yourpassword
-      database: synapse
-      host: localhost
-      cp_min: 5
-      cp_max: 10
-  log_config: <span class="org-string">"/usr/local/src/matrix-synapse/matrix.bhw.name.log.config"</span>
-  media_store_path: /usr/local/src/matrix-synapse/media_store
-  report_stats: true
-  signing_key_path: <span class="org-string">"/usr/local/src/matrix-synapse/matrix.bhw.name.signing.key"</span>
-  trusted_key_servers:
-    - server_name: <span class="org-string">"matrix.org"</span>
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">This is a TOML file. For a complete accounting of each option see
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">https://matrix-construct.github.io/tuwunel/configuration/examples.html
+</span>  [<span class="org-type">global</span>]
+  <span class="org-variable-name">server_name</span> = <span class="org-string">"matrix.bhw.name"</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Embedded RocksDB database. No PostgreSQL required.
+</span>  <span class="org-variable-name">database_path</span> = <span class="org-string">"/var/lib/tuwunel"</span>
+  <span class="org-variable-name">port</span> = 8008
+  <span class="org-variable-name">allow_federation</span> = true
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Set allow_registration to false and restart tuwunel
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">once your account is created below.
+</span>  <span class="org-variable-name">allow_registration</span> = true
+  <span class="org-variable-name">registration_token</span> = <span class="org-string">"correct-horse-battery-staple"</span>
 
-  <span class="org-comment-delimiter"># </span><span class="org-comment">vim:ft=yaml</span>
+  [<span class="org-type">global.well_known</span>]
+  <span class="org-variable-name">client</span> = <span class="org-string">"https://matrix.bhw.name"</span>
 </code></pre>
 </div>
 
 <p>
 Allow inbound HTTPS traffic on port 443 and port 8448 if you desire to use
-<a href="https://element-hq.github.io/synapse/latest/federate.html">Matrix federation</a>.
+<a href="https://matrix.org/docs/matrix-concepts/elements-of-matrix/">Matrix federation</a>.
 </p>
 
 <div class="org-src-container">
@@ -251,95 +213,48 @@ Allow inbound HTTPS traffic on port 443 and port 8448 if you desire to use
 </div>
 
 <p>
-We are going to <a href="https://element-hq.github.io/synapse/latest/reverse_proxy.html?highlight=reverse%20proxy%20caddy#caddy-v2">reverse proxy the Matrix server with Caddy</a>. <code>sudo apt install
+We are going to <a href="https://matrix-construct.github.io/tuwunel/deploying/generic.html">reverse proxy the Matrix server with Caddy</a>. <code>sudo apt install
 caddy</code> and make sure <code>/etc/caddy/Caddyfile</code> includes the following content.
-Start Caddy with <code>systemctl start caddy.service</code>.
+Start Caddy with <code>systemctl start caddy.service</code>. Tuwunel listens on a single
+port and there is no separate <code>/_synapse</code> path to proxy.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-conf"><code>  <span class="org-type">matrix.bhw.name</span> {
-      reverse_proxy /_matrix/* localhost:8008
-      reverse_proxy /_synapse/client/* localhost:8008
-  }
-  matrix.bhw.name:8448 {
-      reverse_proxy /_matrix/* localhost:8008
+<pre class="src src-conf"><code>  matrix.bhw.name, matrix.bhw.name:8448 {
+      reverse_proxy localhost:8008
   }
 </code></pre>
 </div>
 
 <p>
-We can start the server and perform a quick sanity check by visiting from your
-web browser <a href="https://matrix.bhw.name/_matrix/">https://matrix.bhw.name/_matrix/</a>. You should get an error code
-response of &ldquo;Unrecognized request&rdquo;.
+We can now enable the server and perform a quick sanity check by visiting from
+your web browser <a href="https://matrix.bhw.name/_matrix/">https://matrix.bhw.name/_matrix/</a>. You should get an error code
+response of <code>M_UNRECOGNIZED: Not Found</code>.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sh"><code>  <span class="org-type">cd</span> /usr/local/src/matrix-synapse/
-  <span class="org-builtin">source</span> env/bin/activate
-  synctl start
+<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">The .deb ships tuwunel.service, aliased as matrix-tuwunel.service.
+</span>  systemctl enable --now tuwunel
+  systemctl status tuwunel
 </code></pre>
 </div>
 
 <p>
-Now our aim is to create an administrator user. Since <a href="https://element-hq.github.io/synapse/latest/admin_api/register_api.html%20">shared secret registration</a>
-fails due to the nonce for me we will have to workaround this. Our plan is to
-upgrade a regular user to admin by directly editing the database. I create a
-regular user by first allowing registration without verification. This allows us
-to create a user without the hassle of CAPTCHA&rsquo;s or email verification. Opening
-my web browser to <a href="https://app.element.io/#/register">https://app.element.io/#/register</a> &ndash; note that we must change
-the &ldquo;Homeserver&rdquo; from <code>matrix.org</code> to <code>https://matrix.bhw.name</code> &ndash; and creating
-a user with a password will seem to hang and not complete. This is expected. The
-user has still been created. We will now return to our server shell and give our
-user <a href="https://element-hq.github.io/synapse/latest/usage/administration/admin_faq.html#how-do-i-become-a-server-admin%20">admin permissions</a>.
+Now our aim is to create an administrator user. There is no need for
+matrix-synapse&rsquo;s shared secret registration workarounds and database surgery;
+tuwunel grants the first user to register admin privileges by joining them to
+the admin room. Opening my web browser to <a href="https://app.element.io/#/register">https://app.element.io/#/register</a> &ndash;
+note that we must change the &ldquo;Homeserver&rdquo; from <code>matrix.org</code> to
+<code>https://matrix.bhw.name</code> &ndash; I create a user, supplying the
+<code>registration_token</code> set in <code>tuwunel.toml</code>. Our new user is invited to the
+admin room, from which the server is administered by messaging <code>!admin</code>
+commands. With the account created, close registration.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sh"><code>  <span class="org-type">sudo</span> -su postgres
-  psql -d synapse
-  UPDATE users SET admin = 1 WHERE name = <span class="org-string">'@yourusername:matrix.bhw.name'</span>;
-  <span class="org-keyword">exit</span>
-  <span class="org-keyword">exit</span>
-</code></pre>
-</div>
-
-<p>
-The last step is to automate the starting and stopping of the matrix-synapse
-server. The <a href="https://element-hq.github.io/synapse/latest/systemd-with-workers/index.html#setting-up-synapse-with-workers-and-systemd%20">docs</a> provide an exemplar as well as <a href="https://browse.dgit.debian.org/matrix-synapse.git/plain/contrib/systemd/matrix-synapse.service?h=archive/debian/1.78.0-1_bpo11%2B1%20">Debian</a>. Below is my current
-<code>/etc/systemd/system/matrix-synapse.service/</code> file. Do note that I run with
-<code>User</code> as <code>root</code>.
-</p>
-
-<div class="org-src-container">
-<pre class="src src-conf"><code>[<span class="org-type">Unit</span>]
-<span class="org-variable-name">Description</span>=Synapse Matrix homeserver
-<span class="org-comment-delimiter"># </span><span class="org-comment">If you are using postgresql to persist data, uncomment this line to make sure
-</span><span class="org-comment-delimiter"># </span><span class="org-comment">synapse starts after the postgresql service.
-</span><span class="org-variable-name">After</span>=postgresql.service
-
-[<span class="org-type">Service</span>]
-<span class="org-variable-name">Type</span>=notify
-<span class="org-variable-name">NotifyAccess</span>=main
-<span class="org-variable-name">User</span>=root
-<span class="org-variable-name">Group</span>=root
-<span class="org-variable-name">WorkingDirectory</span>=/usr/local/src/matrix-synapse/
-<span class="org-variable-name">ExecStart</span>=/usr/local/src/matrix-synapse/env/bin/python -m synapse.app.homeserver --config-path=/usr/local/src/matrix-synapse/homeserver.yaml
-<span class="org-variable-name">ExecReload</span>=/bin/kill -HUP $MAINPID
-<span class="org-variable-name">Restart</span>=always
-<span class="org-variable-name">RestartSec</span>=3
-<span class="org-variable-name">SyslogIdentifier</span>=matrix-synapse
-
-[<span class="org-type">Install</span>]
-<span class="org-variable-name">WantedBy</span>=matrix-synapse.target
-</code></pre>
-</div>
-
-<p>
-We can now treat <code>matrix-synapse</code> like any other systemd service.
-</p>
-
-<div class="org-src-container">
-<pre class="src src-sh"><code>  systemctl enable matrix-synapse
-  systemctl restart matrix-synapse
+<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">In /etc/tuwunel/tuwunel.toml set,
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">allow_registration = false
+</span>  systemctl restart tuwunel
 </code></pre>
 </div>
 
@@ -348,8 +263,8 @@ Now we can bridge to some 3rd party services!
 </p>
 </div>
 </div>
-<div id="outline-container-org3e386ca" class="outline-3">
-<h3 id="org3e386ca"><span class="section-number-3">2.2.</span> WhatsApp Bridge Installation</h3>
+<div id="outline-container-org14f7226" class="outline-3">
+<h3 id="org14f7226"><span class="section-number-3">2.2.</span> WhatsApp Bridge Installation</h3>
 <div class="outline-text-3" id="text-2-2">
 <p>
 Link our WhatsApp account and our Matrix server. Download the correct prebuilt
@@ -361,11 +276,12 @@ extract it to <code>/opt/mautrix-whatsapp/</code>.
 <pre class="src src-sh"><code><span class="org-comment-delimiter"># </span><span class="org-comment">Create folder if it doesn't exist. Note I am downloading arm64 executable.
 </span><span class="org-type">mkdir</span> /opt/mautrix-whatsapp/
 <span class="org-comment-delimiter"># </span><span class="org-comment">If updating, </span><span class="org-type"><span class="org-comment">make</span></span><span class="org-comment"> sure to 'systemctl stop mautrix-whatsapp'.
-</span><span class="org-type">curl</span> -L -o /opt/mautrix-whatsapp/mautrix-whatsapp https://github.com/mautrix/whatsapp/releases/download/v0.2604.0/mautrix-whatsapp-arm64
-<span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-meta/mautrix-meta https://github.com/mautrix/meta/releases/download/v0.2604.0/mautrix-meta-arm64
-</span><span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-gmessages/mautrix-gmessages https://github.com/mautrix/gmessages/releases/download/v0.2604.0/mautrix-gmessages-arm64
-</span><span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-slack/mautrix-slack https://github.com/mautrix/slack/releases/download/v0.2604.0/mautrix-slack-arm64
-</span><span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-gvoice/mautrix-gvoice https://github.com/mautrix/gvoice/releases/download/v0.2604.0/mautrix-gvoice-arm64
+</span><span class="org-type">curl</span> -L -o /opt/mautrix-whatsapp/mautrix-whatsapp https://github.com/mautrix/whatsapp/releases/download/v0.2607.0/mautrix-whatsapp-arm64
+<span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-gvoice/mautrix-gvoice https://github.com/mautrix/gvoice/releases/download/v0.2605.0/mautrix-gvoice-arm64
+</span><span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-gmessages/mautrix-gmessages https://github.com/mautrix/gmessages/releases/download/v0.2605.0/mautrix-gmessages-arm64
+</span><span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-slack/mautrix-slack https://github.com/mautrix/slack/releases/download/v0.2607.0/mautrix-slack-arm64
+</span><span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-meta/mautrix-meta https://github.com/mautrix/meta/releases/download/v0.2607.0/mautrix-meta-arm64
+</span><span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-discord/mautrix-discord https://github.com/mautrix/discord/releases/download/v0.7.6/mautrix-discord-arm64
 </span><span class="org-type">cd</span> /opt/mautrix-whatsapp
 <span class="org-comment-delimiter"># </span><span class="org-comment">Grant executable permissiosn to the "mautrix-whatsapp" go executable.
 </span><span class="org-type">chmod</span> +x mautrix-whatsapp
@@ -376,19 +292,11 @@ extract it to <code>/opt/mautrix-whatsapp/</code>.
 
 <p>
 Open <code>config.yaml</code> in your favourite editor and you will have to edit the
-<a href="https://docs.mau.fi/bridges/general/initial-config.html">following options</a> inside that file. Note <code>dbuser</code> and <code>dbpass</code> are the
-same as the postgresql setup you initially performed for <code>matrix-synapse</code>. But
-<code>dbname</code> cannot be <code>synapse</code> as that is used by the homeserver. The <code>dbname</code>
-must be created specifically for <code>mautrix-whatsapp</code>.
+<a href="https://docs.mau.fi/bridges/general/initial-config.html">following options</a> inside that file. Since tuwunel brings no PostgreSQL along,
+I point each bridge at its own SQLite database file; no database setup is
+required at all. If you do run PostgreSQL, note that each bridge must have its
+own database.
 </p>
-
-<div class="org-src-container">
-<pre class="src src-sh"><code><span class="org-comment-delimiter"># </span><span class="org-comment">Log into the PostgreSQL user.
-</span><span class="org-type">sudo</span> -su postgres
-<span class="org-comment-delimiter"># </span><span class="org-comment">Create a database mautrix-whatsapp
-</span>createdb --encoding=UTF8 --locale=C --template=template0 --owner=synapse mautrix-whatsapp
-</code></pre>
-</div>
 
 <div class="org-src-container">
 <pre class="src src-yaml"><code>  # For mautrix-meta you will need to specify
@@ -400,10 +308,10 @@ must be created specifically for <code>mautrix-whatsapp</code>.
       domain: matrix.bhw.name
   appservice:
       database:
-          # OR type: sqlite3-fk-wal
-          type: postgres
-          # OR uri: file:/var/lib/tuwunel/mautrix-whatsapp-db?_txlock=immediate
-          uri: postgres://dbuser:dbpass@localhost/dbname?sslmode=disable
+          # OR type: postgres
+          type: sqlite3-fk-wal
+          # OR uri: postgres://dbuser:dbpass@localhost/dbname?sslmode=disable
+          uri: file:/var/lib/tuwunel/mautrix-whatsapp-db?_txlock=immediate
   bridge:
       permissions:
           "matrix.bhw.name": user
@@ -419,29 +327,29 @@ Now we can generate an appservice registration file.
 <pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Generate the appservice registration file.
 </span>  <span class="org-type">cd</span> /opt/mautrix-whatsapp/
   ./mautrix-whatsapp -g
-  <span class="org-type">chmod</span> 644 registration.yaml
 </code></pre>
 </div>
 
 <p>
-If one is not using matrix-synapse as a homeserver, then look up how appservices
-are configured on your particular matrix implementation. i.e. <a href="https://matrix-construct.github.io/tuwunel/appservices.html">Appservices -
-Tuwunel One</a>. Edit file at <code>/usr/local/src/matrix-synapse/homeserver.yaml</code> with
-the following contents,
+Unlike matrix-synapse, where every registration file is listed under
+<code>app_service_config_files</code> in <code>homeserver.yaml</code> followed by a homeserver
+restart, <a href="https://matrix-construct.github.io/tuwunel/appservices.html">tuwunel registers appservices at runtime from the admin room</a>, the
+room our first user was invited to upon registration. Send the following
+message to the admin room, pasting in the contents of <code>registration.yaml</code>.
 </p>
 
-<div class="org-src-container">
-<pre class="src src-yaml"><code>  app_service_config_files:
-    - /opt/mautrix-whatsapp/registration.yaml
-    # Any other bridge registrations.
-    #- /opt/mautrix-gmessages/registration.yaml
-    #- /opt/mautrix-meta/registration.yaml
-</code></pre>
-</div>
+<pre class="example" id="org46a2627">
+  !admin appservices register
+  ```yaml
+  id: whatsapp
+  # ...rest of /opt/mautrix-whatsapp/registration.yaml
+  ```
+</pre>
 
 <p>
-Restart matrix-synapse <code>systemctl restart matrix-synapse</code> to confirm it works.
-Then create a systemd service file at
+The registration persists in tuwunel&rsquo;s database, surviving restarts, and
+registering an existing ID replaces the old entry. See also <code>!admin appservices list</code>
+and <code>!admin appservices unregister &lt;id&gt;</code>. Then create a systemd service file at
 <code>/etc/systemd/system/mautrix-whatsapp.service</code>
 </p>
 
@@ -470,17 +378,16 @@ Enable and start the <code>mautrix-whatsapp.service</code>.
 <pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Will start this service at boot.
 </span>  systemctl enable mautrix-whatsapp.service
   systemctl start mautrix-whatsapp.service
-  <span class="org-comment-delimiter"># </span><span class="org-comment">When updating bridge, restart matrix-synapse as well
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">systemctl restart matrix-synapse</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">When updating a bridge, only the bridge service needs restarting;
+</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">the appservice registration persists in tuwunel's database.</span>
 </code></pre>
 </div>
 
 <p>
 Login to <a href="https://app.element.io/#/login">https://app.element.io/#/login</a> and refer to the <a href="https://docs.mau.fi/bridges/go/whatsapp/authentication.html">documentation</a> for
 initial setup. In my experience, all mautrix bridges are excellent. After this
-setup tutorial, other bridges such as Meta and Google Messenger are similar. Do
-note that <code>/etc/matrix-synapse/conf.d/bridge-registration.yaml</code> must contain a
-list of all appservice registrations you wish to make on your homeserver. Also
+setup tutorial, other bridges such as Meta and Google Messenger are similar;
+remember to register each bridge&rsquo;s <code>registration.yaml</code> in the admin room. Also
 note that <code>mautrix-meta</code> requires <a href="https://docs.mau.fi/bridges/general/initial-config.html#bridge-specific-mandatory-fields">extra configuration</a>. For <code>mautrix-gvoice</code> you
 should login as with <code>mautrix-meta</code> but copy as cURL (bash) the network XHR
 request, <code>log?format=json&amp;hasfast=true&amp;authuser=0</code>, and paste it to the bot to
@@ -488,8 +395,8 @@ login.
 </p>
 </div>
 </div>
-<div id="outline-container-org8ce44a2" class="outline-3">
-<h3 id="org8ce44a2"><span class="section-number-3">2.3.</span> Conclusion</h3>
+<div id="outline-container-org370790a" class="outline-3">
+<h3 id="org370790a"><span class="section-number-3">2.3.</span> Conclusion</h3>
 <div class="outline-text-3" id="text-2-3">
 <p>
 Install <a href="https://github.com/alphapapa/ement.el">ement.el</a> and login,
@@ -506,7 +413,7 @@ Install <a href="https://github.com/alphapapa/ement.el">ement.el</a> and login,
 </div>
 
 <p>
-My own <a href="../dotemacs.html#ID-20220829T170131.891099">config</a> is available <a href="https://www.bhw.name/assets/blog/dotspacemacs.html">here.</a> Three parting thoughts. I am somewhat
+My own <a href="dotemacs.html#ID-20220829T170131.891099">config</a> is available <a href="https://www.bhw.name/assets/blog/dotspacemacs.html">here.</a> Three parting thoughts. I am somewhat
 optimistic about Matrix&rsquo;s longevity <a href="https://element.io/case-studies/bundeswehr">as the German armed forces has adopted the
 standard.</a> Secondly, Emacs users often have to deal with their complex
 configurations falling apart on mobile phones but this is not that case with the
@@ -524,8 +431,8 @@ References
 </div>
 </div>
 </div>
-<div id="outline-container-org8a296db" class="outline-2">
-<h2 id="org8a296db"><span class="section-number-2">3.</span> Email - GMail with Mbsync and Mu4e</h2>
+<div id="outline-container-org7071233" class="outline-2">
+<h2 id="org7071233"><span class="section-number-2">3.</span> Email - GMail with Mbsync and Mu4e</h2>
 <div class="outline-text-2" id="text-3">
 <p>
 <a href="https://wiki.archlinux.org/title/isync">Mbsync</a> synchronizes email from your <a href="https://www.cloudflare.com/learning/email-security/what-is-imap/">IMAP</a> server (Gmail/Outlook/<a href="https://proton.me/blog/email-is-your-digital-id">Proton</a>) and
@@ -610,8 +517,8 @@ instead I mark it as read and move it out of my inbox to &ldquo;All mail&rdquo;.
 For my usage patterns, <a href="https://www.bhw.name/assets/blog/dotspacemacs.html">see heading &ldquo;Mu4e Config&rdquo;.</a> Maybe I&rsquo;ll <a href="https://taoshu.in/net/selfhost-email.html">self-host</a> someday?
 </p>
 </div>
-<div id="outline-container-org30db46b" class="outline-3">
-<h3 id="org30db46b"><span class="section-number-3">3.1.</span> Viewing HTML email in your internet browser</h3>
+<div id="outline-container-org4648f18" class="outline-3">
+<h3 id="org4648f18"><span class="section-number-3">3.1.</span> Viewing HTML email in your internet browser</h3>
 <div class="outline-text-3" id="text-3-1">
 <p>
 Microsoft Edge browser disables viewing <code>file://</code> links by <a href="https://textslashplain.com/2021/03/29/per-site-permissions-in-edge/">default</a> for <a href="https://textslashplain.com/2019/10/09/navigating-to-file-urls/">security
@@ -656,8 +563,8 @@ References
 </div>
 </div>
 </div>
-<div id="outline-container-org6d375b6" class="outline-2">
-<h2 id="org6d375b6"><span class="section-number-2">4.</span> Web logs &amp; Web feeds - Org Publish and Elfeed</h2>
+<div id="outline-container-org61eba82" class="outline-2">
+<h2 id="org61eba82"><span class="section-number-2">4.</span> Web logs &amp; Web feeds - Org Publish and Elfeed</h2>
 <div class="outline-text-2" id="text-4">
 <p>
 I am aware of two options to read RSS/atom feeds in Emacs. <a href="https://www.emacswiki.org/emacs/GnusRss">GNUS with the nnrss
@@ -710,9 +617,9 @@ to assist in taking notes on books, spaced repetition and concept mapping.
                               <footer>
                                 <div class="copyright-container">
                                     Comments? Corrections? <a href="https://bhw.name/contact"> Please do reach out.</a><a href="https://bhw.name/assets/blog/atom.xml"> RSS Feed. </a><a href="https://bhw.name/subscribe"> Mailing List. </a><br/>
-                                    Copyright 2021 Benedict H. Wang. <br/>
+                                    Copyright 2021 Ben H. W. <br/>
                                     Blog content is available under <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"> CC-BY-SA 4.0 </a> unless otherwise noted.<br/>
-                                    Created with <a href="https://www.gnu.org/software/emacs/">Emacs</a> 30.1 (<a href="https://orgmode.org">Org</a> mode 9.8.2) on <a href="https://www.gnu.org">GNU</a>/<a href="https://www.kernel.org/">Linux</a><br/>
+                                    Created with <a href="https://www.gnu.org/software/emacs/">Emacs</a> 30.1 (<a href="https://orgmode.org">Org</a> mode 9.8.7) on <a href="https://www.gnu.org">GNU</a>/<a href="https://www.kernel.org/">Linux</a><br/>
                                 </div>
                               </footer>
 </div>

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- 2026-05-08 Fri 20:19 -->
+<!-- 2026-08-18 Tue 21:41 -->
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Project Isidore Design Notebook</title>
@@ -12,7 +12,7 @@
                       <link rel="stylesheet"
                             href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.2.0/styles/base16/solarized-light.min.css">
                       <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.2.0/highlight.min.js" defer></script>
-                      <script>var hlf=function(){Array.prototype.forEach.call(document.querySelectorAll("pre.src"),function(t){var e;e=t.getAttribute("class"),e=e.replace(/src-(w+)/,"src-$1 $1"),console.log(e),t.setAttribute("class",e),hljs.highlightBlock(t)})};addEventListener("DOMContentLoaded",hlf);</script>
+                      <script>var hlf=function(){Array.prototype.forEach.call(document.querySelectorAll("pre.src"),function(t){var e;e=t.getAttribute("class"),e=e.replace(/src-(\w+)/,"src-$1 $1"),t.setAttribute("class",e),hljs.highlightElement(t)})};addEventListener("DOMContentLoaded",hlf);</script>
 <script>
   window.MathJax = {
     tex: {
@@ -66,10 +66,10 @@
                                     </div>
                                     <h1 class="title">Project Isidore Design Notebook</h1>
                                     <p class="subtitle">Divus Isidorus Hispalensis ora pro nobis</p> <br/>
-                                    <p class="updated"><a href="/contact#article-history">Updated:</a> 2026-05-08 Fri 20:18</p>
+                                    <p class="updated"><a href="/contact#article-history">Updated:</a> 2026-07-30 Thu 00:25</p>
 </div>
 <div id="content" class="content">
-<div class="abstract" id="org45a8498">
+<div class="abstract" id="orge766f9b">
 <p>
 
 </p>
@@ -102,12 +102,12 @@ via <a href="https://orgmode.org/worg/org-contrib/babel/">org-babel.</a>
 <li><a href="#Org-Publish-Pipeline">4. Org Publish Pipeline</a></li>
 <li><a href="#Development-Operations">5. Development Operations</a>
 <ul>
-<li><a href="#org06ea336">5.1. Continous Integration</a>
+<li><a href="#orgd8ebe1d">5.1. Continous Integration</a>
 <ul>
 <li><a href="#Testing">5.1.1. Testing</a>
 <ul>
 <li><a href="#Notes-on-Drakma">Notes on Drakma</a></li>
-<li><a href="#orgf34f52c">Notes on CL-SMTP</a></li>
+<li><a href="#orgc4bbbcd">Notes on CL-SMTP</a></li>
 <li><a href="#Debugging">Debugging</a></li>
 <li><a href="#Logging">Logging</a></li>
 <li><a href="#Generate-Code-Coverage-Report">Generate Code Coverage Report</a></li>
@@ -115,18 +115,18 @@ via <a href="https://orgmode.org/worg/org-contrib/babel/">org-babel.</a>
 </li>
 </ul>
 </li>
-<li><a href="#org2029fe9">5.2. Continous Delivery</a></li>
-<li><a href="#orgece3641">5.3. Continous Deployment</a>
+<li><a href="#org32df869">5.2. Continous Delivery</a></li>
+<li><a href="#org2319993">5.3. Continous Deployment</a>
 <ul>
-<li><a href="#org3e57f50">5.3.1. Oracle Cloud Infrastructure</a></li>
+<li><a href="#org3ea9402">5.3.1. Oracle Cloud Infrastructure</a></li>
 </ul>
 </li>
 <li><a href="#Benchmarking-Profiling">5.4. Micro Benchmarks</a>
 <ul>
-<li><a href="#orgbe5b8a4">5.4.1. Standards Compliance</a></li>
+<li><a href="#org1f8960a">5.4.1. Standards Compliance</a></li>
 </ul>
 </li>
-<li><a href="#orgc2c3dc6">5.5. Financial Reports</a></li>
+<li><a href="#org42b1db9">5.5. Financial Reports</a></li>
 </ul>
 </li>
 <li><a href="#Data-Persistence">6. Data Persistence</a>
@@ -136,7 +136,7 @@ via <a href="https://orgmode.org/worg/org-contrib/babel/">org-babel.</a>
 <li><a href="#BKNR-Datastore-vs-Rucksack-vs-Postmodern">6.3. BKNR.Datastore vs Rucksack vs Postmodern</a></li>
 </ul>
 </li>
-<li><a href="#org7e4c2f2">7. A Portable Graphical User Interface</a></li>
+<li><a href="#orgae5850a">7. A Portable Graphical User Interface</a></li>
 <li><a href="#Case-Study-Profiling-and-Performance">8. Case Study: Profiling and Performance</a></li>
 <li><a href="#User-Manual">9. User Manual</a>
 <ul>
@@ -151,7 +151,8 @@ via <a href="https://orgmode.org/worg/org-contrib/babel/">org-babel.</a>
 <li><a href="#Generate-Reference-Manual">10.1. Generate Reference Manual</a></li>
 </ul>
 </li>
-<li><a href="#Project-History-Credits">11. Project History &amp; Credits</a></li>
+<li><a href="#org4db22dc">11. Bible data migration script</a></li>
+<li><a href="#Project-History-Credits">12. Project History &amp; Credits</a></li>
 </ul>
 </div>
 </nav>
@@ -189,14 +190,14 @@ otherwise noted.
 <h2 id="Common-Lisp-Environment-Setup"><span class="section-number-2">2.</span> Common Lisp Environment Setup</h2>
 <div class="outline-text-2" id="text-Common-Lisp-Environment-Setup">
 <p>
-<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-03-22T16:14:00">[2026-03-22 Sun 16:14]</time></span> &lt;- <a href="../.stversions/cpb.html#ID-6754d0e8-1c8c-43eb-bdc3-0072f9aa4acd">Library of Babel</a>
-<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-03-22T16:14:00">[2026-03-22 Sun 16:14]</time></span> &lt;- <a href="../.stversions/cpb.html#ID-6588253f-4a2e-4a8c-ac23-bcb073e47213">Linux Program Directory</a>
+<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-03-22T16:14:00">[2026-03-22 Sun 16:14]</time></span> &lt;- <a href="../cpb.html#ID-6754d0e8-1c8c-43eb-bdc3-0072f9aa4acd">Library of Babel</a>
+<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-03-22T16:14:00">[2026-03-22 Sun 16:14]</time></span> &lt;- <a href="../cpb.html#ID-6588253f-4a2e-4a8c-ac23-bcb073e47213">Linux Program Directory</a>
 <span class="timestamp-wrapper"><time class="timestamp" datetime="2026-03-22T16:14:00">[2026-03-22 Sun 16:14]</time></span> &lt;- <a href="../bibtex-notes/seibelPracticalCommonLisp2005.html#ID-031a3b02-b36c-4875-b714-6ff8e9a3978c">Practical Common Lisp</a>
 </p>
 <ul class="org-ul">
-<li><a href="../dotemacs.html#ID-0d5cd091-ec8a-420d-9585-8d6ed856a00c">&lt;&ndash;Common Lisp Config</a></li>
+<li><a href="dotemacs.html#ID-0d5cd091-ec8a-420d-9585-8d6ed856a00c">&lt;&ndash;Common Lisp Config</a></li>
 <li><a href="../bibtex-notes/seibelPracticalCommonLisp2005.html#ID-031a3b02-b36c-4875-b714-6ff8e9a3978c">&lt;&ndash;Practical Common Lisp</a></li>
-<li><a href="../.stversions/cpb.html#ID-6588253f-4a2e-4a8c-ac23-bcb073e47213">&lt;&ndash;Linux Program Directory</a></li>
+<li><a href="../cpb.html#ID-6588253f-4a2e-4a8c-ac23-bcb073e47213">&lt;&ndash;Linux Program Directory</a></li>
 <li><a href="https://www.creativetension.co/posts/common-lisp-development-tooling">Common Lisp Development Tooling — creative:tension</a></li>
 </ul>
 
@@ -391,7 +392,7 @@ browser <a href="https://www.gnu.org/software/emacs/manual/html_mono/eww.html">E
 </p>
 
 <div class="org-src-container">
-<pre class="src src-emacs-lisp"><code>    (<span class="org-keyword">setf</span> <span class="org-variable-name">common-lisp-hyperspec-root</span> <span class="org-string">"file:///home/$USER/HyperSpec/"</span>)
+<pre class="src src-emacs-lisp"><code>    (<span class="org-keyword">setf</span> common-lisp-hyperspec-root <span class="org-string">"file:///home/$USER/HyperSpec/"</span>)
     <span class="org-comment-delimiter">;; </span><span class="org-comment">Optionally, execute the HYPERSPEC-LOOKUP function with local variable
 </span>    <span class="org-comment-delimiter">;; </span><span class="org-comment">changes to view HyperSpec links exclusively in EWW.
 </span>    (<span class="org-constant">advice-add</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">hyperspec-lookup</span>
@@ -603,7 +604,7 @@ Call <code>sly-eval-buffer</code> on the following code block to update the grap
 </div>
 
 
-<figure id="org7b7cb5b">
+<figure id="org04bfae8">
 <img src="../project-isidore-dependency-graph.png" alt="Project Isidore dependency graph">
 
 <figcaption><span class="figure-number">Figure 1: </span>Project Isidore dependency graph</figcaption>
@@ -806,12 +807,12 @@ In the following breakdown, I explain how to run the steps on the local machine.
 
 <p>
 For the uninitiated, an excellent git porcelain (with spacemacs layer
-integration) is <a href="https://magit.vc">Magit.</a> This, paired with [<a href="#chaconProGit2014">chaconProGit2014</a>], takes care of
+integration) is <a href="https://magit.vc">Magit.</a> This, paired with \cite{chaconProGit2014}, takes care of
 your version control needs.
 </p>
 </div>
-<div id="outline-container-org06ea336" class="outline-3">
-<h3 id="org06ea336"><span class="section-number-3">5.1.</span> Continous Integration</h3>
+<div id="outline-container-orgd8ebe1d" class="outline-3">
+<h3 id="orgd8ebe1d"><span class="section-number-3">5.1.</span> Continous Integration</h3>
 <div class="outline-text-3" id="text-5-1">
 <p>
 Some measure of quality assurance through unit, integration and regression
@@ -890,9 +891,9 @@ text, e.g., &ldquo;OK&rdquo;
 </p>
 </div>
 </div>
-<div id="outline-container-orgf34f52c" class="outline-5">
-<h5 id="orgf34f52c">Notes on CL-SMTP</h5>
-<div class="outline-text-5" id="text-orgf34f52c">
+<div id="outline-container-orgc4bbbcd" class="outline-5">
+<h5 id="orgc4bbbcd">Notes on CL-SMTP</h5>
+<div class="outline-text-5" id="text-orgc4bbbcd">
 <p>
 <a href="https://jay.gooby.org/2022/05/06/use-a-basic-gmail-account-to-send-mail-as-with-a-domain-that-uses-cloudflare-email-routing">Use a basic Gmail account to “Send mail as” with a domain that uses Cloudflar&hellip;</a>
 </p>
@@ -1114,8 +1115,8 @@ Edi.
 </div>
 </div>
 </div>
-<div id="outline-container-org2029fe9" class="outline-3">
-<h3 id="org2029fe9"><span class="section-number-3">5.2.</span> Continous Delivery</h3>
+<div id="outline-container-org32df869" class="outline-3">
+<h3 id="org32df869"><span class="section-number-3">5.2.</span> Continous Delivery</h3>
 <div class="outline-text-3" id="text-5-2">
 <p>
 Building an executable binary for all 3 major operating system platforms on the
@@ -1131,8 +1132,8 @@ and SBCL runtime included.
 </p>
 </div>
 </div>
-<div id="outline-container-orgece3641" class="outline-3">
-<h3 id="orgece3641"><span class="section-number-3">5.3.</span> Continous Deployment</h3>
+<div id="outline-container-org2319993" class="outline-3">
+<h3 id="org2319993"><span class="section-number-3">5.3.</span> Continous Deployment</h3>
 <div class="outline-text-3" id="text-5-3">
 <table>
 
@@ -1210,7 +1211,7 @@ Deploy Project Isidore
 <p>
 Shell access with Root SSH credentials to a Debian machine is needed. Whether
 this is a physical server or a virtual private server is up to you. I have a
-guided setup on <a href="#org3e57f50">Oracle Cloud Infrastructure</a>.
+guided setup on <a href="#org3ea9402">Oracle Cloud Infrastructure</a>.
 </p>
 
 <p>
@@ -1295,8 +1296,8 @@ Optional: with the boys.
 </p></li>
 </ul>
 </div>
-<div id="outline-container-org3e57f50" class="outline-4">
-<h4 id="org3e57f50"><span class="section-number-4">5.3.1.</span> Oracle Cloud Infrastructure</h4>
+<div id="outline-container-org3ea9402" class="outline-4">
+<h4 id="org3ea9402"><span class="section-number-4">5.3.1.</span> Oracle Cloud Infrastructure</h4>
 <div class="outline-text-4" id="text-5-3-1">
 <p>
 Oracle Corporation offers the most generous free tier in cloud computing
@@ -1895,8 +1896,8 @@ So with the bare minimum amount of testing done I can say with confidence that
 my website is well prepared given the restraints on cost, time, and money.
 </p>
 </div>
-<div id="outline-container-orgbe5b8a4" class="outline-4">
-<h4 id="orgbe5b8a4"><span class="section-number-4">5.4.1.</span> Standards Compliance</h4>
+<div id="outline-container-org1f8960a" class="outline-4">
+<h4 id="org1f8960a"><span class="section-number-4">5.4.1.</span> Standards Compliance</h4>
 <div class="outline-text-4" id="text-5-4-1">
 <table>
 
@@ -1937,8 +1938,8 @@ my website is well prepared given the restraints on cost, time, and money.
 </div>
 </div>
 </div>
-<div id="outline-container-orgc2c3dc6" class="outline-3">
-<h3 id="orgc2c3dc6"><span class="section-number-3">5.5.</span> Financial Reports</h3>
+<div id="outline-container-org42b1db9" class="outline-3">
+<h3 id="org42b1db9"><span class="section-number-3">5.5.</span> Financial Reports</h3>
 <div class="outline-text-3" id="text-5-5">
 <p>
 This website is run as a non-profit hobby, for no advertising is or will be
@@ -2408,8 +2409,8 @@ report, Center for Software Science, University of Utah, 1994. UUCS-94*
 </div>
 </div>
 </div>
-<div id="outline-container-org7e4c2f2" class="outline-2">
-<h2 id="org7e4c2f2"><span class="section-number-2">7.</span> A Portable Graphical User Interface</h2>
+<div id="outline-container-orgae5850a" class="outline-2">
+<h2 id="orgae5850a"><span class="section-number-2">7.</span> A Portable Graphical User Interface</h2>
 <div class="outline-text-2" id="text-7">
 <p>
 Good proprietary solutions exist: <a href="http://www.lispworks.com/documentation/lw60/CAPUG-U/html/capiuser-u.htm">Lispworks&rsquo; CAPI</a> and <a href="https://franz.com/support/documentation/10.1/doc/cgide.htm">Allegro CL&rsquo;s Common
@@ -2552,6 +2553,10 @@ learning how to dance in CLOGs!
 <div id="outline-container-Case-Study-Profiling-and-Performance" class="outline-2">
 <h2 id="Case-Study-Profiling-and-Performance"><span class="section-number-2">8.</span> Case Study: Profiling and Performance</h2>
 <div class="outline-text-2" id="text-Case-Study-Profiling-and-Performance">
+<p>
+<a href="https://www.stylewarning.com/posts/nbody/">Idiomatic Lisp and the nbody benchmark</a>
+</p>
+
 <p>
 A through treatment of the generalities of optimization in Common Lisp can be
 found in weitzCommonLispRecipes2016 pages 503-560. Dr. Weitz testifies that lisp
@@ -2746,7 +2751,7 @@ system, I would try a library like <a href="https://gitlab.common-lisp.net/dkoch
   <span class="org-comment-delimiter">;; </span><span class="org-comment">Includes COMMON LISP USER package symbols as defined in the Hyperspec.
 </span>  (sb-sprof:profile-call-counts <span class="org-string">"CL-USER"</span>)
   <span class="org-comment-delimiter">;; </span><span class="org-comment">Profile and output both graph and flat formats.
-</span>  (<span class="org-keyword">sb-sprof:with-profiling</span> (<span class="org-builtin">:max-samples</span> 5000
+</span>  (sb-sprof:with-profiling (<span class="org-builtin">:max-samples</span> 5000
                             <span class="org-builtin">:report</span> <span class="org-builtin">:graph</span>
                             <span class="org-builtin">:loop</span> t
                             <span class="org-builtin">:show-progress</span> t)
@@ -3185,7 +3190,7 @@ it will regenerate the reference manual and include changes into the commit.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sh" id="org2dea715"><code>  <span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/sh
+<pre class="src src-sh" id="org93f2429"><code>  <span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/sh
 </span>
   <span class="org-comment-delimiter"># </span><span class="org-comment">Generate updated manual. SBCL must be installed. See documentation for
 </span>  <span class="org-comment-delimiter"># </span><span class="org-comment">environment setup
@@ -3197,8 +3202,233 @@ it will regenerate the reference manual and include changes into the commit.
 </div>
 </div>
 </div>
+<div id="outline-container-org4db22dc" class="outline-2">
+<h2 id="org4db22dc"><span class="section-number-2">11.</span> Bible data migration script</h2>
+<div class="outline-text-2" id="text-11">
+<div class="org-src-container">
+<pre class="src src-lisp"><code><span class="org-comment-delimiter">;;;; </span><span class="org-comment">SPDX-FileCopyrightText: 2021  Ben H. W.<a href="mailto:foss%40bhw.name">&lt;foss@bhw.name&gt;</a>
+</span><span class="org-comment-delimiter">;;;; </span><span class="org-comment">SPDX-License-Identifier: AGPL-3.0-or-later
+</span>
+(uiop:define-package <span class="org-builtin">#:project-isidore/migration</span>
+  (<span class="org-builtin">:use</span> <span class="org-builtin">#:common-lisp</span>
+        <span class="org-builtin">#:series</span>
+        <span class="org-builtin">#:project-isidore/bible</span>
+        <span class="org-builtin">#:project-isidore/database</span>)
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">No package local nicknames. See commit 1962a26.
+</span>  (<span class="org-builtin">:documentation</span>
+   <span class="org-doc">"Data import: USFM (Unified Standard Format Markers) -&gt; CLOS objects
+backed by graph-db (Vivace Graph V3).
+
+Source text: https://github.com/bhw-foss/ENG-B-Haydock1883-pd-PSFM
+
+The functions in this file are sequential one-shots for re-ingesting the
+bible corpus. They are not called at runtime.
+
+Two-step import for the SFM source:
+  (migrate-data \"/path/to/ENG-B-Haydock1883-pd-PSFM/\")
+
+One-shot import from a previously dumped sexp (used by the rucksack
+-&gt; graph-db migration):
+  (migrate-from-dump #P\"data/migration-dump/\")"</span>))
+
+(<span class="org-keyword">in-package</span> <span class="org-builtin">#:project-isidore/migration</span>)
+
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">UNIQUE-ID assignment for fresh imports. The bible CLOS class no longer
+</span><span class="org-comment-delimiter">;;; </span><span class="org-comment">has a hook analogous to rucksack's INITIALIZE-INSTANCE :AFTER that
+</span><span class="org-comment-delimiter">;;; </span><span class="org-comment">auto-assigns unique-id (graph-db's MAKE-VERTEX skips initialize-instance
+</span><span class="org-comment-delimiter">;;; </span><span class="org-comment">on the subclass). Callers must pass :unique-id explicitly, using
+</span><span class="org-comment-delimiter">;;; </span><span class="org-comment">NEXT-UNIQUE-ID for sequential allocation.
+</span>
+(<span class="org-keyword">defvar</span> <span class="org-variable-name">*unique-id*</span> -1)
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">next-unique-id</span> ()
+  (incf *unique-id*))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">create-bible</span> (heading text <span class="org-type">&amp;key</span> (unique-id (next-unique-id)))
+  <span class="org-doc">"Create a BIBLE vertex with the given HEADING and TEXT.
+Auto-assigns UNIQUE-ID via NEXT-UNIQUE-ID unless explicitly supplied."</span>
+  (<span class="org-keyword">with-db-transaction</span> (<span class="org-builtin">:context</span> <span class="org-string">"create-bible"</span> <span class="org-builtin">:graph</span> *bible-database*)
+    (make-bible <span class="org-builtin">:unique-id</span> unique-id
+                <span class="org-builtin">:heading</span> heading
+                <span class="org-builtin">:text</span> text)))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">set-bible-slot</span> (bible-uid slot value)
+  <span class="org-doc">"Update a single slot on the BIBLE vertex with UNIQUE-ID = BIBLE-UID.
+Invalidates the bible-obj cache so subsequent reads see the new value."</span>
+  (<span class="org-keyword">with-db-transaction</span> (<span class="org-builtin">:context</span> <span class="org-string">"set-bible-slot"</span> <span class="org-builtin">:graph</span> *bible-database*)
+    (<span class="org-keyword">let</span> ((obj (bible-obj-with-id bible-uid)))
+      (<span class="org-keyword">when</span> obj
+        (<span class="org-keyword">let</span> ((c (graph-db:copy obj)))
+          (setf (slot-value c slot) value)
+          (graph-db:save c)
+          (clear-bible-obj-cache)
+          c)))))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">create-footnote</span> (bible-uid text)
+  (set-bible-slot bible-uid 'footnotes text))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">create-cross-reference</span> (bible-uid text)
+  (set-bible-slot bible-uid 'cross-references text))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">import-bible-text</span> (file)
+  <span class="org-doc">"Process USFM text to vertex slots depending on markup tags."</span>
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">FIXME There are two Genesis fr 1:1. The later one replaces the earlier.
+</span>  (<span class="org-keyword">let</span> ((book) (chapter) (verse))
+    (iterate ((line (scan (uiop:read-file-lines file))))
+             (<span class="org-keyword">cond</span>
+               ((string-equal <span class="org-string">"\\h"</span> (car (ppcre:split <span class="org-string">" "</span> line)))
+                (setf book (bible-book-convert-dwim (ppcre:regex-replace-all <span class="org-string">"\\\\h "</span> line <span class="org-string">""</span>))))
+
+               ((string-equal <span class="org-string">"\\im"</span> (car (ppcre:split <span class="org-string">" "</span> line)))
+                (create-bible (nreverse (pairlis '(project-isidore/bible::book
+                                                   project-isidore/bible::chapter
+                                                   project-isidore/bible::verse)
+                                                 (list book 0 0)))
+                              (ppcre:regex-replace-all <span class="org-string">"\\\\im "</span> line <span class="org-string">""</span>)))
+
+               ((string-equal <span class="org-string">"\\mt1"</span> (car (ppcre:split <span class="org-string">" "</span> line)))
+                (setf book (bible-book-convert-dwim (ppcre:regex-replace-all <span class="org-string">"\\\\mt1 "</span> line <span class="org-string">""</span>))))
+
+               ((string-equal <span class="org-string">"\\cl"</span> (car (ppcre:split <span class="org-string">" "</span> line)))
+                (<span class="org-keyword">unless</span> (or (ppcre:all-matches <span class="org-string">"THE PROLOGUE"</span> line)
+                            (ppcre:all-matches <span class="org-string">"Psalm x. according to the Hebrews"</span> line))
+                  (setf chapter (parse-integer (car (last (ppcre:split <span class="org-string">" "</span> line)))))))
+
+               ((string-equal <span class="org-string">"\\cd"</span> (car (ppcre:split <span class="org-string">" "</span> line)))
+                (create-bible (nreverse (pairlis '(project-isidore/bible::book
+                                                   project-isidore/bible::chapter
+                                                   project-isidore/bible::verse)
+                                                 (list book chapter 0)))
+                              (ppcre:regex-replace-all <span class="org-string">"\\\\cd "</span> line <span class="org-string">""</span>)))
+
+               ((string-equal <span class="org-string">"\\v"</span> (car (ppcre:split <span class="org-string">" "</span> line)))
+                (<span class="org-keyword">progn</span>
+                  (ppcre:do-matches-as-strings (match <span class="org-string">"\\\\v [0-9]{1,3}"</span> line)
+                    (setf verse (parse-integer (car (last (ppcre:split <span class="org-string">" "</span> match))))))
+                  (create-bible (nreverse (pairlis '(project-isidore/bible::book
+                                                     project-isidore/bible::chapter
+                                                     project-isidore/bible::verse)
+                                                   (list book chapter verse)))
+                                (ppcre:regex-replace-all <span class="org-string">"\\\\v [0-9]{1,3} "</span> line <span class="org-string">""</span>))))))))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">import-bible-footnotes</span> (file)
+  (<span class="org-keyword">let</span> ((book) (chapter) (verse) (text))
+    (iterate ((line (scan (uiop:read-file-lines file))))
+             (<span class="org-keyword">cond</span>
+               ((string-equal <span class="org-string">"\\mt1"</span> (car (ppcre:split <span class="org-string">" "</span> line)))
+                (setf book (bible-book-convert-dwim (ppcre:regex-replace-all <span class="org-string">"\\\\mt1 "</span> line <span class="org-string">""</span>))))
+
+               ((string-equal <span class="org-string">"\\f"</span> (car (ppcre:split <span class="org-string">" "</span> line)))
+                (ppcre:do-matches-as-strings (match <span class="org-string">"\\\\fr [0-9]{1,3}:[0-9]{1,3}"</span> line)
+                  (<span class="org-keyword">progn</span>
+                    (setf chapter (parse-integer (car (cl-ppcre:split <span class="org-string">":"</span> (car (last (ppcre:split <span class="org-string">" "</span> match)))))))
+                    (setf verse (parse-integer (cadr (cl-ppcre:split <span class="org-string">":"</span> (car (last (ppcre:split <span class="org-string">" "</span> match)))))))
+                    (setf text (ppcre:regex-replace-all <span class="org-string">"\\\\f \\+ \\\\fr [0-9]{1,3}:[0-9]{1,3}\\ ?\\\\ft "</span> line <span class="org-string">""</span>))
+                    (setf text (ppcre:regex-replace-all <span class="org-string">"\\\\f\\*"</span> text <span class="org-string">""</span>))
+                    (<span class="org-keyword">let*</span> ((uid (get-bible-uid book chapter verse))
+                           (existing (footnotes-of (bible-obj-with-id uid))))
+                      (<span class="org-keyword">if</span> existing
+                          (create-footnote uid (concatenate 'string existing <span class="org-string">" "</span> text))
+                          (create-footnote uid text)))
+                    (setf text nil))))
+
+               ((string-equal <span class="org-string">"\\x"</span> (car (ppcre:split <span class="org-string">" "</span> line)))
+                (ppcre:do-matches-as-strings (match <span class="org-string">"\\\\xo [0-9]{1,3}:[0-9]{1,3}"</span> line)
+                  (<span class="org-keyword">progn</span>
+                    (setf chapter (parse-integer (car (cl-ppcre:split <span class="org-string">":"</span> (car (last (ppcre:split <span class="org-string">" "</span> match)))))))
+                    (setf verse (parse-integer (cadr (cl-ppcre:split <span class="org-string">":"</span> (car (last (ppcre:split <span class="org-string">" "</span> match)))))))
+                    (setf text (ppcre:regex-replace-all <span class="org-string">"\\\\x \\+ \\\\xo [0-9]{1,3}:[0-9]{1,3}\\ ?\\\\xt "</span> line <span class="org-string">""</span>))
+                    (setf text (ppcre:regex-replace-all <span class="org-string">"\\\\x\\*"</span> text <span class="org-string">""</span>))
+                    (create-cross-reference (get-bible-uid book chapter verse) text)
+                    (setf text nil))))))))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">create-search-index</span> ()
+  <span class="org-doc">"Run after MIGRATE-DATA. Populates Montezuma index in data/montezuma/ keyed
+by the same UNIQUE-ID values as the BIBLE vertices."</span>
+  (iterate ((x (scan-range <span class="org-builtin">:from</span> 0 <span class="org-builtin">:upto</span> 37198)))
+           (montezuma:add-document-to-index
+            *search-index*
+            `((<span class="org-string">"b"</span> . ,(bible-book-convert-dwim (cdar (heading-of (bible-obj-with-id x)))))
+              (<span class="org-string">"c"</span> . ,(cdadr (heading-of (bible-obj-with-id x))))
+              (<span class="org-string">"v"</span> . ,(cdaddr (heading-of (bible-obj-with-id x))))
+              (<span class="org-string">"t"</span> . ,(get-bible-text x))
+              (<span class="org-string">"f"</span> . ,(get-footnotes-text x))
+              (<span class="org-string">"x"</span> . ,(get-cross-references-text x))))))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">migrate-data</span> (source-directory)
+  <span class="org-doc">"Verses must be completely imported before footnotes and cross-references."</span>
+  (setf *unique-id* -1)
+  (iterate ((book-file (scan (directory (concatenate 'string source-directory <span class="org-string">"*.sfm"</span>)))))
+           (import-bible-text book-file))
+  (iterate ((book-file (scan (directory (concatenate 'string source-directory <span class="org-string">"*.sfm"</span>)))))
+           (import-bible-footnotes book-file))
+  (create-search-index))
+
+
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">One-shot rucksack -&gt; graph-db import. Run after producing the sexp
+</span><span class="org-comment-delimiter">;;; </span><span class="org-comment">dumps under DUMP-DIR. Idempotency: does NOT clear existing data; only
+</span><span class="org-comment-delimiter">;;; </span><span class="org-comment">run against a freshly created (empty) graph-db.
+</span>
+(<span class="org-keyword">defun</span> <span class="org-function-name">read-sexp-file</span> (path)
+  (<span class="org-keyword">with-open-file</span> (in path <span class="org-builtin">:direction</span> <span class="org-builtin">:input</span> <span class="org-builtin">:external-format</span> <span class="org-builtin">:utf-8</span>)
+    (<span class="org-keyword">with-standard-io-syntax</span>
+      (<span class="org-keyword">let</span> ((*package* (find-package <span class="org-builtin">:keyword</span>))
+            (*read-eval* nil))
+        (read in)))))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">migrate-from-dump</span> (<span class="org-type">&amp;optional</span>
+                            (dump-dir
+                             (asdf:system-relative-pathname
+                              <span class="org-builtin">:project-isidore</span> <span class="org-string">"data/migration-dump/"</span>)))
+  <span class="org-doc">"Import bible vertices, bible-metadata, and slack-subscriptions from
+the SEXP dump under DUMP-DIR into the currently open *BIBLE-DATABASE*
+and *DATABASE* graphs."</span>
+  (<span class="org-keyword">let</span> ((bible-file (merge-pathnames <span class="org-string">"bible.sexp"</span> dump-dir))
+        (metadata-file (merge-pathnames <span class="org-string">"bible-metadata.sexp"</span> dump-dir))
+        (subs-file (merge-pathnames <span class="org-string">"slack-subscriptions.sexp"</span> dump-dir)))
+    (<span class="org-keyword">when</span> (probe-file bible-file)
+      (format t <span class="org-string">"~&amp;Importing bible vertices from ~A~%"</span> bible-file)
+      (<span class="org-keyword">let</span> ((entries (read-sexp-file bible-file))
+            (count 0))
+        (<span class="org-keyword">dolist</span> (entry entries)
+          (<span class="org-keyword">with-db-transaction</span> (<span class="org-builtin">:context</span> <span class="org-string">"import-bible"</span> <span class="org-builtin">:graph</span> *bible-database*)
+            (<span class="org-keyword">let</span> ((args (list <span class="org-builtin">:unique-id</span> (getf entry <span class="org-builtin">:unique-id</span>)
+                              <span class="org-builtin">:heading</span>   (getf entry <span class="org-builtin">:heading</span>)
+                              <span class="org-builtin">:text</span>      (getf entry <span class="org-builtin">:text</span>))))
+              (<span class="org-keyword">let</span> ((xref (getf entry <span class="org-builtin">:cross-references</span>)))
+                (<span class="org-keyword">unless</span> (eq xref <span class="org-builtin">:unbound</span>)
+                  (setf args (append args (list <span class="org-builtin">:cross-references</span> xref)))))
+              (<span class="org-keyword">let</span> ((fn (getf entry <span class="org-builtin">:footnotes</span>)))
+                (<span class="org-keyword">unless</span> (eq fn <span class="org-builtin">:unbound</span>)
+                  (setf args (append args (list <span class="org-builtin">:footnotes</span> fn)))))
+              (apply #'make-bible args)))
+          (incf count)
+          (<span class="org-keyword">when</span> (zerop (mod count 5000))
+            (format t <span class="org-string">"  ~D imported~%"</span> count)))
+        (format t <span class="org-string">"  Done: ~D bible vertices.~%"</span> count)))
+
+    (<span class="org-keyword">when</span> (probe-file metadata-file)
+      (format t <span class="org-string">"~&amp;Importing bible-metadata from ~A~%"</span> metadata-file)
+      (<span class="org-keyword">let</span> ((md (read-sexp-file metadata-file)))
+        (<span class="org-keyword">with-db-transaction</span> (<span class="org-builtin">:context</span> <span class="org-string">"import-bible-metadata"</span>
+                              <span class="org-builtin">:graph</span> *bible-database*)
+          (make-bible-metadata <span class="org-builtin">:book-numbers</span> (getf md <span class="org-builtin">:book-numbers</span>)
+                               <span class="org-builtin">:chapter-urls</span> (getf md <span class="org-builtin">:chapter-urls</span>)
+                               <span class="org-builtin">:book-urls</span>    (getf md <span class="org-builtin">:book-urls</span>)))))
+
+    (<span class="org-keyword">when</span> (probe-file subs-file)
+      (format t <span class="org-string">"~&amp;Importing slack-subscriptions from ~A~%"</span> subs-file)
+      (<span class="org-keyword">let</span> ((subs (read-sexp-file subs-file)))
+        (<span class="org-keyword">dolist</span> (entry subs)
+          (add-slack-subscription (car entry) (cdr entry)))))
+
+    (format t <span class="org-string">"~&amp;Migration complete.~%"</span>)))
+</code></pre>
+</div>
+</div>
+</div>
 <div id="outline-container-Project-History-Credits" class="outline-2">
-<h2 id="Project-History-Credits"><span class="section-number-2">11.</span> Project History &amp; Credits</h2>
+<h2 id="Project-History-Credits"><span class="section-number-2">12.</span> Project History &amp; Credits</h2>
 <div class="outline-text-2" id="text-Project-History-Credits">
 <p>
 This website would not be possible without,
@@ -3232,9 +3462,9 @@ From the bottom of my heart, thank you!
                               <footer>
                                 <div class="copyright-container">
                                     Comments? Corrections? <a href="https://bhw.name/contact"> Please do reach out.</a><a href="https://bhw.name/assets/blog/atom.xml"> RSS Feed. </a><a href="https://bhw.name/subscribe"> Mailing List. </a><br/>
-                                    Copyright 2021 Benedict H. Wang. <br/>
+                                    Copyright 2021 Ben H. W. <br/>
                                     Blog content is available under <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"> CC-BY-SA 4.0 </a> unless otherwise noted.<br/>
-                                    Created with <a href="https://www.gnu.org/software/emacs/">Emacs</a> 30.1 (<a href="https://orgmode.org">Org</a> mode 9.8.2) on <a href="https://www.gnu.org">GNU</a>/<a href="https://www.kernel.org/">Linux</a><br/>
+                                    Created with <a href="https://www.gnu.org/software/emacs/">Emacs</a> 30.1 (<a href="https://orgmode.org">Org</a> mode 9.8.7) on <a href="https://www.gnu.org">GNU</a>/<a href="https://www.kernel.org/">Linux</a><br/>
                                 </div>
                               </footer>
 </div>

@@ -59,7 +59,7 @@
 ;; Caddy is used for SSL Termination and as a Reverse Proxy.
 (push :hunchentoot-no-ssl *features*)
 ;; Whitespace to enhance readability in logs.
-(format t "~&        *PROJECT-DIR* = ~a" (make-pathname :directory *project-dir*))
+(format t "~&        *PROJECT-DIR* = ~a" *project-dir*)
 (format t "~&        COMMON-LISP-ENV = ~a:~a (Provided ASDF version ~a) on ~a~%"
         (lisp-implementation-type) (lisp-implementation-version)
         (asdf:asdf-version) (machine-type))

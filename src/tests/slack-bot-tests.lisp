@@ -156,6 +156,11 @@ keep seeing the production graph."
   :parent slack-bot-suite
   (with-temp-database
       (db:add-slack-subscription +test-user-id+ "BW")
+    ;; Direct lookup outside WITH-DB-TRANSACTION, i.e. with GRAPH-DB:*GRAPH*
+    ;; unbound: used to fail with VERTEX-TABLE (NIL) once a row existed.
+    (let ((found (db:find-slack-subscription +test-user-id+)))
+      (true found)
+      (is string= "BW" (db:initial-of found)))
     (is equal '(("BW"))
         (mapcar (lambda (s) (list (cdr s)))
                 (remove-if-not

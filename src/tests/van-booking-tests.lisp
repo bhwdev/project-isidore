@@ -251,7 +251,44 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
           (true dgh)
           (is string= "" (trip-destination dgh))
           (is string= "8:35 am" (trip-departure dgh))
-          (is equal '("MM") (trip-dep-passengers dgh))))))
+          (is equal '("MM") (trip-dep-passengers dgh)))))
+
+  (define-test weekday-label-row
+      ;; The sheet keeps a weekday reminder in the Personal column (L) on the
+      ;; last row of each block.  gviz drops empty rows, so for a block with
+      ;; no destination and no times that reminder is the row found at the
+      ;; time offset.  It must not be read as a Personal departure time
+      ;; (which made /view list a PERSONAL trip departing at "Saturday" for
+      ;; every unbooked block and marked the Personal slot as taken).
+      (let* ((rows (list (list "" "" "TEST SHEET" "" "" "" "" "" "" "" "" "" "")
+                         (list "" "" "Stewards" "" "" "" "" "" "" "" "" "" "")
+                         (list "Saturday September 5" "" "Chevy" "" "" "DGH" "" "" "LGH" "" "" "Personal" "")
+                         (list "" "" "Dep." "Ret." "" "Dep." "Ret." "" "Dep." "Ret." "" "Dep." "Ret.")
+                         (list "" "" "" "" "" "" "" "" "" "" "" "Saturday" "")
+                         (list "" "" "Chevy" "" "" "DGH" "" "" "LGH" "" "" "Personal" "")
+                         (list "" "" "Dep." "Ret." "" "Dep." "Ret." "" "Dep." "Ret." "" "Dep." "Ret.")
+                         (list "" "" "" "" "" "" "" "" "" "" "" "Saturday" "")))
+             (trips (vb::parse-schedule rows)))
+        (is = 8 (length trips))
+        (dolist (tr trips)
+          (is string= "Saturday September 5" (trip-day tr))
+          (is string= "" (trip-destination tr))
+          (is string= "" (trip-departure tr))
+          (is string= "" (trip-return-time tr))
+          (false (trip-dep-passengers tr))
+          (false (vb::booked-trip-p tr)))
+        ;; ... so the Personal slot is free for a new booking
+        (true (vb::find-empty-slot trips "Saturday September 5" :personal))))
+
+  (define-test label-row-p
+      (true (vb::label-row-p '("" "" "" "" "" "" "" "" "" "" "" "Saturday" "")))
+    (true (vb::label-row-p '("" "" "" "" "" "" "" "" "" "" "" "MONDAY" "")))
+    (true (vb::label-row-p '("Saturday September 5" "" "Chevy" "" "" "DGH" "" "" "LGH" "" "" "Personal" "")))
+    (true (vb::label-row-p '("" "" "Dep." "Ret." "" "Dep." "Ret." "" "Dep." "Ret." "" "Dep." "Ret.")))
+    (true (vb::label-row-p '("" "")))
+    (false (vb::label-row-p '("" "" "" "" "" "8:35 am" "10:30 am" "" "" "" "" "" "")))
+    (false (vb::label-row-p '("" "" "SHMS" "" "" "" "" "" "" "" "" "" "")))
+    (false (vb::label-row-p '("" "" "" "" "" "MM" "" "" "" "" "" "Saturday" "")))))
 
 ;;; --- Unit tests: find-trips ---
 

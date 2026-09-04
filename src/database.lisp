@@ -337,8 +337,12 @@ the binary was built against a different path."
 (defun find-slack-subscription (user-id)
   "Return the persistent SLACK-SUBSCRIPTION vertex for USER-ID, or NIL.
 Lookup is case-insensitive on USER-ID. Eagerly hydrates the vertex's
-data alist (see BIBLE-OBJ-WITH-ID)."
-  (let* ((rows (graph-db:invoke-graph-view 'slack-subscription
+data alist (see BIBLE-OBJ-WITH-ID).  Binds GRAPH-DB:*GRAPH* to *DATABASE*
+itself: MAP-VIEW looks each matching row up through *GRAPH* rather than
+the :GRAPH argument, so without the binding a call made outside
+WITH-DB-TRANSACTION fails with VERTEX-TABLE (NIL) once a row exists."
+  (let* ((graph-db:*graph* *database*)
+         (rows (graph-db:invoke-graph-view 'slack-subscription
                                            'subscription-by-user-ci
                                            :key (string-downcase user-id)
                                            :graph *database*))

@@ -155,6 +155,23 @@ before the spreadsheet's tab list is fetched again.")
                  "Wednesday" "Thursday" "Friday" "Saturday" "Sunday")
           :test #'string-equal))
 
+(defun label-row-p (row)
+  "Return T if ROW carries no booking data: every cell from column C on is
+blank or a block label (see HEADER-CELL-P).  That covers the
+\"Chevy/DGH/LGH/Personal\" and \"Dep./Ret.\" header rows and the weekday
+reminder the sheet keeps in the Personal column (e.g. \"Saturday\" in L) on
+the last row of each block.  Columns A and B are ignored because the merged
+day text lives in A on header rows.
+
+PARSE-SCHEDULE uses this to decide whether the row at the time offset really
+holds times: the gviz CSV drops empty rows, so for a block with no times the
+row found there is that weekday reminder, and reading it as data made every
+unbooked block look like a Personal trip departing at \"Saturday\"."
+  (every (lambda (cell)
+           (let ((c (string-trim '(#\Space #\Tab) cell)))
+             (or (not (non-blank-p c)) (header-cell-p c))))
+         (nthcdr 2 row)))
+
 (defun collect-passengers (rows start-offset col max-rows)
   "Collect non-blank passenger initials from column COL starting at START-OFFSET in ROWS.
    Stops at empty cells, block headers, or after MAX-ROWS."
@@ -199,9 +216,11 @@ before the spreadsheet's tab list is fetched again.")
                            (pass-offset (if has-dest-row 4 3)))
                       (when (and current-day (< (+ i time-offset) (length rows)))
                         (let* ((time-row (nth (+ i time-offset) rows))
-                               (time-row-empty
-                                 (or (string-equal "Chevy" (string-trim " " (safe-nth 2 time-row)))
-                                     (string-equal "Dep." (string-trim " " (safe-nth 2 time-row))))))
+                               ;; gviz drops empty rows, so with no times the
+                               ;; row at this offset is the next block header,
+                               ;; a "Dep./Ret." row, or the weekday reminder in
+                               ;; column L.  LABEL-ROW-P covers all three.
+                               (time-row-empty (label-row-p time-row)))
                           (iterate ((vspec (scan *vehicles*)))
                             (destructuring-bind (vname dep-col ret-col) vspec
                               (let ((dest (if dest-row

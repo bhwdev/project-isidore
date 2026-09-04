@@ -10,8 +10,15 @@
   (:import-from #:cl-csv)
   (:import-from #:dexador)
   (:import-from #:chronicity
-                #:hour-of #:minute-of #:dow-of #:dow-name
-                #:year-of #:month-of #:day-of)
+                #:hour-of #:minute-of #:year-of #:month-of #:day-of)
+  (:import-from #:project-isidore/booking-nlp
+                #:parse-booking
+                #:booking-request-destination #:booking-request-day
+                #:booking-request-passengers #:booking-request-dep-time
+                #:booking-request-ret-time #:booking-request-vehicle
+                #:booking-request-missing #:booking-request-understood
+                #:booking-incomplete
+                #:format-time-12h #:format-booking-day #:*month-names*)
   (:export
    ;; struct
    #:trip #:make-trip #:copy-trip #:trip-p
@@ -22,6 +29,7 @@
    #:parse-schedule #:find-trips #:find-empty-slot
    #:add-passengers #:create-booking #:book #:print-trip
    #:read-range #:write-range #:main
+   #:fetch-all-trips #:known-destinations
    #:book-natural
    #:remind-driver
    #:view-schedule
@@ -32,13 +40,16 @@
   - parse-schedule — reads the full sheet, filters CSV artifacts, extracts 72 trip
   structs with correct sheet row numbers
   - find-trips — filters by day and/or destination (substring, case-insensitive)
+  - fetch-all-trips — reads and parses every week in *weeks* (or one week)
   - book — top-level entry point:
     - Existing trip found → adds passengers to both dep and ret columns
     - No match + times provided → creates new booking with vehicle priority DGH → LGH →
   Chevy
-    - No match + no times → tells user to provide :dep-time and :ret-time
+    - No match + no times → signals BOOKING-INCOMPLETE naming the absent time(s)
     - No empty slots → informs user
-  - book-natural — natural language frontend to book
+  - book-natural — free-form English frontend to book (see project-isidore/booking-nlp).
+    Signals BOOKING-INCOMPLETE, whose report asks the user to re-send the request
+    with the missing pieces, when destination, day or passengers cannot be found.
   - view-schedule — render a plaintext table of booked trips for a natural-language date range"))
 
 (in-package #:project-isidore/van-booking)
@@ -67,10 +78,6 @@
 
 (defparameter *auto-vehicles* '(:dgh :lgh :chevy)
   "Vehicle priority order for automatic assignment.")
-
-(defparameter *month-names*
-  '("January" "February" "March" "April" "May" "June"
-    "July" "August" "September" "October" "November" "December"))
 
 (defstruct trip
   day
@@ -325,264 +332,96 @@
             (trip-vehicle slot) day destination dep-time ret-time passengers)
     slot))
 
-(defun book (day destination passengers &key dep-time ret-time vehicle week)
+(defun fetch-all-trips (&key week)
+  "Read and parse the schedule for every week in *WEEKS*, or only WEEK (a sheet
+   name such as \"Apr 20-26\") when given.  Returns a list of TRIP structs."
+  (let ((weeks-to-search (if week
+                             (list (list week nil))
+                             *weeks*)))
+    (collect-append
+     (map-fn 'list
+             (lambda (w)
+               (let* ((sheet-name (first w))
+                      (rows (read-range nil :sheet-name sheet-name)))
+                 (parse-schedule rows :sheet-name sheet-name)))
+             (scan weeks-to-search)))))
+
+(defun known-destinations (trips)
+  "Return the distinct non-blank destinations found in TRIPS, in the sheet's
+   own spelling.  Used as a gazetteer by BOOK-NATURAL."
+  (remove-duplicates
+   (remove-if-not #'non-blank-p (mapcar #'trip-destination trips))
+   :test #'string-equal :from-end t))
+
+(defun book (day destination passengers &key dep-time ret-time vehicle week trips)
   "Book PASSENGERS for a trip on DAY to DESTINATION.
-   If an existing trip matches, adds passengers to it.
-   Otherwise creates a new booking (requires DEP-TIME and RET-TIME).
+   If an existing trip matches, adds passengers to it (no times needed).
+   Otherwise creates a new booking, which requires DEP-TIME and RET-TIME; when
+   either is missing, signals BOOKING-INCOMPLETE so the caller can ask for them.
    VEHICLE can override automatic selection (DGH > LGH > Chevy).
-   WEEK is the sheet name (e.g. \"Apr 20-26\"). If omitted, searches all weeks."
-  (let* ((weeks-to-search (if week
-                              (list (list week nil))
-                              *weeks*))
-         (all-trips (collect-append
-                     (map-fn 'list
-                             (lambda (w)
-                               (let* ((sheet-name (first w))
-                                      (rows (read-range nil :sheet-name sheet-name)))
-                                 (parse-schedule rows :sheet-name sheet-name)))
-                             (scan weeks-to-search)))))
-    (let ((matches (find-trips all-trips :day day :destination destination)))
-      (cond
-        (matches
-         (format t "Found ~d existing trip~:p to ~a on ~a:~%" (length matches) destination day)
-         (iterate ((m (scan matches))) (print-trip m))
-         (let ((target (first matches)))
-           (format t "Adding passengers to ~a trip (~a)...~%"
-                   (trip-vehicle target) (trip-sheet-name target))
-           (add-passengers target passengers)))
-        ((and dep-time ret-time)
-         (create-booking all-trips day destination dep-time ret-time passengers
-                         :vehicle vehicle))
-        (t
-         (format t "No existing trips to ~a on ~a.~%Provide :dep-time and :ret-time to create a new booking.~%"
-                 destination day)
-         nil)))))
-
-(defun format-time-12h (hour minute)
-  "Format HOUR (0-23) and MINUTE as a 12-hour time string, e.g. \"7:00 pm\"."
-  (let* ((period (if (>= hour 12) "pm" "am"))
-         (h12 (cond ((= hour 0) 12)
-                    ((> hour 12) (- hour 12))
-                    (t hour))))
-    (format nil "~D:~2,'0D ~A" h12 minute period)))
-
-(defun format-booking-day (dt)
-  "Format a chronicity datetime DT as \"DayOfWeek MonthName Day\", e.g. \"Tuesday April 7\"."
-  (format nil "~A ~A ~D"
-          (string-capitalize (symbol-name (dow-name (dow-of dt))))
-          (nth (1- (month-of dt)) *month-names*)
-          (day-of dt)))
+   WEEK is the sheet name (e.g. \"Apr 20-26\"). If omitted, searches all weeks.
+   TRIPS, when given, is a pre-fetched list from FETCH-ALL-TRIPS and skips the read."
+  (let* ((all-trips (or trips (fetch-all-trips :week week)))
+         (matches (find-trips all-trips :day day :destination destination)))
+    (cond
+      (matches
+       (format t "Found ~d existing trip~:p to ~a on ~a:~%" (length matches) destination day)
+       (iterate ((m (scan matches))) (print-trip m))
+       (let ((target (first matches)))
+         (format t "Adding passengers to ~a trip (~a)...~%"
+                 (trip-vehicle target) (trip-sheet-name target))
+         (add-passengers target passengers)))
+      ((and dep-time ret-time)
+       (create-booking all-trips day destination dep-time ret-time passengers
+                       :vehicle vehicle))
+      (t
+       (error 'booking-incomplete
+              :missing (remove nil (list (unless dep-time :dep-time)
+                                         (unless ret-time :ret-time)))
+              :understood (append (list :destination destination :day day
+                                        :passengers passengers)
+                                  (when dep-time (list :dep-time dep-time))
+                                  (when ret-time (list :ret-time ret-time))
+                                  (when vehicle (list :vehicle vehicle)))
+              :preamble (format nil "No existing trip to ~a on ~a to join, so this would be a new booking."
+                                destination day))))))
 
 (defun parse-passenger-initials (text)
   "Extract uppercase 2-3 character initials from TEXT."
   (cl-ppcre:all-matches-as-strings "[A-Z]{2,3}" text))
 
-(defparameter *day-phrase-pattern*
-  "(?:(?:next\\s+(?:week\\s+)?|this\\s+|last\\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|tomorrow|today|yesterday|(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?)"
-  "CL-PPCRE pattern matching temporal day expressions understood by chronicity.")
-
-(defparameter *booking-normalizations*
-  '(;; --- Preamble stripping (must be first, anchored to start) ---
-    ("(?i)^(?:I(?:'d| would) like to|I need to|I want to|can you(?: please)?|could you(?: please)?|please)\\s+" . "")
-    ("(?i)^(?:book|reserve|schedule|get)\\s+(?:(?:a|the)\\s+)?(?:van\\s+)?" . "")
-    ("(?i)^(dgh|lgh|chevy|personal)\\b" . "use \\1")
-
-    ;; --- Period-style meridiem → plain am/pm (must precede time rules) ---
-    ("(?i)\\ba\\.m\\.?" . "am")
-    ("(?i)\\bp\\.m\\.?" . "pm")
-
-    ;; --- Time-range: "from X to Y" → "at X to Y" ---
-    ("(?i)\\bfrom\\s+(.+?)\\s+to\\b"    . "at \\1 to")
-
-    ;; --- Departure-time introducers → "at" ---
-    ("(?i)\\bstarting\\s+at\\b"          . "at")
-    ("(?i)\\bstarting\\b"               . "at")
-    ("(?i)\\bdeparting\\s+at\\b"         . "at")
-    ("(?i)\\bdeparting\\b"              . "at")
-    ("(?i)\\bleaving\\s+at\\b"           . "at")
-    ("(?i)\\bleaving\\b"                . "at")
-    ("(?i)\\bbeginning\\s+at\\b"         . "at")
-    ("(?i)\\bbeginning\\b"              . "at")
-    ("(?i)\\bgoing\\s+at\\b"             . "at")
-    ("(?i)\\bpick(?:ing)?\\s*up\\s+at\\b" . "at")
-
-    ;; --- Return-time introducers → "to" ---
-    ("(?i)\\buntil\\b"                  . "to")
-    ("(?i)\\btill\\b"                   . "to")
-    ("(?i)\\bthrough\\b"               . "to")
-    ("(?i)\\breturning\\s+at\\b"         . "to")
-    ("(?i)\\breturning\\s+by\\b"         . "to")
-    ("(?i)\\breturning\\b"              . "to")
-    ("(?i)\\bending\\s+at\\b"            . "to")
-    ("(?i)\\bending\\b"                 . "to")
-    ("(?i)\\bbe\\s+back\\s+(?:by|at)\\b"  . "to")
-    ("(?i)\\bget\\s+back\\s+(?:by|at)\\b" . "to")
-    ("(?i)\\bback\\s+(?:by|at)\\b"       . "to")
-    ("(?i)\\bdrop(?:ping)?\\s*off\\s+at\\b" . "to")
-    ("(?i)\\barrive\\s+(?:by|at)\\b"      . "to")
-    ("(?i)\\breturn\\s+(?:by|at)\\b"      . "to")
-    ("(?i)\\bdone\\s+(?:by|at)\\b"        . "to")
-    ("(?i)\\bfinish(?:ed)?\\s+(?:by|at)\\b" . "to")
-
-    ;; --- Destination introducers → "for" ---
-    ("(?i)\\b(?:going|headed|heading|driving)\\s+to\\b" . "for")
-
-    ;; --- Vehicle preference → "use VEHICLE" ---
-    ("(?i)\\b(?:take|prefer|in)\\s+(?:the\\s+)?(dgh|lgh|chevy|personal)\\b" . "use \\1")
-
-    ;; --- Passenger introducers → "for" ---
-    ("(?i)\\bwith\\s+([A-Z]{2,3})"      . "for \\1")
-    ("(?i)\\bcarrying\\s+([A-Z]{2,3})"  . "for \\1")
-    ("(?i)\\btaking\\s+([A-Z]{2,3})"    . "for \\1")
-    ("(?i)\\bbringing\\s+([A-Z]{2,3})"  . "for \\1")
-    ("(?i)\\bpassengers?\\s+([A-Z]{2,3})" . "for \\1"))
-  "Alist of (regex . replacement) pairs applied to normalize booking text
-before the structural parse.  Order matters: the from→at rule must precede
-individual departure-time introducers.")
-
-(defparameter *time-expr-pattern*
-  "(?:\\d{1,2}:\\d{2}\\s*(?:am|pm)?|\\d{1,2}\\s*(?:am|pm)|(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\\s+(?:am|pm))"
-  "CL-PPCRE pattern matching a single time expression (H:MM with optional am/pm, or H am/pm).")
-
-(defun normalize-booking-text (text)
-  "Canonicalize synonyms in TEXT for parse-booking-text.
-Collapses whitespace and applies *booking-normalizations* in order."
-  (let ((initial (cl-ppcre:regex-replace-all "\\s+" (string-trim " " text) " ")))
-    (collect-fn 'string
-                (lambda () initial)
-                (lambda (acc pair)
-                  (cl-ppcre:regex-replace-all (car pair) acc (cdr pair)))
-                (scan *booking-normalizations*))))
-
-(defun all-initials-p (text)
-  "Return T if TEXT consists entirely of uppercase 2-3 char initials with separators (and, &, commas)."
-  (let* ((trimmed (string-trim " " text))
-         (cleaned (cl-ppcre:regex-replace-all "(?i)\\b(?:and|&)\\b|," trimmed " "))
-         (cleaned (cl-ppcre:regex-replace-all "\\s+" (string-trim " " cleaned) " ")))
-    (and (plusp (length cleaned))
-         (every (lambda (token) (cl-ppcre:scan "^[A-Z]{2,3}$" token))
-                (cl-ppcre:split "\\s+" cleaned)))))
-
-(defun parse-booking-text (text)
-  "Parse natural language booking TEXT into components using order-agnostic extraction.
-Returns (values destination day-phrase passengers-raw dep-time-raw ret-time-raw vehicle)
-or NIL if required components (destination, passengers, times) cannot be found.
-Day defaults to \"today\" if not specified.  VEHICLE is a keyword (:DGH, :LGH, :CHEVY,
-:PERSONAL) or NIL.
-
-Components may appear in any order:
-  \"book a van for swimming next Tuesday for CG at 7 pm to 9 pm\"
-  \"I'd like to reserve the DGH for a haircut from 12:30pm to 2:30pm for GG.\"
-  \"for CG and BW at seven PM to nine PM going to swimming next week Tuesday\""
-  (let ((norm (normalize-booking-text text)))
-    ;; Strip trailing punctuation
-    (setf norm (string-trim " " (cl-ppcre:regex-replace "[.!?]+\\s*$" norm "")))
-    (let (dep-raw ret-raw day-phrase pax-raw dest vehicle)
-      ;; 1. Extract time range: "at DEP-TIME to RET-TIME"
-      (let ((time-re (concatenate 'string
-                                  "(?i)\\bat\\s+(" *time-expr-pattern* ")\\s+to\\s+("
-                                  *time-expr-pattern* ")")))
-        (cl-ppcre:register-groups-bind (d r) (time-re norm)
-          (setf dep-raw d ret-raw r))
-        (when dep-raw
-          (setf norm (string-trim " "
-                                  (cl-ppcre:regex-replace-all "\\s+"
-                                                              (cl-ppcre:regex-replace time-re norm " ") " ")))))
-      ;; 1b. Fallback: bare "TIME to TIME" without "at" introducer
-      (unless dep-raw
-        (let ((bare-re (concatenate 'string
-                                    "(?i)(" *time-expr-pattern* ")\\s+to\\s+("
-                                    *time-expr-pattern* ")")))
-          (cl-ppcre:register-groups-bind (d r) (bare-re norm)
-            (setf dep-raw d ret-raw r))
-          (when dep-raw
-            (setf norm (string-trim " "
-                                    (cl-ppcre:regex-replace-all "\\s+"
-                                                                (cl-ppcre:regex-replace bare-re norm " ") " "))))))
-      ;; 2. Extract vehicle preference: "use DGH" etc.
-      (let ((veh-re "(?i)\\buse\\s+(?:the\\s+)?(dgh|lgh|chevy|personal)\\b"))
-        (cl-ppcre:register-groups-bind (v) (veh-re norm)
-          (when v
-            (setf vehicle (find (string-upcase v)
-                                '(:dgh :lgh :chevy :personal)
-                                :key #'symbol-name :test #'string=))
-            (setf norm (string-trim " "
-                                    (cl-ppcre:regex-replace-all "\\s+"
-                                                                (cl-ppcre:regex-replace veh-re norm " ") " "))))))
-      ;; 3. Extract day phrase (optionally preceded by "on")
-      (let ((day-re (concatenate 'string
-                                 "(?i)\\b(?:on\\s+)?(" *day-phrase-pattern* ")\\b")))
-        (cl-ppcre:register-groups-bind (d) (day-re norm)
-          (setf day-phrase d))
-        (when day-phrase
-          (setf norm (string-trim " "
-                                  (cl-ppcre:regex-replace-all "\\s+"
-                                                              (cl-ppcre:regex-replace day-re norm " ") " ")))))
-      ;; 4. Classify "for" segments as passengers or destination
-      (let ((segments (cl-ppcre:split "(?i)\\bfor\\b" norm)))
-        (dolist (seg (rest segments))
-          (let ((trimmed (string-trim " " seg)))
-            (when (plusp (length trimmed))
-              (if (all-initials-p trimmed)
-                  (unless pax-raw (setf pax-raw trimmed))
-                  (unless dest (setf dest trimmed)))))))
-      (when (and dest pax-raw dep-raw ret-raw)
-        (values dest (or day-phrase "today") pax-raw dep-raw ret-raw vehicle)))))
-
 (defun book-natural (text &key week)
-  "
-Examples:
-  (book-natural \"book a van for swimming next Tuesday for CG and BW at 7 pm to 9 pm\")
-  (book-natural \"I'd like to reserve the DGH for a haircut from 12:30pm to 2:30pm for GG.\")
-  (book-natural \"going to swimming tomorrow for CG 8am to 10am\")
+  "Book from free-form English TEXT, e.g.
 
-DAY-PHRASE is resolved by chronicity (supports: \"next Tuesday\", \"next week Friday\",
-\"this Monday\", \"tomorrow\", etc.).  DEP-TIME and RET-TIME are likewise resolved
-\(\"seven PM\", \"9:00 am\", etc.).  PASSENGERS are uppercase 2-3 letter initials."
-  (multiple-value-bind (dest day-phrase passengers-raw dep-raw ret-raw vehicle)
-      (parse-booking-text text)
-    (unless dest
-      (let ((missing '()))
-        (let ((norm (normalize-booking-text text)))
-          (setf norm (string-trim " " (cl-ppcre:regex-replace "[.!?]+\\s*$" norm "")))
-          (let ((time-re (concatenate 'string
-                                      "(?i)\\bat\\s+(" *time-expr-pattern* ")\\s+to\\s+("
-                                      *time-expr-pattern* ")"))
-                (bare-re (concatenate 'string
-                                      "(?i)(" *time-expr-pattern* ")\\s+to\\s+("
-                                      *time-expr-pattern* ")")))
-            (unless (or (cl-ppcre:scan time-re norm)
-                        (cl-ppcre:scan bare-re norm))
-              (push "times (e.g. 'from 8am to 10am' or '8am to 10am')" missing))
-            (setf norm (string-trim " " (cl-ppcre:regex-replace-all "\\s+"
-                                                                    (cl-ppcre:regex-replace (if (cl-ppcre:scan time-re norm) time-re bare-re)
-                                                                                            norm " ") " "))))
-          (let ((segments (cl-ppcre:split "(?i)\\bfor\\b" norm))
-                (has-pax nil) (has-dest nil))
-            (dolist (seg (rest segments))
-              (let ((trimmed (string-trim " " seg)))
-                (when (plusp (length trimmed))
-                  (if (all-initials-p trimmed)
-                      (setf has-pax t)
-                      (setf has-dest t)))))
-            (unless has-pax (push "passengers (e.g. 'for BW' or 'for CG and BW')" missing))
-            (unless has-dest (push "destination (e.g. 'for swimming' or 'for haircut')" missing))))
-        (error "Cannot parse booking request: missing ~{~A~^, ~}.~%~
-                Examples:~%  ~
-                  'for swimming tomorrow for CG from 8am to 10am'~%  ~
-                  'going to the pool next Tuesday for BW at 7 pm to 9 pm'~%  ~
-                  'reserve the DGH for haircut for MM 8:35am to 10:25am'~%~
-                Got: ~A" missing text)))
-    (let* ((day-dt (chronicity:parse day-phrase :context :future))
-           (dep-dt (chronicity:parse dep-raw    :context :future))
-           (ret-dt (chronicity:parse ret-raw    :context :future))
-           (day    (format-booking-day day-dt))
-           (dep    (format-time-12h (hour-of dep-dt) (minute-of dep-dt)))
-           (ret    (format-time-12h (hour-of ret-dt) (minute-of ret-dt)))
-           (pax    (parse-passenger-initials passengers-raw)))
-      (apply #'book day dest pax :dep-time dep :ret-time ret
-             (append (when vehicle (list :vehicle vehicle))
-                     (when week (list :week week)))))))
+  (book-natural \"book a van for swimming next Tuesday for CG and BW at 7 pm to 9 pm\")
+  (book-natural \"Can BW and MM take the DGH to the dentist tomorrow, leaving at 8:30 and back around 11?\")
+  (book-natural \"add GG to the SHMS trip on Thursday\")
+
+TEXT is parsed by PROJECT-ISIDORE/BOOKING-NLP:PARSE-BOOKING.  Destination, day
+and passengers are required; if any is missing, BOOKING-INCOMPLETE is signalled
+before the sheet is read, and its report tells the user what was understood and
+how to phrase the missing pieces.  Times are optional when an existing trip
+matches; otherwise BOOK signals BOOKING-INCOMPLETE for the absent time(s).
+The sheet's own destination spellings are used as a gazetteer so \"the SHMS
+trip\" joins the existing SHMS trip.  WEEK restricts the search to one sheet."
+  (let* ((first-pass (parse-booking text))
+         (missing (remove-if-not (lambda (slot) (member slot '(:destination :day :passengers)))
+                                 (booking-request-missing first-pass))))
+    (when missing
+      (error 'booking-incomplete
+             :missing missing
+             :understood (booking-request-understood first-pass)
+             :text text))
+    (let* ((trips (fetch-all-trips :week week))
+           (req (parse-booking text :known-destinations (known-destinations trips))))
+      (book (booking-request-day req)
+            (booking-request-destination req)
+            (booking-request-passengers req)
+            :dep-time (booking-request-dep-time req)
+            :ret-time (booking-request-ret-time req)
+            :vehicle (booking-request-vehicle req)
+            :week week
+            :trips trips))))
 
 (defun month-abbrev-num (abbrev)
   "Return 1-based month number from ABBREV like \"Mar\", \"Apr\", or \"May\".

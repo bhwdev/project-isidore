@@ -4,15 +4,25 @@
 (uiop:define-package #:project-isidore/tests/slack-bot-tests
   (:use #:common-lisp #:parachute)
   (:local-nicknames (#:sb #:project-isidore/slack-bot)
-                    (#:db #:project-isidore/database))
+                    (#:db #:project-isidore/database)
+                    (#:vb #:project-isidore/van-booking)
+                    (#:bn #:project-isidore/booking-nlp))
+  (:import-from #:project-isidore/tests/test-utils #:with-mocked-functions)
+  (:import-from #:alexandria #:plist-hash-table)
+  (:import-from #:bordeaux-threads)
+  (:import-from #:com.inuoe.jzon)
+  (:import-from #:flexi-streams)
+  (:import-from #:ironclad)
   (:documentation
    "Parachute tests for project-isidore/slack-bot.
 
 Covers pure helpers (form decoding, initial parsing, dispatch table,
 docstring-driven help output, reminder-key determinism, date-rollover
-reset) and rucksack-backed subscription CRUD. Handlers that would hit
-the Slack API or Google Sheets (cmd-book, cmd-view, full scheduler
-tick) are stubbed via FLET shadowing."))
+reset), request signature verification, the Lack middleware and both
+endpoints, the slash-command handlers, message events, the reminder
+scheduler tick, and graph-db-backed subscription CRUD.  Everything that
+would hit the Slack API or Google Sheets is mocked with
+WITH-MOCKED-FUNCTIONS."))
 
 (in-package #:project-isidore/tests/slack-bot-tests)
 
@@ -98,12 +108,12 @@ tick) are stubbed via FLET shadowing."))
     (sb::maybe-reset-sent-reminders)
     (is = 1 (hash-table-count sb::*sent-reminders*))))
 
-;;; --- Subscription CRUD (rucksack round-trip) ---
+;;; --- Subscription CRUD (graph-db round-trip) ---
 ;;;
-;;; Each CRUD test runs against a fresh, temporary rucksack so nothing
+;;; Each CRUD test runs against a fresh, temporary graph-db store so nothing
 ;;; leaks into ~/.local/share/project-isidore/ (or wherever
 ;;; PROJECT_ISIDORE_DATA points). WITH-TEMP-DATABASE handles the open,
-;;; the *database*/*rucksack* rebind, the slack-subscription schema
+;;; the *database* rebind, the slack-subscription schema
 ;;; registration, and the teardown.
 
 (defparameter +test-user-id+ "__TEST_USER_slack_bot_tests__"
@@ -289,3 +299,335 @@ top-level)."
       (sb::cmd-subscribe (make-params "user_id" +test-user-id+ "text" "BW"))
     (let ((reply (sb::cmd-unsubscribe (make-params "user_id" +test-user-id+))))
       (true (search "Unsubscribed" reply)))))
+
+(defun unix-now ()
+  "Current time as Unix epoch seconds, as Slack sends it."
+  (- (get-universal-time) 2208988800))
+
+(defun sign (secret timestamp body)
+  "Compute Slack's v0 request signature for BODY at TIMESTAMP with SECRET."
+  (let ((hmac (ironclad:make-hmac (ironclad:ascii-string-to-byte-array secret) :sha256)))
+    (ironclad:update-hmac hmac (ironclad:ascii-string-to-byte-array
+                                (format nil "v0:~a:~a" timestamp body)))
+    (format nil "v0=~(~{~2,'0X~}~)" (coerce (ironclad:hmac-digest hmac) 'list))))
+
+(defun body-env (string &rest plist)
+  "A minimal Lack ENV plist whose raw body is STRING (UTF-8)."
+  (list* :raw-body
+         (flexi-streams:make-in-memory-input-stream
+          (flexi-streams:string-to-octets string :external-format :utf-8))
+         plist))
+
+(defun signed-env (path body &key (secret "testsecret") signature extra-headers)
+  "A Lack ENV for a Slack POST to PATH with BODY, signed with SECRET (or a
+literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
+  (let ((ts (princ-to-string (unix-now)))
+        (headers (make-hash-table :test #'equal)))
+    (setf (gethash "x-slack-request-timestamp" headers) ts
+          (gethash "x-slack-signature" headers) (or signature (sign secret ts body)))
+    (loop for (k v) on extra-headers by #'cddr
+          do (setf (gethash k headers) v))
+    (body-env body :request-method :post :path-info path :headers headers)))
+
+(defun message-event (&rest plist)
+  "Build a Slack event hash-table from PLIST (\"text\" \"...\" \"channel\" \"C1\" ...)."
+  (let ((h (make-hash-table :test #'equal)))
+    (loop for (k v) on plist by #'cddr
+          do (setf (gethash k h) v))
+    h))
+
+(define-test signature-verification
+  :parent slack-bot-suite
+  (let ((sb::*slack-signing-secret* "testsecret")
+        (ts (princ-to-string (unix-now)))
+        (body "command=%2Fbook&text=hi"))
+    (true (sb::verify-slack-signature ts body (sign "testsecret" ts body)))
+    ;; tampered body or wrong secret
+    (false (sb::verify-slack-signature ts (concatenate 'string body "x") (sign "testsecret" ts body)))
+    (false (sb::verify-slack-signature ts body (sign "othersecret" ts body)))
+    ;; stale timestamp (replay protection)
+    (let ((old (princ-to-string (- (unix-now) 1000))))
+      (false (sb::verify-slack-signature old body (sign "testsecret" old body))))
+    ;; missing or malformed pieces
+    (false (sb::verify-slack-signature nil body "v0=00"))
+    (false (sb::verify-slack-signature ts body nil))
+    (false (sb::verify-slack-signature "not-a-number" body "v0=00")))
+  ;; no secret configured -> nothing verifies
+  (let ((sb::*slack-signing-secret* nil)
+        (ts (princ-to-string (unix-now))))
+    (false (sb::verify-slack-signature ts "b" (sign "testsecret" ts "b")))))
+
+(define-test request-helpers
+  :parent slack-bot-suite
+  ;; strip-mention
+  (is string= "book a van" (sb::strip-mention "<@U123ABC> book a van"))
+  (is string= "book a van" (sb::strip-mention "book a van"))
+  (is string= "hi <@U123ABC>" (sb::strip-mention "hi <@U123ABC>"))
+  (is string= "" (sb::strip-mention "<@U123ABC>"))
+  ;; json-response
+  (let ((resp (sb::json-response 200 (plist-hash-table '("challenge" "abc") :test #'equal))))
+    (is = 200 (first resp))
+    (is equal '(:content-type "application/json") (second resp))
+    (is string= "abc" (gethash "challenge" (com.inuoe.jzon:parse (first (third resp))))))
+  ;; read-body-string decodes UTF-8 and tolerates a missing body
+  (is string= "héllo=wörld" (sb::read-body-string (body-env "héllo=wörld")))
+  (is string= "" (sb::read-body-string (body-env "")))
+  (false (sb::read-body-string '(:path-info "/x")))
+  ;; help text describes the free-form contract
+  (dolist (needle '("destination" "day" "passengers" "times" "vehicle" "re-send"
+                    "/view" "/subscribe" "/unsubscribe" "/help"))
+    (true (search needle sb::+help-text+) "help mentions ~a" needle)))
+
+(define-test middleware-routing
+  :parent slack-bot-suite
+  (let* ((app-calls '())
+         (app (lambda (env) (push (getf env :path-info) app-calls) '(200 () ("app"))))
+         (handler (funcall (sb:make-slack-middleware) app)))
+    ;; GET passes through, even on the slack paths
+    (is equal '(200 () ("app"))
+        (funcall handler '(:request-method :get :path-info "/slack/events")))
+    ;; POST elsewhere passes through
+    (is equal '(200 () ("app"))
+        (funcall handler (body-env "x" :request-method :post :path-info "/other")))
+    (is equal '("/other" "/slack/events") app-calls)
+    ;; POST to the slack paths is handled here: no body -> 400
+    (is = 400 (first (funcall handler '(:request-method :post :path-info "/slack/events"))))
+    (is = 400 (first (funcall handler '(:request-method :post :path-info "/slack/commands"))))
+    (is = 2 (length app-calls))))
+
+(define-test events-endpoint
+  :parent slack-bot-suite
+  (let ((sb::*slack-signing-secret* "testsecret"))
+    ;; the url_verification handshake echoes the challenge as JSON
+    (let ((resp (sb::handle-slack-request
+                 (signed-env "/slack/events"
+                             "{\"type\":\"url_verification\",\"challenge\":\"xyz\"}"))))
+      (is = 200 (first resp))
+      (is equal '(:content-type "application/json") (second resp))
+      (is string= "xyz" (gethash "challenge" (com.inuoe.jzon:parse (first (third resp))))))
+    ;; bad or missing signature -> 403; no body -> 400
+    (is = 403 (first (sb::handle-slack-request
+                      (signed-env "/slack/events" "{\"type\":\"url_verification\"}"
+                                  :signature "v0=bad"))))
+    (is = 403 (first (sb::handle-slack-request
+                      (body-env "{}" :request-method :post :path-info "/slack/events"))))
+    (is = 400 (first (sb::handle-slack-request '(:request-method :post :path-info "/slack/events"))))
+    ;; retries are acknowledged but not processed; first deliveries dispatch
+    (let ((events '()))
+      (with-mocked-functions ((sb::handle-message-event (lambda (event) (push event events) nil)))
+        (let ((body "{\"type\":\"event_callback\",\"event\":{\"type\":\"message\",\"text\":\"hi\"}}"))
+          (is = 200 (first (sb::handle-slack-request
+                            (signed-env "/slack/events" body
+                                        :extra-headers '("x-slack-retry-num" "1")))))
+          (is = 0 (length events))
+          (is = 200 (first (sb::handle-slack-request (signed-env "/slack/events" body))))
+          (is = 1 (length events))
+          (is string= "hi" (gethash "text" (first events))))
+        ;; an event_callback without an event is harmless
+        (is = 200 (first (sb::handle-slack-request
+                          (signed-env "/slack/events" "{\"type\":\"event_callback\"}"))))
+        (is = 1 (length events))))
+    ;; unknown payload types are acknowledged
+    (is = 200 (first (sb::handle-slack-request
+                      (signed-env "/slack/events" "{\"type\":\"something_else\"}"))))))
+
+(define-test commands-endpoint
+  :parent slack-bot-suite
+  (let ((sb::*slack-signing-secret* "testsecret"))
+    (is = 403 (first (sb::handle-slash-command
+                      (signed-env "/slack/commands" "command=%2Fhelp" :signature "v0=bad"))))
+    (is = 400 (first (sb::handle-slash-command '(:request-method :post :path-info "/slack/commands"))))
+    (let ((resp (sb::handle-slash-command
+                 (signed-env "/slack/commands" "command=%2Fbogus&user_id=U1&channel_id=C1"))))
+      (is = 200 (first resp))
+      (true (search "Unknown command: /bogus" (first (third resp)))))
+    ;; a known command runs in a worker thread and posts its reply to the channel
+    (let ((posted '()))
+      (with-mocked-functions ((sb::post-slack-message
+                               (lambda (channel text) (push (cons channel text) posted))))
+        (let ((resp (sb::handle-slash-command
+                     (signed-env "/slack/commands" "command=%2Fhelp&user_id=U1&channel_id=C1"))))
+          (is = 200 (first resp))
+          (loop repeat 100 until posted do (sleep 0.05))
+          (is = 1 (length posted))
+          (is string= "C1" (car (first posted)))
+          (true (search "/book" (cdr (first posted)))))))
+    ;; subscribe replies go to the user as a DM
+    (let ((posted '()))
+      (with-mocked-functions ((sb::post-slack-message
+                               (lambda (channel text) (push (cons channel text) posted)))
+                              (db:add-slack-subscription (lambda (user-id initial)
+                                                           (declare (ignore user-id initial)) t)))
+        (sb::handle-slash-command
+         (signed-env "/slack/commands" "command=%2Fsubscribe&text=BW&user_id=U7&channel_id=C1"))
+        (loop repeat 100 until posted do (sleep 0.05))
+        (is = 1 (length posted))
+        (is string= "U7" (car (first posted)))
+        (true (search "Subscribed" (cdr (first posted))))))))
+
+(define-test cmd-book-replies
+  :parent slack-bot-suite
+  (true (search "Usage" (sb::cmd-book (make-params "text" ""))))
+  (true (search "Usage" (sb::cmd-book (make-params "text" "   "))))
+  (true (search "Usage" (sb::cmd-book (make-params))))
+  ;; an incomplete booking returns the re-send prompt, not an error banner
+  (with-mocked-functions ((vb:book-natural
+                           (lambda (text &key week) (declare (ignore week))
+                             (error 'bn:booking-incomplete :missing '(:day)
+                                                           :understood '(:destination "pool")
+                                                           :text text))))
+    (let ((reply (sb::cmd-book (make-params "text" "for the pool for MM"))))
+      (true (search "Please re-send" reply))
+      (true (search "destination: pool" reply))
+      (true (search (bn:missing-piece-hint :day) reply))
+      (false (search "Booking failed" reply))))
+  ;; the booking's printed output is the reply
+  (with-mocked-functions ((vb:book-natural
+                           (lambda (text &key week) (declare (ignore text week))
+                             (format t "Created DGH booking~%"))))
+    (true (search "Created DGH booking" (sb::cmd-book (make-params "text" "x")))))
+  ;; silent success
+  (with-mocked-functions ((vb:book-natural (lambda (text &key week) (declare (ignore text week)) nil)))
+    (true (search "no output" (sb::cmd-book (make-params "text" "x")))))
+  ;; other errors are reported with their condition type
+  (with-mocked-functions ((vb:book-natural (lambda (text &key week) (declare (ignore text week))
+                                             (error "boom"))))
+    (let ((reply (sb::cmd-book (make-params "text" "x"))))
+      (true (search "Booking failed [SIMPLE-ERROR]" reply))
+      (true (search "boom" reply))
+      (true (search "/help" reply)))))
+
+(define-test cmd-view-replies
+  :parent slack-bot-suite
+  (with-mocked-functions ((vb:view-schedule
+                           (lambda (&optional range) (format t "TABLE for ~a" range) "ignored")))
+    (true (search "TABLE for today" (sb::cmd-view (make-params "text" ""))))
+    (true (search "TABLE for today" (sb::cmd-view (make-params))))
+    (true (search "TABLE for Apr 20 to Apr 26"
+                  (sb::cmd-view (make-params "text" " Apr 20 to Apr 26 ")))))
+  (with-mocked-functions ((vb:view-schedule
+                           (lambda (&optional range) (declare (ignore range)) (error "no sheet"))))
+    (let ((reply (sb::cmd-view (make-params "text" "x"))))
+      (true (search "View failed" reply))
+      (true (search "no sheet" reply)))))
+
+(define-test message-events
+  :parent slack-bot-suite
+  (let ((posted '()))
+    (with-mocked-functions ((sb::post-slack-message
+                             (lambda (channel text) (push (cons channel text) posted)))
+                            (vb:book-natural
+                             (lambda (text &key week) (declare (ignore week))
+                               (format t "booked ~a" text))))
+      ;; ignored events post nothing and return NIL
+      (false (sb::handle-message-event (message-event "text" "x" "channel" "C1" "bot_id" "B1")))
+      (false (sb::handle-message-event (message-event "text" "x" "channel" "C1" "subtype" "edited")))
+      (false (sb::handle-message-event (message-event "text" "   " "channel" "C1")))
+      (false (sb::handle-message-event (message-event "channel" "C1")))
+      (false (sb::handle-message-event (message-event "text" "x")))
+      (is = 0 (length posted))
+      ;; help keywords post the help text synchronously
+      (false (sb::handle-message-event (message-event "text" "help" "channel" "C1")))
+      (false (sb::handle-message-event (message-event "text" "?" "channel" "C1")))
+      (is = 2 (length posted))
+      (true (search "Van Booking Bot" (cdr (first posted))))
+      ;; a booking runs in a worker thread; the mention prefix is stripped
+      (let ((thread (sb::handle-message-event
+                     (message-event "text" "<@U1> for the pool" "channel" "C2"))))
+        (true (bt:threadp thread))
+        (bt:join-thread thread)
+        (is string= "C2" (car (first posted)))
+        (is string= "booked for the pool" (cdr (first posted))))))
+  ;; an incomplete booking posts the re-send prompt, not an error banner
+  (let ((posted '()))
+    (with-mocked-functions ((sb::post-slack-message
+                             (lambda (channel text) (declare (ignore channel)) (push text posted)))
+                            (vb:book-natural
+                             (lambda (text &key week) (declare (ignore week))
+                               (error 'bn:booking-incomplete :missing '(:passengers)
+                                                             :understood '(:destination "pool")
+                                                             :text text))))
+      (bt:join-thread (sb::handle-message-event (message-event "text" "for the pool" "channel" "C1")))
+      (is = 1 (length posted))
+      (true (search "Please re-send" (first posted)))
+      (true (search "destination: pool" (first posted)))
+      (false (search "Booking failed" (first posted)))))
+  ;; silent success and other errors
+  (let ((posted '()))
+    (with-mocked-functions ((sb::post-slack-message
+                             (lambda (channel text) (declare (ignore channel)) (push text posted)))
+                            (vb:book-natural (lambda (text &key week) (declare (ignore text week)) nil)))
+      (bt:join-thread (sb::handle-message-event (message-event "text" "for the pool" "channel" "C1")))
+      (true (search "no output" (first posted))))
+    (with-mocked-functions ((sb::post-slack-message
+                             (lambda (channel text) (declare (ignore channel)) (push text posted)))
+                            (vb:book-natural (lambda (text &key week) (declare (ignore text week))
+                                               (error "boom"))))
+      (bt:join-thread (sb::handle-message-event (message-event "text" "for the pool" "channel" "C1")))
+      (true (search "Booking failed [SIMPLE-ERROR]" (first posted)))
+      (true (search "boom" (first posted))))))
+
+(define-test scheduler-tick-window
+  :parent slack-bot-suite
+  (let* ((trip (vb:make-trip :day "Monday" :vehicle :dgh :destination "SHMS"
+                             :departure "8:00 am" :block-start-row 3
+                             :dep-passengers '("BW")))
+         (dep-offset 100)
+         (posted '())
+         (sb::*sent-reminders* (make-hash-table :test #'equal))
+         (sb::*sent-reminders-date* (sb::today-date-key)))
+    (with-mocked-functions ((db:all-slack-subscriptions
+                             (lambda () '(("U1" . "BW"))))
+                            (vb:trips-for-driver-today
+                             (lambda (initial) (declare (ignore initial)) (list trip)))
+                            (vb:trip-departure-universal-time
+                             (lambda (tr) (declare (ignore tr)) (+ (get-universal-time) dep-offset)))
+                            (vb:remind-driver
+                             (lambda (initial &optional day)
+                               (declare (ignore day))
+                               (format nil "reminder for ~a" initial)))
+                            (sb::post-slack-message
+                             (lambda (channel text) (push (cons channel text) posted))))
+      ;; inside the 5-minute window -> one DM to the subscriber
+      (sb::scheduler-tick)
+      (is = 1 (length posted))
+      (is string= "U1" (car (first posted)))
+      (is string= "reminder for BW" (cdr (first posted)))
+      ;; the same trip on the next tick is deduplicated
+      (sb::scheduler-tick)
+      (is = 1 (length posted))
+      ;; outside the window (too far ahead, or already departed) -> nothing
+      (clrhash sb::*sent-reminders*)
+      (setf dep-offset 400)
+      (sb::scheduler-tick)
+      (is = 1 (length posted))
+      (setf dep-offset -10)
+      (sb::scheduler-tick)
+      (is = 1 (length posted))
+      ;; the window's far edge is inclusive
+      (setf dep-offset 355)
+      (sb::scheduler-tick)
+      (is = 2 (length posted))
+      ;; a trip without a parseable departure is skipped
+      (clrhash sb::*sent-reminders*)
+      (with-mocked-functions ((vb:trip-departure-universal-time (lambda (tr) (declare (ignore tr)) nil)))
+        (sb::scheduler-tick)
+        (is = 2 (length posted))))
+    ;; errors for one subscription are logged, not raised
+    (with-mocked-functions ((db:all-slack-subscriptions (lambda () '(("U1" . "BW"))))
+                            (vb:trips-for-driver-today (lambda (initial) (declare (ignore initial))
+                                                         (error "sheet unavailable"))))
+      (let ((*error-output* (make-string-output-stream)))
+        (finish (sb::scheduler-tick))
+        (true (search "sheet unavailable" (get-output-stream-string *error-output*)))))))
+
+(define-test reminder-key-shape
+  :parent slack-bot-suite
+  (let ((a (vb:make-trip :vehicle :dgh :block-start-row 3))
+        (b (vb:make-trip :vehicle :lgh :block-start-row 3))
+        (c (vb:make-trip :vehicle :dgh :block-start-row 18)))
+    (is equal (sb::reminder-key "U1" a) (sb::reminder-key "U1" a))
+    (false (equal (sb::reminder-key "U1" a) (sb::reminder-key "U2" a)))
+    (false (equal (sb::reminder-key "U1" a) (sb::reminder-key "U1" b)))
+    (false (equal (sb::reminder-key "U1" a) (sb::reminder-key "U1" c)))
+    (is = (sb::today-date-key) (fourth (sb::reminder-key "U1" a)))))

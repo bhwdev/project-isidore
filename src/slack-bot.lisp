@@ -12,6 +12,8 @@
   (:import-from #:flexi-streams)
   (:import-from #:ironclad)
   (:import-from #:quri)
+  (:import-from #:project-isidore/booking-nlp
+                #:booking-incomplete)
   (:import-from #:project-isidore/van-booking
                 #:book-natural
                 #:view-schedule
@@ -38,7 +40,12 @@ Provides a Lack middleware that serves two endpoints:
   POST /slack/commands — Slash commands /book, /view, /subscribe,
                          /unsubscribe, /help.
 
-A persistent /subscribe registry (rucksack-backed via project-isidore/database)
+Booking requests are free-form English (see project-isidore/booking-nlp).
+When a required piece is missing, the BOOKING-INCOMPLETE report is posted
+back: it lists what was understood and asks the user to re-send the request
+with the missing piece.
+
+A persistent /subscribe registry (graph-db-backed via project-isidore/database)
 plus an in-process scheduler thread DMs subscribed drivers 5 minutes before
 each of their trips.
 
@@ -114,21 +121,25 @@ If CHANNEL evaluates to NIL, error reports are suppressed (only logged)."
              (report-error ,c)))))))
 
 (defparameter +help-text+
-  "*Van Booking Bot* — DM me or @mention me with a natural-language booking.
+  "*Van Booking Bot* — DM me, @mention me, or use `/book` with a plain-English request.
 
-Required pieces (order-free):
-  • *destination* — e.g. `for swimming`, `for haircut`
-  • *day* — e.g. `tomorrow`, `next Tuesday`, `April 22`
-  • *passengers* — uppercase 2-3 letter initials, e.g. `for CG and BW`
-  • *times* — e.g. `at 7 pm to 9 pm`, `from 8am to 10am`
-  • *vehicle* (optional) — `use DGH`, `use LGH`, `use Chevy`, `use Personal`
+I look for these pieces, in any order and any wording:
+  • *destination* — `for swimming`, `to the dentist`, `the SHMS trip`
+  • *day* — `tomorrow`, `next Tuesday`, `April 22`, `Thursday's`
+  • *passengers* — uppercase 2-3 letter initials: `for CG and BW`, `with MM, DM & CG`
+  • *times* — `at 7 pm to 9 pm`, `leaving at 8:30 and back around 11`, `7-9pm`
+    Times are only needed for a new trip; to join a trip already on the sheet, leave them out.
+  • *vehicle* (optional) — just mention it: `take the DGH`, `in the LGH`, `use Chevy`, `the personal car`
 
 Examples:
   • `book a van for swimming next Tuesday for CG and BW at 7 pm to 9 pm`
-  • `I'd like to reserve the DGH for a haircut from 12:30pm to 2:30pm for GG`
-  • `going to swimming tomorrow for CG 8am to 10am`
+  • `Can BW and MM take the DGH to the dentist tomorrow morning, leaving at 8:30 and back around 11?`
+  • `add GG to the SHMS trip on Thursday`
+  • `We need the van Friday, going to Saint Marys church with MM DM and CG, out at 9 and home by noon`
 
-Type `help` or `/help` anytime to see this message."
+If something is missing I reply with what I understood and ask you to re-send the request with the missing piece.
+
+Other commands: `/view [date range]`, `/subscribe <INITIAL>`, `/unsubscribe`, `/help`."
   "User-facing help string for the Slack bot.")
 
 ;;; Signature Verification
@@ -193,31 +204,43 @@ fail silently."
   "Strip leading Slack bot mention (<@U...>) from TEXT."
   (string-trim '(#\Space) (cl-ppcre:regex-replace "^<@[A-Z0-9]+>\\s*" text "")))
 
+(defun run-booking (text)
+  "Run BOOK-NATURAL on TEXT and return the reply to post.  The captured output
+is the reply; a BOOKING-INCOMPLETE condition becomes its own report, which
+asks the user to re-send the request with the missing pieces.  Other errors
+propagate to the caller."
+  (handler-case
+      (let ((output (with-output-to-string (*standard-output*)
+                      (book-natural text))))
+        (if (plusp (length (string-trim '(#\Space #\Newline) output)))
+            output
+            "Booking processed (no output)."))
+    (booking-incomplete (c)
+      (princ-to-string c))))
+
 (defun handle-message-event (event)
   "Process a Slack message event. Runs book-natural and posts the result back.
 Ignores bot messages to prevent loops. Recognizes `help`/`/help`/`?` as a
-request for usage docs. On book-natural failure, replies with the condition
-class as an error code and a pointer to `/help`."
+request for usage docs. A BOOKING-INCOMPLETE condition is posted as-is (it
+asks the user to re-send the request with the missing pieces); any other
+failure is reported with the condition class as an error code and a pointer
+to `/help`. Returns the worker thread, or NIL when the event was ignored."
   (let ((text (gethash "text" event))
         (channel (gethash "channel" event))
         (bot-id (gethash "bot_id" event))
         (subtype (gethash "subtype" event)))
     (when (or bot-id subtype (null text) (null channel))
-      (return-from handle-message-event))
+      (return-from handle-message-event nil))
     (let ((clean-text (strip-mention text)))
       (when (zerop (length (string-trim '(#\Space) clean-text)))
-        (return-from handle-message-event))
+        (return-from handle-message-event nil))
       (when (member clean-text '("help" "/help" "?")
                     :test #'string-equal)
         (post-slack-message channel +help-text+)
-        (return-from handle-message-event))
+        (return-from handle-message-event nil))
       (with-slack-error-reply (channel :context "Booking"
                                        :thread-name "slack-booking")
-        (let ((output (with-output-to-string (*standard-output*)
-                        (book-natural clean-text))))
-          (if (plusp (length (string-trim '(#\Space #\Newline) output)))
-              (post-slack-message channel output)
-              (post-slack-message channel "Booking processed (no output).")))))))
+        (post-slack-message channel (run-booking clean-text))))))
 
 ;;; Lack Middleware
 
@@ -296,20 +319,21 @@ Verifies the signature, dispatches on event type, returns an appropriate respons
     (and m m)))
 
 (defslash-command "/book" (params)
-  "/book <natural language> — book a trip. Example:
+  "/book <plain-English request> — book a trip or join one already on the sheet.
+Examples:
   /book a van for swimming next Tuesday for CG and BW at 7 pm to 9 pm
-Required pieces (order-free): destination (for X), day (tomorrow, next Tue),
-passengers (for BW and CG), times (at 7pm to 9pm). Optional: use DGH/LGH/Chevy."
+  /book Can BW and MM take the DGH to the dentist tomorrow, leaving at 8:30 and back around 11?
+  /book add GG to the SHMS trip on Thursday
+Needed, in any order: destination, day, passengers (uppercase initials).
+Times (departure and return) are needed only when no matching trip exists.
+Optional: mention a vehicle (DGH, LGH, Chevy, personal car).
+If a piece is missing, the reply says what was understood and asks you to
+re-send the request including it."
   (let ((text (gethash "text" params)))
     (when (or (null text) (zerop (length (string-trim '(#\Space) text))))
       (return-from cmd-book
-        "Usage: /book a van for <destination> <day> for <INITIALS> at <dep> to <ret>"))
-    (handler-case
-        (let ((out (with-output-to-string (*standard-output*)
-                     (book-natural text))))
-          (if (plusp (length (string-trim '(#\Space #\Newline) out)))
-              out
-              "Booking processed (no output)."))
+        "Usage: /book <plain-English request>, e.g. /book take the DGH to the dentist tomorrow for BW, leaving at 8:30 and back by 11"))
+    (handler-case (run-booking text)
       (error (c)
         (format nil "Booking failed [~A]: ~A~%Type `/help` for usage."
                 (type-of c) c)))))

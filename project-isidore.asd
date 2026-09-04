@@ -13,6 +13,37 @@
   (when variance
     (pushnew variance uiop/lisp-build:*uninteresting-conditions*)))
 
+;; cl-stdutils (a dependency of langutils, used by project-isidore/nlp) bundles
+;; an ancient copy of split-sequence whose DEFPACKAGE also exports PARTITION,
+;; PARTITION-IF and PARTITION-IF-NOT.  Those exports clash with
+;; SERAPEUM:PARTITION inside SERAPEUM/BUNDLE (which re-exports both serapeum
+;; and split-sequence) whichever of serapeum or stdutils loads first.  The two
+;; PERFORM methods below resolve the clash around that one file: before it
+;; loads, SERAPEUM/BUNDLE (if it already exists) keeps serapeum's PARTITION
+;; explicitly; after it loads, the stray exports are removed so a later
+;; serapeum load sees the split-sequence 2.x API it expects.
+(defun stdutils-split-sequence-file-p (component)
+  (and (typep component 'asdf:cl-source-file)
+       (string= (asdf:component-name component) "split-sequence")
+       (string-equal (asdf:component-name (asdf:component-system component)) "stdutils")))
+
+(defmethod asdf:perform :before ((op asdf:load-op) (component asdf:cl-source-file))
+  (when (stdutils-split-sequence-file-p component)
+    (let ((bundle (find-package "SERAPEUM/BUNDLE"))
+          (partition (and (find-package "SERAPEUM")
+                          (find-symbol "PARTITION" "SERAPEUM"))))
+      (when (and bundle partition)
+        (shadowing-import partition bundle)))))
+
+(defmethod asdf:perform :after ((op asdf:load-op) (component asdf:cl-source-file))
+  (when (stdutils-split-sequence-file-p component)
+    (let ((package (find-package "SPLIT-SEQUENCE")))
+      (when package
+        (dolist (name '("PARTITION" "PARTITION-IF" "PARTITION-IF-NOT"))
+          (let ((symbol (find-symbol name package)))
+            (when symbol
+              (unexport symbol package))))))))
+
 (asdf:defsystem "project-isidore"
   :name "Project Isidore"
   :version "1.2.2"
@@ -42,12 +73,16 @@
   :class :package-inferred-system
   :pathname "src/tests"
   :depends-on ("project-isidore/tests/tests"
+               "project-isidore/tests/nlp-tests"
+               "project-isidore/tests/booking-nlp-tests"
                "project-isidore/tests/slack-bot-tests"
                "project-isidore/tests/van-booking-tests"
                )
   :perform (asdf:test-op
             (op c)
             (uiop:symbol-call :parachute :test :project-isidore/tests/tests)
+            (uiop:symbol-call :parachute :test :project-isidore/tests/nlp-tests)
+            (uiop:symbol-call :parachute :test :project-isidore/tests/booking-nlp-tests)
             (uiop:symbol-call :parachute :test :project-isidore/tests/slack-bot-tests)
             (uiop:symbol-call :parachute :test :project-isidore/tests/van-booking-tests)
             ))

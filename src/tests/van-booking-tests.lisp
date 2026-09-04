@@ -3,9 +3,17 @@
 
 (uiop:define-package #:project-isidore/tests/van-booking-tests
   (:use #:common-lisp #:parachute #:project-isidore/van-booking)
-  (:local-nicknames (#:vb #:project-isidore/van-booking))
+  (:local-nicknames (#:vb #:project-isidore/van-booking)
+                    (#:bn #:project-isidore/booking-nlp))
+  (:import-from #:project-isidore/tests/test-utils #:with-mocked-functions)
+  (:import-from #:chronicity)
+  (:import-from #:com.inuoe.jzon)
+  (:import-from #:dexador)
   (:documentation
-   ""))
+   "Parachute tests for project-isidore/van-booking: sheet parsing, trip
+lookup, booking writes (with the Google Sheets calls mocked), the
+BOOK-NATURAL front end, reminders and the schedule view.  Natural-language
+parsing itself is covered in booking-nlp-tests."))
 
 (in-package #:project-isidore/tests/van-booking-tests)
 
@@ -233,42 +241,51 @@
 
 ;;; --- Unit tests: find-trips ---
 
+(defun sample-trips ()
+  "Four trips over three days for the FIND-TRIPS tests."
+  (list (make-trip :day "Monday April 20" :vehicle :dgh
+                   :destination "SHMS" :departure "8 am")
+        (make-trip :day "Monday April 20" :vehicle :lgh
+                   :destination "Shrine" :departure "5 pm")
+        (make-trip :day "Tuesday April 21" :vehicle :dgh
+                   :destination "SHMS" :departure "10 am")
+        (make-trip :day "Wednesday April 22" :vehicle :chevy
+                   :destination "" :departure "")))
+
 (define-test find-trips
-    (let* ((trips (list (make-trip :day "Monday April 20" :vehicle :dgh
-                                   :destination "SHMS" :departure "8 am")
-                        (make-trip :day "Monday April 20" :vehicle :lgh
-                                   :destination "Shrine" :departure "5 pm")
-                        (make-trip :day "Tuesday April 21" :vehicle :dgh
-                                   :destination "SHMS" :departure "10 am")
-                        (make-trip :day "Wednesday April 22" :vehicle :chevy
-                                   :destination "" :departure ""))))
+  (define-test filter-by-day
+    (let ((trips (sample-trips)))
+      (is = 2 (length (vb::find-trips trips :day "Monday")))
+      (is = 1 (length (vb::find-trips trips :day "Tuesday")))
+      (is = 0 (length (vb::find-trips trips :day "Thursday")))))
 
-      (define-test filter-by-day
-          (is = 2 (length (vb::find-trips trips :day "Monday")))
-        (is = 1 (length (vb::find-trips trips :day "Tuesday")))
-        (is = 0 (length (vb::find-trips trips :day "Thursday"))))
+  (define-test filter-by-destination
+    (let ((trips (sample-trips)))
+      (is = 2 (length (vb::find-trips trips :destination "SHMS")))
+      (is = 1 (length (vb::find-trips trips :destination "Shrine")))))
 
-      (define-test filter-by-destination
-          (is = 2 (length (vb::find-trips trips :destination "SHMS")))
-        (is = 1 (length (vb::find-trips trips :destination "Shrine"))))
+  (define-test filter-both
+    (let ((trips (sample-trips)))
+      (is = 1 (length (vb::find-trips trips :day "Monday" :destination "SHMS")))
+      (is = 0 (length (vb::find-trips trips :day "Tuesday" :destination "Shrine")))))
 
-      (define-test filter-both
-          (is = 1 (length (vb::find-trips trips :day "Monday" :destination "SHMS")))
-        (is = 0 (length (vb::find-trips trips :day "Tuesday" :destination "Shrine"))))
+  (define-test find-trips-case-insensitive
+    (let ((trips (sample-trips)))
+      (is = 2 (length (vb::find-trips trips :destination "shms")))
+      (is = 1 (length (vb::find-trips trips :day "monday" :destination "shrine")))))
 
-      (define-test case-insensitive
-          (is = 2 (length (vb::find-trips trips :destination "shms")))
-        (is = 1 (length (vb::find-trips trips :day "monday" :destination "shrine"))))
+  (define-test substring-match
+    (let ((trips (sample-trips)))
+      (is = 2 (length (vb::find-trips trips :day "April 20")))
+      ;; a bare "April 2" is a prefix of every April 2x day
+      (is = 4 (length (vb::find-trips trips :day "April 2")))
+      (is = 1 (length (vb::find-trips trips :destination "Shr")))))
 
-      (define-test substring-match
-          (is = 2 (length (vb::find-trips trips :day "April 2")))
-        (is = 1 (length (vb::find-trips trips :destination "Shr"))))
+  (define-test no-filters
+    (is = 4 (length (vb::find-trips (sample-trips)))))
 
-      (define-test no-filters
-          (is = 4 (length (vb::find-trips trips))))
-
-      (define-test empty-dest-excluded
-          (is = 0 (length (vb::find-trips trips :destination ""))))))
+  (define-test empty-dest-excluded
+    (is = 0 (length (vb::find-trips (sample-trips) :destination "")))))
 
 ;;; --- Unit tests: find-empty-slot ---
 
@@ -290,45 +307,49 @@
   (define-test empty-input
       (is equal '() (vb::filter-new-passengers '() '("X")))))
 
+(defun slot-trips ()
+  "One Monday with the DGH taken and the other vehicles free."
+  (list (make-trip :day "Monday April 20" :vehicle :dgh
+                   :destination "SHMS" :departure "8 am")
+        (make-trip :day "Monday April 20" :vehicle :lgh
+                   :destination "" :departure "")
+        (make-trip :day "Monday April 20" :vehicle :chevy
+                   :destination "" :departure "")
+        (make-trip :day "Monday April 20" :vehicle :personal
+                   :destination "" :departure "")))
+
 (define-test find-empty-slot
-    (let* ((trips (list (make-trip :day "Monday April 20" :vehicle :dgh
-                                   :destination "SHMS" :departure "8 am")
-                        (make-trip :day "Monday April 20" :vehicle :lgh
-                                   :destination "" :departure "")
-                        (make-trip :day "Monday April 20" :vehicle :chevy
-                                   :destination "" :departure "")
-                        (make-trip :day "Monday April 20" :vehicle :personal
-                                   :destination "" :departure ""))))
+  (define-test auto-priority
+    ;; DGH is taken, should pick LGH (next in priority)
+    (let ((slot (vb::find-empty-slot (slot-trips) "Monday")))
+      (true slot)
+      (is eq :lgh (trip-vehicle slot))))
 
-      (define-test auto-priority
-          ;; DGH is taken, should pick LGH (next in priority)
-          (let ((slot (vb::find-empty-slot trips "Monday")))
-            (true slot)
-            (is eq :lgh (trip-vehicle slot))))
+  (define-test preferred-vehicle
+    (let ((slot (vb::find-empty-slot (slot-trips) "Monday" :chevy)))
+      (true slot)
+      (is eq :chevy (trip-vehicle slot))))
 
-      (define-test preferred-vehicle
-          (let ((slot (vb::find-empty-slot trips "Monday" :chevy)))
-            (true slot)
-            (is eq :chevy (trip-vehicle slot))))
+  (define-test preferred-taken
+    ;; DGH is taken
+    (false (vb::find-empty-slot (slot-trips) "Monday" :dgh)))
 
-      (define-test preferred-taken
-          ;; DGH is taken
-          (false (vb::find-empty-slot trips "Monday" :dgh)))
+  (define-test personal-not-auto
+    ;; Personal should not be auto-selected even though it's empty
+    (let ((all-taken (list (make-trip :day "Monday" :vehicle :dgh
+                                      :destination "X" :departure "8")
+                           (make-trip :day "Monday" :vehicle :lgh
+                                      :destination "Y" :departure "9")
+                           (make-trip :day "Monday" :vehicle :chevy
+                                      :destination "Z" :departure "10")
+                           (make-trip :day "Monday" :vehicle :personal
+                                      :destination "" :departure ""))))
+      (false (vb::find-empty-slot all-taken "Monday"))
+      ;; ... unless asked for explicitly
+      (is eq :personal (trip-vehicle (vb::find-empty-slot all-taken "Monday" :personal)))))
 
-      (define-test personal-not-auto
-          ;; Personal should not be auto-selected even though it's empty
-          (let* ((all-taken (list (make-trip :day "Monday" :vehicle :dgh
-                                             :destination "X" :departure "8")
-                                  (make-trip :day "Monday" :vehicle :lgh
-                                             :destination "Y" :departure "9")
-                                  (make-trip :day "Monday" :vehicle :chevy
-                                             :destination "Z" :departure "10")
-                                  (make-trip :day "Monday" :vehicle :personal
-                                             :destination "" :departure ""))))
-            (false (vb::find-empty-slot all-taken "Monday"))))
-
-      (define-test wrong-day
-          (false (vb::find-empty-slot trips "Tuesday")))))
+  (define-test wrong-day
+    (false (vb::find-empty-slot (slot-trips) "Tuesday"))))
 
 ;;; --- Unit tests: print-trip ---
 
@@ -452,598 +473,6 @@
 
 ;;; --- Run all tests ---
 
-(define-test book-natural-tests
-
-    (define-test format-time-12h
-        (is string= "12:00 am" (vb::format-time-12h 0 0))
-      (is string= "12:00 pm" (vb::format-time-12h 12 0))
-      (is string= "7:00 pm"  (vb::format-time-12h 19 0))
-      (is string= "11:30 am" (vb::format-time-12h 11 30))
-      (is string= "1:05 pm"  (vb::format-time-12h 13 5)))
-
-  (define-test parse-passenger-initials
-      (is equal '("CG" "BW") (vb::parse-passenger-initials "CG and BW"))
-    (is equal '("MM" "DM" "CG") (vb::parse-passenger-initials "MM, DM and CG"))
-    (is equal '("MM") (vb::parse-passenger-initials "MM"))
-    (is equal '() (vb::parse-passenger-initials "no initials here")))
-
-  (define-test parse-booking-text
-      ;; canonical sentence
-      (multiple-value-bind (dest day pax dep ret)
-          (vb::parse-booking-text
-           "I want to book a van for swimming next week Tuesday for CG and BW at seven PM to nine PM")
-        (is string= "swimming" dest)
-        (true (search "tuesday" (string-downcase day)))
-        (is string= "CG and BW" pax)
-        (true (search "seven" (string-downcase dep)))
-        (true (search "nine" (string-downcase ret))))
-    ;; tomorrow
-    (multiple-value-bind (dest day pax dep ret)
-        (vb::parse-booking-text "book for pool tomorrow for MM at 8 am to 10 am")
-      (is string= "pool" dest)
-      (is string= "tomorrow" (string-downcase day))
-      (is string= "MM" pax)
-      (is string= "8 am" dep)
-      (is string= "10 am" ret))
-    ;; multi-word destination
-    (multiple-value-bind (dest day pax dep ret)
-        (vb::parse-booking-text "for the pool next Friday for BW at 9 am to 11 am")
-      (declare (ignore pax dep ret))
-      (is string= "the pool" dest)
-      (true (search "friday" (string-downcase day))))
-    ;; no match
-    (false (vb::parse-booking-text "no structure here")))
-
-  (define-test normalize-booking-text
-      ;; "from X to Y" → "at X to Y"
-      (true (search "at seven PM to"
-                    (vb::normalize-booking-text
-                     "for swimming tomorrow for CG from seven PM to nine PM")))
-    ;; "starting at" → "at"
-    (true (search "at 8 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM starting at 8 am to 10 am")))
-    ;; "starting" (without "at") → "at"
-    (true (search "at 8 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM starting 8 am to 10 am")))
-    ;; "departing" → "at"
-    (true (search "at 8 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM departing 8 am to 10 am")))
-    ;; "leaving at" → "at"
-    (true (search "at 8 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM leaving at 8 am to 10 am")))
-    ;; "leaving" → "at"
-    (true (search "at 8 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM leaving 8 am to 10 am")))
-    ;; "beginning at" → "at"
-    (true (search "at 8 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM beginning at 8 am to 10 am")))
-    ;; "going at" → "at"
-    (true (search "at 8 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM going at 8 am to 10 am")))
-    ;; "picking up at" → "at"
-    (true (search "at 8 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM picking up at 8 am to 10 am")))
-    ;; "pickup at" → "at"
-    (true (search "at 8 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM pickup at 8 am to 10 am")))
-    ;; "until" → "to"
-    (true (search "to 10 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM at 8 am until 10 am")))
-    ;; "till" → "to"
-    (true (search "to 10 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM at 8 am till 10 am")))
-    ;; "through" → "to"
-    (true (search "to 10 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM at 8 am through 10 am")))
-    ;; "returning at" → "to"
-    (true (search "to 10 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM at 8 am returning at 10 am")))
-    ;; "returning by" → "to"
-    (true (search "to 10 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM at 8 am returning by 10 am")))
-    ;; "ending at" → "to"
-    (true (search "to 10 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM at 8 am ending at 10 am")))
-    ;; "back by" → "to"
-    (true (search "to 10 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM at 8 am back by 10 am")))
-    ;; "back at" → "to"
-    (true (search "to 10 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM at 8 am back at 10 am")))
-    ;; "dropping off at" → "to"
-    (true (search "to 10 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM at 8 am dropping off at 10 am")))
-    ;; "dropoff at" → "to"
-    (true (search "to 10 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM at 8 am dropoff at 10 am")))
-    ;; "with PAX" → "for PAX"
-    (true (search "for CG"
-                  (vb::normalize-booking-text
-                   "for swimming tomorrow with CG at 8 am to 10 am")))
-    ;; "carrying PAX" → "for PAX"
-    (true (search "for CG"
-                  (vb::normalize-booking-text
-                   "for swimming tomorrow carrying CG at 8 am to 10 am")))
-    ;; "taking PAX" → "for PAX"
-    (true (search "for CG"
-                  (vb::normalize-booking-text
-                   "for swimming tomorrow taking CG at 8 am to 10 am")))
-    ;; "bringing PAX" → "for PAX"
-    (true (search "for CG"
-                  (vb::normalize-booking-text
-                   "for swimming tomorrow bringing CG at 8 am to 10 am")))
-    ;; "passengers PAX" → "for PAX"
-    (true (search "for CG"
-                  (vb::normalize-booking-text
-                   "for swimming tomorrow passengers CG at 8 am to 10 am")))
-    ;; idempotent on canonical form
-    (let ((canonical "for swimming tomorrow for CG at 8 am to 10 am"))
-      (is string= canonical (vb::normalize-booking-text canonical))))
-
-  (define-test parse-booking-text-flexible
-      ;; "from ... to" instead of "at ... to"
-      (multiple-value-bind (dest day pax dep ret)
-          (vb::parse-booking-text
-           "book for swimming tomorrow for CG from seven PM to nine PM")
-        (is string= "swimming" dest)
-        (is string= "tomorrow" (string-downcase day))
-        (is string= "CG" pax)
-        (true (search "seven" (string-downcase dep)))
-        (true (search "nine" (string-downcase ret))))
-    ;; "leaving ... until"
-    (multiple-value-bind (dest day pax dep ret)
-        (vb::parse-booking-text
-         "for pool tomorrow for MM leaving 8 am until 10 am")
-      (is string= "pool" dest)
-      (is string= "8 am" dep)
-      (is string= "10 am" ret))
-    ;; "starting at ... till"
-    (multiple-value-bind (dest day pax dep ret)
-        (vb::parse-booking-text
-         "for pool tomorrow for MM starting at 8 am till 10 am")
-      (is string= "pool" dest)
-      (is string= "8 am" dep)
-      (is string= "10 am" ret))
-    ;; "with" as passenger introducer
-    (multiple-value-bind (dest day pax dep ret)
-        (vb::parse-booking-text
-         "for swimming tomorrow with CG at 8 am to 10 am")
-      (is string= "swimming" dest)
-      (is string= "CG" pax)
-      (is string= "8 am" dep))
-    ;; "carrying" as passenger introducer
-    (multiple-value-bind (dest day pax dep ret)
-        (vb::parse-booking-text
-         "for swimming tomorrow carrying CG at 8 am to 10 am")
-      (is string= "swimming" dest)
-      (is string= "CG" pax))
-    ;; mixed: "taking PAX ... from X to Y"
-    (multiple-value-bind (dest day pax dep ret)
-        (vb::parse-booking-text
-         "book for swimming tomorrow taking CG from 8 am to 10 am")
-      (is string= "swimming" dest)
-      (is string= "CG" pax)
-      (is string= "8 am" dep)
-      (is string= "10 am" ret))
-    ;; "back by" as return-time introducer
-    (multiple-value-bind (dest day pax dep ret)
-        (vb::parse-booking-text
-         "for pool tomorrow for MM at 8 am back by 10 am")
-      (is string= "pool" dest)
-      (is string= "8 am" dep)
-      (is string= "10 am" ret)))
-
-  (define-test book-natural-calls-book
-      ;; Verify book-natural parses NL text and calls book with correctly shaped args.
-      ;; Mocks book to avoid network calls.
-      (let ((original (symbol-function 'vb::book))
-            (book-args nil))
-        (unwind-protect
-             (progn
-               (setf (symbol-function 'vb::book)
-                     (lambda (day dest pax &key dep-time ret-time vehicle week)
-                       (declare (ignore vehicle week))
-                       (setf book-args (list :day day :dest dest :pax pax
-                                             :dep dep-time :ret ret-time))))
-               (vb:book-natural
-                "I want to book a van for swimming next week Tuesday for CG and BW at seven PM to nine PM")
-               (is string= "swimming" (getf book-args :dest))
-               (is equal '("CG" "BW") (getf book-args :pax))
-               ;; day format: "DayName MonthName DayNum"
-               (true (cl-ppcre:scan "^\\w+ \\w+ \\d+$" (getf book-args :day)))
-               ;; time format: "H:MM am/pm"
-               (true (cl-ppcre:scan "^\\d+:\\d{2} [ap]m$" (getf book-args :dep)))
-               (true (cl-ppcre:scan "^\\d+:\\d{2} [ap]m$" (getf book-args :ret))))
-          (setf (symbol-function 'vb::book) original)))))
-
-(define-test all-initials-p
-    (define-test single-initial
-        (true (vb::all-initials-p "GG"))
-      (true (vb::all-initials-p "MM"))
-      (true (vb::all-initials-p "CGB")))
-
-  (define-test multiple-with-and
-      (true (vb::all-initials-p "CG and BW"))
-    (true (vb::all-initials-p "MM and DM and CG")))
-
-  (define-test multiple-with-commas
-      (true (vb::all-initials-p "MM, DM, CG"))
-    (true (vb::all-initials-p "MM, DM and CG")))
-
-  (define-test rejects-non-initials
-      (false (vb::all-initials-p "swimming"))
-    (false (vb::all-initials-p "the pool"))
-    (false (vb::all-initials-p "a haircut"))
-    (false (vb::all-initials-p "SHMS"))
-    (false (vb::all-initials-p ""))
-    (false (vb::all-initials-p "ABC store"))))
-
-(define-test parse-booking-text-order-agnostic
-    ;; dest → times → pax (user's requested example)
-    (define-test dest-times-pax
-        (multiple-value-bind (dest day pax dep ret)
-            (vb::parse-booking-text
-             "book a van for a haircut from 12:30pm to 2:30pm for GG.")
-          (is string= "a haircut" dest)
-          (is string= "today" day)
-          (is string= "GG" pax)
-          (is string= "12:30pm" dep)
-          (is string= "2:30pm" ret)))
-
-  ;; pax → dest → times
-  (define-test pax-dest-times
-      (multiple-value-bind (dest day pax dep ret)
-          (vb::parse-booking-text
-           "for CG and BW for swimming at 7 pm to 9 pm")
-        (is string= "swimming" dest)
-        (is string= "CG and BW" pax)
-        (is string= "7 pm" dep)
-        (is string= "9 pm" ret)))
-
-  ;; times → dest → pax
-  (define-test times-dest-pax
-      (multiple-value-bind (dest day pax dep ret)
-          (vb::parse-booking-text
-           "from 12:30pm to 2:30pm for a haircut for GG")
-        (is string= "a haircut" dest)
-        (is string= "GG" pax)
-        (is string= "12:30pm" dep)
-        (is string= "2:30pm" ret)))
-
-  ;; times → pax → dest
-  (define-test times-pax-dest
-      (multiple-value-bind (dest day pax dep ret)
-          (vb::parse-booking-text
-           "from 8 am to 10 am for MM for pool")
-        (is string= "pool" dest)
-        (is string= "MM" pax)
-        (is string= "8 am" dep)
-        (is string= "10 am" ret)))
-
-  ;; day can appear anywhere
-  (define-test day-before-dest
-      (multiple-value-bind (dest day pax dep ret)
-          (vb::parse-booking-text
-           "tomorrow for swimming for CG at 7 pm to 9 pm")
-        (declare (ignore dep ret))
-        (is string= "swimming" dest)
-        (is string= "tomorrow" day)
-        (is string= "CG" pax)))
-
-  (define-test day-after-times
-      (multiple-value-bind (dest day pax dep ret)
-          (vb::parse-booking-text
-           "for swimming for CG at 7 pm to 9 pm tomorrow")
-        (declare (ignore dep ret))
-        (is string= "swimming" dest)
-        (is string= "tomorrow" day)
-        (is string= "CG" pax)))
-
-  (define-test day-between-dest-and-pax
-      (multiple-value-bind (dest day pax dep ret)
-          (vb::parse-booking-text
-           "for swimming tomorrow for CG at 7 pm to 9 pm")
-        (declare (ignore dep ret))
-        (is string= "swimming" dest)
-        (is string= "tomorrow" day)
-        (is string= "CG" pax)))
-
-  ;; day defaults to today when omitted
-  (define-test day-defaults-to-today
-      (multiple-value-bind (dest day pax dep ret)
-          (vb::parse-booking-text
-           "for pool for MM at 8 am to 10 am")
-        (declare (ignore dep ret))
-        (is string= "pool" dest)
-        (is string= "today" day)
-        (is string= "MM" pax)))
-
-  ;; trailing punctuation stripped
-  (define-test trailing-period
-      (multiple-value-bind (dest day pax dep ret)
-          (vb::parse-booking-text
-           "for pool for MM at 8 am to 10 am.")
-        (declare (ignore dep))
-        (is string= "pool" dest)
-        (is string= "MM" pax)
-        (is string= "10 am" ret)))
-
-  ;; multiple passengers with comma + and
-  (define-test multiple-passengers-any-order
-      (multiple-value-bind (dest day pax dep ret)
-          (vb::parse-booking-text
-           "from 8 am to 10 am for MM, DM and CG for pool tomorrow")
-        (declare (ignore dep ret))
-        (is string= "pool" dest)
-        (is string= "tomorrow" day)
-        (is string= "MM, DM and CG" pax))))
-
-(define-test preamble-stripping
-    ;; "I need to book the van" stripped
-    (is string= "for swimming tomorrow for CG at 8 am to 10 am"
-        (vb::normalize-booking-text
-         "I need to book the van for swimming tomorrow for CG at 8 am to 10 am"))
-  ;; "can you book a van" stripped
-  (is string= "for swimming tomorrow for CG at 8 am to 10 am"
-      (vb::normalize-booking-text
-       "can you book a van for swimming tomorrow for CG at 8 am to 10 am"))
-  ;; "please reserve the van" stripped
-  (is string= "for swimming tomorrow for CG at 8 am to 10 am"
-      (vb::normalize-booking-text
-       "please reserve the van for swimming tomorrow for CG at 8 am to 10 am"))
-  ;; "I'd like to schedule a van" stripped
-  (is string= "for swimming tomorrow for CG at 8 am to 10 am"
-      (vb::normalize-booking-text
-       "I'd like to schedule a van for swimming tomorrow for CG at 8 am to 10 am"))
-  ;; "could you please book" stripped
-  (is string= "for swimming tomorrow for CG at 8 am to 10 am"
-      (vb::normalize-booking-text
-       "could you please book the van for swimming tomorrow for CG at 8 am to 10 am"))
-  ;; "I want to get the van" stripped
-  (is string= "for swimming tomorrow for CG at 8 am to 10 am"
-      (vb::normalize-booking-text
-       "I want to get the van for swimming tomorrow for CG at 8 am to 10 am"))
-  ;; just "book" with no article/van
-  (is string= "for swimming tomorrow for CG at 8 am to 10 am"
-      (vb::normalize-booking-text
-       "book for swimming tomorrow for CG at 8 am to 10 am"))
-  ;; preamble-free text unchanged
-  (is string= "for swimming tomorrow for CG at 8 am to 10 am"
-      (vb::normalize-booking-text
-       "for swimming tomorrow for CG at 8 am to 10 am")))
-
-(define-test new-return-time-introducers
-    ;; "arrive by" → "to"
-    (true (search "to 10 am"
-                  (vb::normalize-booking-text
-                   "for pool tomorrow for MM at 8 am arrive by 10 am")))
-  ;; "arrive at" → "to"
-  (true (search "to 10 am"
-                (vb::normalize-booking-text
-                 "for pool tomorrow for MM at 8 am arrive at 10 am")))
-  ;; "be back by" → "to"
-  (true (search "to 10 am"
-                (vb::normalize-booking-text
-                 "for pool tomorrow for MM at 8 am be back by 10 am")))
-  ;; "get back by" → "to"
-  (true (search "to 10 am"
-                (vb::normalize-booking-text
-                 "for pool tomorrow for MM at 8 am get back by 10 am")))
-  ;; "return by" → "to"
-  (true (search "to 10 am"
-                (vb::normalize-booking-text
-                 "for pool tomorrow for MM at 8 am return by 10 am")))
-  ;; "done by" → "to"
-  (true (search "to 10 am"
-                (vb::normalize-booking-text
-                 "for pool tomorrow for MM at 8 am done by 10 am")))
-  ;; "finished by" → "to"
-  (true (search "to 10 am"
-                (vb::normalize-booking-text
-                 "for pool tomorrow for MM at 8 am finished by 10 am")))
-  ;; full parse: "leaving 8 am be back by 10 am"
-  (multiple-value-bind (dest day pax dep ret)
-      (vb::parse-booking-text
-       "for pool tomorrow for MM leaving 8 am be back by 10 am")
-    (is string= "pool" dest)
-    (is string= "8 am" dep)
-    (is string= "10 am" ret)))
-
-(define-test destination-introducers
-    ;; "going to" → "for"
-    (true (search "for swimming"
-                  (vb::normalize-booking-text
-                   "going to swimming tomorrow for CG at 8 am to 10 am")))
-  ;; "headed to" → "for"
-  (true (search "for the pool"
-                (vb::normalize-booking-text
-                 "headed to the pool tomorrow for CG at 8 am to 10 am")))
-  ;; "heading to" → "for"
-  (true (search "for the pool"
-                (vb::normalize-booking-text
-                 "heading to the pool tomorrow for CG at 8 am to 10 am")))
-  ;; "driving to" → "for"
-  (true (search "for the store"
-                (vb::normalize-booking-text
-                 "driving to the store tomorrow for CG at 8 am to 10 am")))
-  ;; full parse: "going to swimming"
-  (multiple-value-bind (dest day pax dep ret)
-      (vb::parse-booking-text
-       "going to swimming tomorrow for CG at 8 am to 10 am")
-    (is string= "swimming" dest)
-    (is string= "CG" pax)))
-
-(define-test bare-time-fallback
-    ;; bare "8am to 10am" without introducer
-    (multiple-value-bind (dest day pax dep ret)
-        (vb::parse-booking-text
-         "for swimming tomorrow for CG 8am to 10am")
-      (is string= "swimming" dest)
-      (is string= "CG" pax)
-      (is string= "8am" dep)
-      (is string= "10am" ret))
-  ;; bare "7 pm to 9 pm"
-  (multiple-value-bind (dest day pax dep ret)
-      (vb::parse-booking-text
-       "for pool for MM 7 pm to 9 pm")
-    (is string= "pool" dest)
-    (is string= "MM" pax)
-    (is string= "7 pm" dep)
-    (is string= "9 pm" ret))
-  ;; bare with preamble: "book a van for X 8am to 10am for Y"
-  (multiple-value-bind (dest day pax dep ret)
-      (vb::parse-booking-text
-       "book a van for swimming tomorrow for CG 8am to 3pm")
-    (is string= "swimming" dest)
-    (is string= "CG" pax)
-    (is string= "8am" dep)
-    (is string= "3pm" ret)))
-
-(define-test vehicle-preference
-    ;; "take the DGH" → vehicle :DGH
-    (multiple-value-bind (dest day pax dep ret vehicle)
-        (vb::parse-booking-text
-         "for swimming tomorrow for CG at 8 am to 10 am take the DGH")
-      (is string= "swimming" dest)
-      (is string= "CG" pax)
-      (is eq :dgh vehicle))
-  ;; "use the LGH"
-  (multiple-value-bind (dest day pax dep ret vehicle)
-      (vb::parse-booking-text
-       "use the LGH for pool for MM at 8 am to 10 am")
-    (is string= "pool" dest)
-    (is eq :lgh vehicle))
-  ;; "prefer the Chevy"
-  (multiple-value-bind (dest day pax dep ret vehicle)
-      (vb::parse-booking-text
-       "for pool for MM at 8 am to 10 am prefer the Chevy")
-    (is string= "pool" dest)
-    (is eq :chevy vehicle))
-  ;; "in the DGH"
-  (multiple-value-bind (dest day pax dep ret vehicle)
-      (vb::parse-booking-text
-       "for pool for MM at 8 am to 10 am in the DGH")
-    (is string= "pool" dest)
-    (is eq :dgh vehicle))
-  ;; no vehicle → NIL
-  (multiple-value-bind (dest day pax dep ret vehicle)
-      (vb::parse-booking-text
-       "for pool for MM at 8 am to 10 am")
-    (is string= "pool" dest)
-    (false vehicle)))
-
-(define-test book-natural-expanded-integration
-    ;; Full sentence with preamble + destination introducer + vehicle + new return introducer
-    (let ((original (symbol-function 'vb::book))
-          (book-args nil))
-      (unwind-protect
-           (progn
-             (setf (symbol-function 'vb::book)
-                   (lambda (day dest pax &key dep-time ret-time vehicle week)
-                     (declare (ignore week))
-                     (setf book-args (list :day day :dest dest :pax pax
-                                           :dep dep-time :ret ret-time
-                                           :vehicle vehicle))))
-             ;; preamble + vehicle + destination introducer + return introducer
-             (vb:book-natural
-              "I'd like to reserve the DGH going to swimming tomorrow for CG leaving 8 am be back by 10 am")
-             (is string= "swimming" (getf book-args :dest))
-             (is eq :dgh (getf book-args :vehicle))
-             (is equal '("CG") (getf book-args :pax))
-             (true (cl-ppcre:scan "\\d+:\\d{2} [ap]m" (getf book-args :dep)))
-             (true (cl-ppcre:scan "\\d+:\\d{2} [ap]m" (getf book-args :ret))))
-        (setf (symbol-function 'vb::book) original)))
-  ;; Bare times with preamble
-  (let ((original (symbol-function 'vb::book))
-        (book-args nil))
-    (unwind-protect
-         (progn
-           (setf (symbol-function 'vb::book)
-                 (lambda (day dest pax &key dep-time ret-time vehicle week)
-                   (declare (ignore week))
-                   (setf book-args (list :day day :dest dest :pax pax
-                                         :dep dep-time :ret ret-time
-                                         :vehicle vehicle))))
-           (vb:book-natural "book the van for pool tomorrow for MM 8am to 3pm")
-           (is string= "pool" (getf book-args :dest))
-           (is equal '("MM") (getf book-args :pax))
-           (false (getf book-args :vehicle)))
-      (setf (symbol-function 'vb::book) original))))
-
-(define-test meridiem-normalization
-    ;; "a.m." → "am"
-    (true (search "9:30 am"
-                  (vb::normalize-booking-text
-                   "for pool for MM at 9:30 a.m. to 11:30 a.m.")))
-  ;; "p.m." → "pm"
-  (true (search "9:30 pm"
-                (vb::normalize-booking-text
-                 "for pool for MM at 9:30 p.m. to 11:30 p.m.")))
-  ;; "a.m" without trailing period
-  (true (search "9:30 am"
-                (vb::normalize-booking-text
-                 "for pool for MM at 9:30 a.m to 11:30 a.m")))
-  ;; mixed case "A.M."
-  (true (search "9:30 am"
-                (vb::normalize-booking-text
-                 "for pool for MM at 9:30 A.M. to 11:30 A.M."))))
-
-(define-test month-day-phrase
-    ;; "April 11th" extracted as day phrase
-    (multiple-value-bind (dest day pax dep ret)
-        (vb::parse-booking-text
-         "for BW for April 11th at 9:30 am to 11:30 am for seminary ordination")
-      (declare (ignore dep ret))
-      (is string= "seminary ordination" dest)
-      (true (search "april" (string-downcase day)))
-      (true (search "11" day))
-      (is string= "BW" pax))
-  ;; Abbreviated month
-  (multiple-value-bind (dest day pax dep ret)
-      (vb::parse-booking-text
-       "for pool for MM for Apr 11 at 8 am to 10 am")
-    (declare (ignore dest dep ret pax))
-    (true (search "apr" (string-downcase day)))
-    (true (search "11" day)))
-  ;; Bare day number without ordinal suffix
-  (multiple-value-bind (dest day pax dep ret)
-      (vb::parse-booking-text
-       "for pool for MM for March 30 at 8 am to 10 am")
-    (declare (ignore dest dep ret pax))
-    (true (search "march" (string-downcase day)))
-    (true (search "30" day))))
-
-(define-test book-natural-month-day-and-meridiem
-    ;; The exact input from the bug report
-    (multiple-value-bind (dest day pax dep ret)
-        (vb::parse-booking-text
-         "Book a van for BW for April 11th from 9:30 a.m. to 11:30 a.m going to seminary ordination.")
-      (is string= "seminary ordination" dest)
-      (true (search "april" (string-downcase day)))
-      (true (search "11" day))
-      (is string= "BW" pax)
-      (is string= "9:30 am" dep)
-      (is string= "11:30 am" ret)))
-
 (define-test month-abbrev-num
     (is = 1 (vb::month-abbrev-num "Jan"))
   (is = 3 (vb::month-abbrev-num "Mar"))
@@ -1059,47 +488,47 @@
   (is = 20251231 (vb::date-key (chronicity:parse "December 31 2025"))))
 
 (define-test parse-week-range
-    (define-test single-month
-        (let ((year (chronicity:year-of (chronicity:parse "today"))))
-          (multiple-value-bind (start end) (vb::parse-week-range "Apr 20-26")
-            (is = (+ (* year 10000) 420) start)
-            (is = (+ (* year 10000) 426) end))))
+  (define-test single-month
+    (let ((year (chronicity:year-of (chronicity:parse "today"))))
+      (multiple-value-bind (start end) (vb::parse-week-range "Apr 20-26")
+        (is = (+ (* year 10000) 420) start)
+        (is = (+ (* year 10000) 426) end))))
   (define-test cross-month
-      (let ((year (chronicity:year-of (chronicity:parse "today"))))
-        (multiple-value-bind (start end) (vb::parse-week-range "Mar 30-Apr 5 (Holy wk)")
-          (is = (+ (* year 10000) 330) start)
-          (is = (+ (* year 10000) 405) end))))
+    (let ((year (chronicity:year-of (chronicity:parse "today"))))
+      (multiple-value-bind (start end) (vb::parse-week-range "Mar 30-Apr 5 (Holy wk)")
+        (is = (+ (* year 10000) 330) start)
+        (is = (+ (* year 10000) 405) end))))
   (define-test trailing-whitespace
-      (let ((year (chronicity:year-of (chronicity:parse "today"))))
-        (multiple-value-bind (start end) (vb::parse-week-range "Apr 13-19 ")
-          (is = (+ (* year 10000) 413) start)
-          (is = (+ (* year 10000) 419) end))))
-  (define-test no-match
-      (multiple-value-bind (start end) (vb::parse-week-range "garbage")
-        (false start)
-        (false end))))
+    (let ((year (chronicity:year-of (chronicity:parse "today"))))
+      (multiple-value-bind (start end) (vb::parse-week-range "Apr 13-19 ")
+        (is = (+ (* year 10000) 413) start)
+        (is = (+ (* year 10000) 419) end))))
+  (define-test parse-week-range-no-match
+    (multiple-value-bind (start end) (vb::parse-week-range "garbage")
+      (false start)
+      (false end))))
 
 (define-test find-week-sheet
-    (define-test mid-week-match
-        (let* ((year (chronicity:year-of (chronicity:parse "today")))
-               (target (chronicity:parse (format nil "April 22 ~D" year))))
-          (is string= "Apr 20-26" (vb::find-week-sheet target))))
+  (define-test mid-week-match
+    (let* ((year (chronicity:year-of (chronicity:parse "today")))
+           (target (chronicity:parse (format nil "April 22 ~D" year))))
+      (is string= "Apr 20-26" (vb::find-week-sheet target))))
   (define-test boundary-match-start
-      (let* ((year (chronicity:year-of (chronicity:parse "today")))
-             (target (chronicity:parse (format nil "April 20 ~D" year))))
-        (is string= "Apr 20-26" (vb::find-week-sheet target))))
+    (let* ((year (chronicity:year-of (chronicity:parse "today")))
+           (target (chronicity:parse (format nil "April 20 ~D" year))))
+      (is string= "Apr 20-26" (vb::find-week-sheet target))))
   (define-test boundary-match-end
-      (let* ((year (chronicity:year-of (chronicity:parse "today")))
-             (target (chronicity:parse (format nil "April 26 ~D" year))))
-        (is string= "Apr 20-26" (vb::find-week-sheet target))))
+    (let* ((year (chronicity:year-of (chronicity:parse "today")))
+           (target (chronicity:parse (format nil "April 26 ~D" year))))
+      (is string= "Apr 20-26" (vb::find-week-sheet target))))
   (define-test cross-month-match
-      (let* ((year (chronicity:year-of (chronicity:parse "today")))
-             (target (chronicity:parse (format nil "April 1 ~D" year))))
-        (is string= "Mar 30-Apr 5 (Holy wk)" (vb::find-week-sheet target))))
-  (define-test no-match
-      (let* ((year (chronicity:year-of (chronicity:parse "today")))
-             (target (chronicity:parse (format nil "December 25 ~D" year))))
-        (false (vb::find-week-sheet target)))))
+    (let* ((year (chronicity:year-of (chronicity:parse "today")))
+           (target (chronicity:parse (format nil "April 1 ~D" year))))
+      (is string= "Mar 30-Apr 5 (Holy wk)" (vb::find-week-sheet target))))
+  (define-test find-week-sheet-no-match
+    (let* ((year (chronicity:year-of (chronicity:parse "today")))
+           (target (chronicity:parse (format nil "December 25 ~D" year))))
+      (false (vb::find-week-sheet target)))))
 
 (defun call-with-mock-read-range (rows thunk)
   "Run THUNK with vb::read-range stubbed to return ROWS regardless of args."
@@ -1427,8 +856,442 @@
                                        (true afternoon-pos)
                                        (true (< morning-pos afternoon-pos))))))))
 
+(define-test parse-passenger-initials
+  (is equal '("CG" "BW") (vb::parse-passenger-initials "CG and BW"))
+  (is equal '("MM" "DM" "CG") (vb::parse-passenger-initials "MM, DM and CG"))
+  (is equal '("MM") (vb::parse-passenger-initials "MM"))
+  (is equal '() (vb::parse-passenger-initials "no initials here")))
+
+(define-test trips-and-destinations
+  (define-test known-destinations-are-deduplicated
+    (is equal '("SHMS" "Shrine")
+        (vb::known-destinations
+         (list (make-trip :destination "SHMS")
+               (make-trip :destination "")
+               (make-trip :destination "Shrine")
+               (make-trip :destination "shms")
+               (make-trip :destination nil))))
+    (is equal '() (vb::known-destinations '())))
+
+  (define-test fetch-all-trips-reads-every-week
+    (let ((reads '())
+          (block (make-block "Monday April 20           Monday April 20"
+                             '(:dgh "SHMS") '(:dgh ("8 am" "10 am")) '(:dgh (("MM") ("MM"))))))
+      (with-mocked-functions ((vb::read-range (lambda (range &key sheet-name)
+                                                (declare (ignore range))
+                                                (push sheet-name reads)
+                                                (make-test-sheet block))))
+        (let ((vb::*weeks* '(("Apr 13-19 " nil) ("Apr 20-26" nil))))
+          (let ((trips (vb::fetch-all-trips)))
+            (is equal '("Apr 13-19 " "Apr 20-26") (reverse reads))
+            ;; 4 vehicles x 1 block x 2 weeks
+            (is = 8 (length trips))
+            (is equal '("Apr 13-19 " "Apr 20-26")
+                (remove-duplicates (mapcar #'trip-sheet-name trips) :test #'string= :from-end t))))
+        (setf reads '())
+        (let ((trips (vb::fetch-all-trips :week "Apr 6-12")))
+          (is equal '("Apr 6-12") reads)
+          (is = 4 (length trips)))))))
+
+(defun sheet-with-shms ()
+  "A one-block sheet for \"Thursday April 9\" with MM on the DGH SHMS trip."
+  (make-test-sheet
+   (make-block "Thursday April 9           Thursday April 9"
+               '(:dgh "SHMS") '(:dgh ("8:35 am" "10:30 am")) '(:dgh (("MM") ("MM"))))))
+
+(defun empty-sheet ()
+  "A one-block sheet for \"Thursday April 9\" with every vehicle free."
+  (make-test-sheet
+   (make-block "Thursday April 9           Thursday April 9" '() '() '())))
+
+(defun call-recording-writes (thunk)
+  "Run THUNK with WRITE-RANGE mocked and *STANDARD-OUTPUT* captured.
+Returns (values OUTPUT WRITES); WRITES is a list of (range values sheet-name)
+in call order."
+  (let ((writes '()))
+    (let ((out (with-output-to-string (*standard-output*)
+                 (with-mocked-functions ((vb::write-range
+                                          (lambda (range values &key sheet-name)
+                                            (push (list range values sheet-name) writes))))
+                   (funcall thunk)))))
+      (values out (nreverse writes)))))
+
+(define-test book-tests
+  ;; Fixtures (see SHEET-WITH-SHMS / EMPTY-SHEET): one block for
+  ;; "Thursday April 9" starting at sheet row 3.  DGH occupies columns F (dep)
+  ;; and G (ret); passengers start at row 7.
+  (define-test joins-existing-trip-without-times
+    (let ((trips (vb::parse-schedule (sheet-with-shms) :sheet-name "test-sheet")))
+      (multiple-value-bind (out writes)
+          (call-recording-writes
+           (lambda () (vb:book "Thursday April 9" "SHMS" '("GG") :trips trips)))
+        (true (search "Found 1 existing trip" out))
+        ;; MM already occupies row 7, so GG goes to row 8 in both columns
+        (is equal '(("F8:F8" (("GG")) "test-sheet")
+                    ("G8:G8" (("GG")) "test-sheet"))
+            writes))))
+
+  (define-test trips-argument-skips-the-sheet-read
+    (let ((trips (vb::parse-schedule (sheet-with-shms) :sheet-name "test-sheet"))
+          (read-called nil))
+      (with-mocked-functions ((vb::read-range (lambda (range &key sheet-name)
+                                                (declare (ignore range sheet-name))
+                                                (setf read-called t)
+                                                nil)))
+        (call-recording-writes
+         (lambda () (vb:book "Thursday April 9" "SHMS" '("GG") :trips trips)))
+        (false read-called))))
+
+  (define-test week-argument-reads-one-sheet
+    (let ((reads '()))
+      (with-mocked-functions ((vb::read-range (lambda (range &key sheet-name)
+                                                (declare (ignore range))
+                                                (push sheet-name reads)
+                                                (sheet-with-shms))))
+        (multiple-value-bind (out writes)
+            (call-recording-writes
+             (lambda () (vb:book "Thursday April 9" "SHMS" '("GG") :week "Apr 6-12")))
+          (declare (ignore out))
+          (is equal '("Apr 6-12") reads)
+          (is equal '("F8:F8" "G8:G8") (mapcar #'first writes))
+          (is equal '("Apr 6-12" "Apr 6-12") (mapcar #'third writes))))))
+
+  (define-test creates-new-booking-with-times
+    (let ((trips (vb::parse-schedule (empty-sheet) :sheet-name "test-sheet")))
+      (multiple-value-bind (out writes)
+          (call-recording-writes
+           (lambda ()
+             (vb:book "Thursday April 9" "Dentist" '("BW" "CG")
+                      :dep-time "8:00 am" :ret-time "10:00 am" :trips trips)))
+        (true (search "Created DGH booking" out))
+        (is equal '(("F4" (("Dentist")) "test-sheet")
+                    ("F6" (("8:00 am")) "test-sheet")
+                    ("G6" (("10:00 am")) "test-sheet")
+                    ("F7:F8" (("BW") ("CG")) "test-sheet")
+                    ("G7:G8" (("BW") ("CG")) "test-sheet"))
+            writes))))
+
+  (define-test vehicle-override-uses-that-vehicles-columns
+    (let ((trips (vb::parse-schedule (empty-sheet) :sheet-name "test-sheet")))
+      (multiple-value-bind (out writes)
+          (call-recording-writes
+           (lambda ()
+             (vb:book "Thursday April 9" "Dentist" '("BW")
+                      :dep-time "8:00 am" :ret-time "10:00 am"
+                      :vehicle :chevy :trips trips)))
+        (true (search "Created CHEVY booking" out))
+        (is equal '("C4" "C6" "D6" "C7:C7" "D7:D7") (mapcar #'first writes)))))
+
+  (define-test missing-both-times-signals-booking-incomplete
+    (let* ((trips (vb::parse-schedule (empty-sheet) :sheet-name "test-sheet"))
+           (c (handler-case
+                  (progn (vb:book "Thursday April 9" "Dentist" '("BW") :trips trips) nil)
+                (bn:booking-incomplete (c) c))))
+      (true c)
+      (is equal '(:dep-time :ret-time) (bn:booking-incomplete-missing c))
+      (is string= "Dentist" (getf (bn:booking-incomplete-understood c) :destination))
+      (is string= "Thursday April 9" (getf (bn:booking-incomplete-understood c) :day))
+      (is equal '("BW") (getf (bn:booking-incomplete-understood c) :passengers))
+      (true (search "No existing trip to Dentist on Thursday April 9"
+                    (bn:booking-incomplete-preamble c)))
+      (true (search "Please re-send" (princ-to-string c)))))
+
+  (define-test missing-one-time-names-only-that-one
+    (let* ((trips (vb::parse-schedule (empty-sheet) :sheet-name "test-sheet"))
+           (c (handler-case
+                  (progn (vb:book "Thursday April 9" "Dentist" '("BW")
+                                  :dep-time "8:00 am" :vehicle :lgh :trips trips)
+                         nil)
+                (bn:booking-incomplete (c) c))))
+      (is equal '(:ret-time) (bn:booking-incomplete-missing c))
+      (is string= "8:00 am" (getf (bn:booking-incomplete-understood c) :dep-time))
+      (is eq :lgh (getf (bn:booking-incomplete-understood c) :vehicle))))
+
+  (define-test no-empty-slot-reports-and-returns-nil
+    (let* ((sheet (make-test-sheet
+                   (make-block "Thursday April 9           Thursday April 9"
+                               '(:dgh "A" :lgh "B" :chevy "C")
+                               '(:dgh ("8 am" "9 am") :lgh ("8 am" "9 am") :chevy ("8 am" "9 am"))
+                               '(:dgh (("MM") ("MM")) :lgh (("DM") ("DM")) :chevy (("CG") ("CG"))))))
+           (trips (vb::parse-schedule sheet :sheet-name "test-sheet")))
+      (multiple-value-bind (out writes)
+          (call-recording-writes
+           (lambda ()
+             (false (vb:book "Thursday April 9" "Dentist" '("BW")
+                             :dep-time "8:00 am" :ret-time "10:00 am" :trips trips))))
+        (true (search "No available vehicle slots" out))
+        (is equal '() writes)))))
+
+(defun fixture-header ()
+  "Sheet header text for April 9 of the current year, whatever weekday that is."
+  (let* ((year (nth-value 5 (decode-universal-time (get-universal-time))))
+         (day-str (bn:format-booking-day (chronicity:parse (format nil "April 9 ~d" year)))))
+    (format nil "~a           ~a" day-str day-str)))
+
+(defun run-book-natural (text sheet)
+  "Run BOOK-NATURAL on TEXT with the sheet reads returning SHEET, writes
+recorded and only one week configured.
+Returns (values WRITES OUTPUT READS CONDITION): WRITES is a list of
+(range values sheet-name), READS the number of sheet reads, CONDITION the
+BOOKING-INCOMPLETE signalled, if any."
+  (let ((writes '()) (reads 0) (condition nil) (out ""))
+    (let ((vb::*weeks* '(("Apr 6-12" nil))))
+      (with-mocked-functions ((vb::read-range (lambda (range &key sheet-name)
+                                                (declare (ignore range sheet-name))
+                                                (incf reads)
+                                                sheet))
+                              (vb::write-range (lambda (range values &key sheet-name)
+                                                 (push (list range values sheet-name) writes))))
+        (setf out (with-output-to-string (*standard-output*)
+                    (handler-case (vb:book-natural text)
+                      (bn:booking-incomplete (c) (setf condition c)))))))
+    (values (nreverse writes) out reads condition)))
+
+(define-test book-natural-tests
+  ;; End-to-end through the parser and BOOK with the sheet mocked (see
+  ;; RUN-BOOK-NATURAL).  The fixture day is "April 9" of the current year so
+  ;; the parsed day string matches the sheet header whatever the weekday.
+  (define-test creates-a-new-booking
+    (multiple-value-bind (writes out reads condition)
+        (run-book-natural "Can BW and CG take the van to the dentist on April 9 from 8 am to 10 am?"
+                          (make-test-sheet (make-block (fixture-header) '() '() '())))
+      (false condition)
+      (is = 1 reads)
+      (true (search "Created DGH booking" out))
+      (is equal '(("F4" (("dentist")) "Apr 6-12")
+                  ("F6" (("8:00 am")) "Apr 6-12")
+                  ("G6" (("10:00 am")) "Apr 6-12")
+                  ("F7:F8" (("BW") ("CG")) "Apr 6-12")
+                  ("G7:G8" (("BW") ("CG")) "Apr 6-12"))
+          writes)))
+
+  (define-test honours-vehicle-preference
+    (multiple-value-bind (writes out)
+        (run-book-natural "take the LGH to the dentist on April 9 for BW, 8 am to 10 am"
+                          (make-test-sheet (make-block (fixture-header) '() '() '())))
+      (true (search "Created LGH booking" out))
+      (is equal '("I4" "I6" "J6" "I7:I7" "J7:J7") (mapcar #'first writes))))
+
+  (define-test joins-an-existing-trip-without-times
+    (multiple-value-bind (writes out)
+        (run-book-natural "Please add GG to the SHMS trip on April 9"
+                          (make-test-sheet
+                           (make-block (fixture-header) '(:dgh "SHMS")
+                                       '(:dgh ("8:35 am" "10:30 am"))
+                                       '(:dgh (("MM") ("MM"))))))
+      (true (search "Found 1 existing trip" out))
+      (is equal '(("F8:F8" (("GG")) "Apr 6-12")
+                  ("G8:G8" (("GG")) "Apr 6-12"))
+          writes)))
+
+  (define-test uses-the-sheets-destination-spelling
+    ;; "saint marys church" in the message resolves to the sheet's
+    ;; "Saint Mary's Church" and joins that trip instead of creating one.
+    (multiple-value-bind (writes out)
+        (run-book-natural "MM to saint marys church on April 9"
+                          (make-test-sheet
+                           (make-block (fixture-header) '(:lgh "Saint Mary's Church")
+                                       '(:lgh ("5:00 pm" "8:00 pm"))
+                                       '(:lgh (("MK") ("MK"))))))
+      (true (search "Found 1 existing trip" out))
+      (is equal '("I8:I8" "J8:J8") (mapcar #'first writes))))
+
+  (define-test skips-passengers-already-on-the-trip
+    (multiple-value-bind (writes out)
+        (run-book-natural "add MM and GG to the SHMS trip on April 9"
+                          (make-test-sheet
+                           (make-block (fixture-header) '(:dgh "SHMS")
+                                       '(:dgh ("8:35 am" "10:30 am"))
+                                       '(:dgh (("MM") ("MM"))))))
+      (true (search "Skipped (already booked): MM" out))
+      (is equal '(("F8:F8" (("GG")) "Apr 6-12")
+                  ("G8:G8" (("GG")) "Apr 6-12"))
+          writes)))
+
+  (define-test missing-day-is-reported-before-any-sheet-read
+    (multiple-value-bind (writes out reads condition)
+        (run-book-natural "for the pool for MM 8 am to 10 am" (make-test-sheet))
+      (declare (ignore out))
+      (true condition)
+      (is = 0 reads)
+      (is equal '() writes)
+      (is equal '(:day) (bn:booking-incomplete-missing condition))
+      (is string= "pool" (getf (bn:booking-incomplete-understood condition) :destination))
+      (is string= "for the pool for MM 8 am to 10 am" (bn:booking-incomplete-text condition))))
+
+  (define-test missing-destination-and-passengers
+    (multiple-value-bind (writes out reads condition)
+        (run-book-natural "tomorrow at 8 am" (make-test-sheet))
+      (declare (ignore writes out))
+      (is = 0 reads)
+      (is equal '(:destination :passengers) (bn:booking-incomplete-missing condition))))
+
+  (define-test no-trip-and-no-times-asks-for-times
+    (multiple-value-bind (writes out reads condition)
+        (run-book-natural "add BW to the pool trip on April 9"
+                          (make-test-sheet (make-block (fixture-header) '() '() '())))
+      (declare (ignore out))
+      (true condition)
+      (is = 1 reads)
+      (is equal '() writes)
+      (is equal '(:dep-time :ret-time) (bn:booking-incomplete-missing condition))
+      (true (search "No existing trip to pool" (bn:booking-incomplete-preamble condition)))
+      (is string= "pool" (getf (bn:booking-incomplete-understood condition) :destination))))
+
+  (define-test only-return-time-missing
+    (multiple-value-bind (writes out reads condition)
+        (run-book-natural "BW to the pool on April 9 leaving at 8 am"
+                          (make-test-sheet (make-block (fixture-header) '() '() '())))
+      (declare (ignore writes out reads))
+      (is equal '(:ret-time) (bn:booking-incomplete-missing condition))
+      (is string= "8:00 am" (getf (bn:booking-incomplete-understood condition) :dep-time))))
+
+  (define-test book-natural-calls-book
+    ;; The parsed pieces reach BOOK in the sheet's formats, with the
+    ;; pre-fetched trips passed through.
+    (let ((book-args nil))
+      (with-mocked-functions ((vb::fetch-all-trips (lambda (&key week) (declare (ignore week))
+                                                     (list (make-trip :destination "Pool"))))
+                              (vb::book (lambda (day dest pax &key dep-time ret-time vehicle week trips)
+                                          (setf book-args (list :day day :dest dest :pax pax
+                                                                :dep dep-time :ret ret-time
+                                                                :vehicle vehicle :week week
+                                                                :trips trips)))))
+        (vb:book-natural
+         "I want to book the DGH for the pool next week Tuesday for CG and BW at seven PM to nine PM"
+         :week "Apr 6-12")
+        (is string= "Pool" (getf book-args :dest))
+        (is equal '("CG" "BW") (getf book-args :pax))
+        (true (cl-ppcre:scan "^\\w+ \\w+ \\d+$" (getf book-args :day)))
+        (is string= "7:00 pm" (getf book-args :dep))
+        (is string= "9:00 pm" (getf book-args :ret))
+        (is eq :dgh (getf book-args :vehicle))
+        (is string= "Apr 6-12" (getf book-args :week))
+        (is = 1 (length (getf book-args :trips)))))))
+
+(define-test sheet-io-tests
+  (define-test write-range-payload
+    (let ((requests '()) (gets '()))
+      (with-mocked-functions ((dexador:request
+                               (lambda (uri &rest args)
+                                 (push (list* uri args) requests)
+                                 (let ((headers (make-hash-table :test #'equal)))
+                                   (setf (gethash "location" headers) "https://example.invalid/result")
+                                   (values "" 302 headers))))
+                              (dexador:get (lambda (uri &rest args)
+                                             (declare (ignore args))
+                                             (push uri gets)
+                                             "ok")))
+        (is string= "ok" (vb:write-range "F4" '(("SHMS")) :sheet-name "Apr 20-26"))
+        (is = 1 (length requests))
+        (is equal '("https://example.invalid/result") gets)
+        (destructuring-bind (uri &key method content headers max-redirects) (first requests)
+          (true (search "script.google.com" uri))
+          (true (search (format nil "spreadsheetId=~a" vb::*spreadsheet-id*) uri))
+          (is eq :post method)
+          (is = 0 max-redirects)
+          (is string= "application/json" (cdr (assoc "Content-Type" headers :test #'string=)))
+          (let* ((payload (com.inuoe.jzon:parse content))
+                 (arguments (gethash "arguments" payload))
+                 (body (gethash "body" payload)))
+            (is string= "Apr 20-26!F4" (gethash "range" arguments))
+            (is string= "USER_ENTERED" (gethash "valueInputOption" arguments))
+            (is equalp #(#("SHMS")) (gethash "values" body)))))
+      ;; without a sheet name the range is unqualified
+      (with-mocked-functions ((dexador:request
+                               (lambda (uri &rest args)
+                                 (declare (ignore uri))
+                                 (push args requests)
+                                 (let ((headers (make-hash-table :test #'equal)))
+                                   (setf (gethash "location" headers) "https://example.invalid/r")
+                                   (values "" 302 headers))))
+                              (dexador:get (lambda (uri &rest args) (declare (ignore uri args)) "ok")))
+        (vb:write-range "F7:F8" '(("BW") ("CG")))
+        (let ((payload (com.inuoe.jzon:parse (getf (first requests) :content))))
+          (is string= "F7:F8" (gethash "range" (gethash "arguments" payload)))
+          (is equalp #(#("BW") #("CG")) (gethash "values" (gethash "body" payload)))))))
+
+  (define-test write-range-without-redirect-errors
+    (with-mocked-functions ((dexador:request
+                             (lambda (uri &rest args)
+                               (declare (ignore uri args))
+                               (values "" 200 (make-hash-table :test #'equal)))))
+      (fail (vb:write-range "F4" '(("SHMS")) :sheet-name "Apr 20-26") error)))
+
+  (define-test read-range-urls
+    (let ((urls '()))
+      (with-mocked-functions ((dexador:get (lambda (uri &rest args)
+                                             (declare (ignore args))
+                                             (push uri urls)
+                                             (format nil "a,b~%c,d~%"))))
+        ;; gviz endpoint for a named sheet
+        (let ((rows (vb:read-range nil :sheet-name "Apr 20-26")))
+          (is equal '(("a" "b") ("c" "d")) rows)
+          (true (search "gviz/tq" (first urls)))
+          (true (search "sheet=Apr%2020-26" (first urls)))
+          (true (search "out:csv" (first urls)))
+          (true (search vb::*spreadsheet-id* (first urls))))
+        ;; CSV export for a range on the default gid
+        (vb:read-range "A1:B2")
+        (true (search "export?format=csv" (first urls)))
+        (true (search "range=A1:B2" (first urls)))
+        (true (search (format nil "gid=~a" vb::*gid*) (first urls)))))))
+
+(define-test driver-helpers
+  (define-test departure-universal-time
+    (let ((ut (vb::trip-departure-universal-time (make-trip :departure "8:35 am"))))
+      (true ut)
+      (multiple-value-bind (s m h day month year) (decode-universal-time ut)
+        (multiple-value-bind (ts tm th tday tmonth tyear) (decode-universal-time (get-universal-time))
+          (declare (ignore ts tm th))
+          (is = 0 s)
+          (is = 35 m)
+          (is = 8 h)
+          (is = tday day)
+          (is = tmonth month)
+          (is = tyear year))))
+    (multiple-value-bind (s m h) (decode-universal-time
+                                  (vb::trip-departure-universal-time (make-trip :departure "12:35 pm")))
+      (declare (ignore s))
+      (is = 35 m)
+      (is = 12 h))
+    (false (vb::trip-departure-universal-time (make-trip :departure "")))
+    (false (vb::trip-departure-universal-time (make-trip :departure nil)))
+    (false (vb::trip-departure-universal-time (make-trip :departure "garbage"))))
+
+  (define-test driver-trips-today
+    (let* ((day-str (bn:format-booking-day (chronicity:parse "today")))
+           (sheet (make-test-sheet
+                   (make-block (format nil "~a           ~a" day-str day-str)
+                               '(:dgh "SHMS" :lgh "Shrine")
+                               '(:dgh ("8:00 am" "10:00 am") :lgh ("5:00 pm" "8:00 pm"))
+                               '(:dgh (("BW" "CG") ("BW" "CG")) :lgh (("CG") ("CG")))))))
+      (call-with-mock-read-range
+       sheet
+       (lambda ()
+         ;; a week range covering every day of the year
+         (let ((vb::*weeks* '(("Jan 1-Dec 31" nil))))
+           (let ((trips (vb::trips-for-driver-today "BW")))
+             (is = 1 (length trips))
+             (is string= "SHMS" (trip-destination (first trips))))
+           ;; CG drives the LGH trip but only rides on the DGH one
+           (let ((trips (vb::trips-for-driver-today "cg")))
+             (is = 1 (length trips))
+             (is string= "Shrine" (trip-destination (first trips))))
+           (is equal '() (vb::trips-for-driver-today "ZZ")))
+         ;; no sheet covers today
+         (let ((vb::*weeks* '(("Feb 30-Feb 31" nil))))
+           (is equal '() (vb::trips-for-driver-today "BW")))))))
+
+  (define-test current-year-key
+    (let ((year (nth-value 5 (decode-universal-time (get-universal-time)))))
+      (is = (+ (* year 10000) 422)
+          (vb::current-year-date-key (chronicity:parse "April 22 2030")))
+      (is = (+ (* year 10000) 101)
+          (vb::current-year-date-key (chronicity:parse "January 1 1999"))))))
+
 (define-test vb-tests
-    (test 'utilities)
+  (test 'utilities)
   (test 'clean-rows)
   (test 'collect-passengers)
   (test 'parse-schedule)
@@ -1437,18 +1300,12 @@
   (test 'find-empty-slot)
   (test 'add-passengers-dedup)
   (test 'print-trip)
+  (test 'parse-passenger-initials)
+  (test 'trips-and-destinations)
+  (test 'book-tests)
   (test 'book-natural-tests)
-  (test 'all-initials-p)
-  (test 'parse-booking-text-order-agnostic)
-  (test 'preamble-stripping)
-  (test 'new-return-time-introducers)
-  (test 'destination-introducers)
-  (test 'bare-time-fallback)
-  (test 'vehicle-preference)
-  (test 'book-natural-expanded-integration)
-  (test 'meridiem-normalization)
-  (test 'month-day-phrase)
-  (test 'book-natural-month-day-and-meridiem)
+  (test 'sheet-io-tests)
+  (test 'driver-helpers)
   (test 'month-abbrev-num)
   (test 'date-key)
   (test 'parse-week-range)

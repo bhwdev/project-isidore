@@ -128,6 +128,7 @@ lack-session-store-redis, ghcr.io/ocicl/lack@sha256:2130f916ada220a008dff0b618ba
 lack-test, ghcr.io/ocicl/lack@sha256:2130f916ada220a008dff0b618ba4a6d102233c6e8eb94a64f777b5a8133e7c5, lack-20250804-f3302ce/lack-test.asd
 lack-util, ghcr.io/ocicl/lack@sha256:2130f916ada220a008dff0b618ba4a6d102233c6e8eb94a64f777b5a8133e7c5, lack-20250804-f3302ce/lack-util.asd
 lack-util-writer-stream, ghcr.io/ocicl/lack@sha256:2130f916ada220a008dff0b618ba4a6d102233c6e8eb94a64f777b5a8133e7c5, lack-20250804-f3302ce/lack-util-writer-stream.asd
+langutils, ghcr.io/ocicl/langutils@sha256:572fc4269bcafae40d576197e53a06263bf2a924f333d8de40916699ae2f2ee8, cl-langutils-20240503-38beec7/langutils.asd
 lisp-namespace, ghcr.io/ocicl/lisp-namespace@sha256:ae08006e0b267958c50160658c729c799c6e1c18d94eef83f2ce5cf6ab8bbd20, lisp-namespace-20240503-699fccb/lisp-namespace.asd
 lisp-namespace.test, ghcr.io/ocicl/lisp-namespace@sha256:ae08006e0b267958c50160658c729c799c6e1c18d94eef83f2ce5cf6ab8bbd20, lisp-namespace-20240503-699fccb/lisp-namespace.test.asd
 local-time, ghcr.io/ocicl/local-time@sha256:15dc0e56d0ff55bd2a3c597e67be1c26bd0677c230a15ad5098c5207a9df5554, local-time-20250808-c28f38e/local-time.asd
@@ -165,6 +166,8 @@ pythonic-string-reader, ghcr.io/ocicl/pythonic-string-reader@sha256:6f0c22694e7d
 quri, ghcr.io/ocicl/quri@sha256:e2559f91600e4895e115b42dde88fcaac3677f051335d73431888dcf7af99f95, quri-0.7.0/quri.asd
 quri-test, ghcr.io/ocicl/quri@sha256:e2559f91600e4895e115b42dde88fcaac3677f051335d73431888dcf7af99f95, quri-0.7.0/quri-test.asd
 rfc2388, ghcr.io/ocicl/rfc2388@sha256:4190f6eb36b3b2f53def6eff56b44e76edf4086ada2feb6d88bb671a40fc9f70, rfc2388-20240503-591bcf7/rfc2388.asd
+s-xml, ghcr.io/ocicl/s-xml@sha256:32e0e653b5996b6c75e4ca15580e168dbddee7f95c86ace8a2060960669fb93e, s-xml-20240503-194ccea/s-xml.asd
+s-xml-rpc, ghcr.io/ocicl/s-xml-rpc@sha256:44a7895e4f3e9d0211c0d545e45aee4e36b692dc3c19a53fa074bd5253544da6, s-xml-rpc-7/s-xml-rpc.asd
 serapeum, ghcr.io/ocicl/serapeum@sha256:c2d9623e8e48fa4befe99435c3c22e3470bb07bd09e4de1d04b8ebc8eca0ab2f, serapeum-20260510-c4dcbb6/serapeum.asd
 series, ghcr.io/ocicl/series@sha256:11c6af9dac4ed96e3636685590948cd23e88a177003626363f9ce9bcfafb7e73, series-20240503-da9061b/series.asd
 sha1, ghcr.io/ocicl/sha1@sha256:d332af205bf3b5db2bdf8ea6df9f5127627343ce19bc313d00cfa2d80a5fb404, sha1-20240503-be8b1b1/sha1.asd
@@ -176,6 +179,7 @@ split-sequence, ghcr.io/ocicl/split-sequence@sha256:3a37662eedd99c42995587b9d443
 sqlite, ghcr.io/ocicl/sqlite@sha256:a7f80757e6ee13af06e2eeaeff1e079dba439d85ea5c7f68e262bccc40dcbd5c, cl-sqlite-0.2.1/sqlite.asd
 sqlite-tests, ghcr.io/ocicl/sqlite@sha256:a7f80757e6ee13af06e2eeaeff1e079dba439d85ea5c7f68e262bccc40dcbd5c, cl-sqlite-0.2.1/sqlite-tests.asd
 static-vectors, ghcr.io/ocicl/static-vectors@sha256:53e11e5689c3dbea6a3017760b55f052588003d774913539930ddc4330a69970, static-vectors-20240624-3d9d89b/static-vectors.asd
+stdutils, ghcr.io/ocicl/stdutils@sha256:69298951181f11ee9c9aff0e1bb11cd0192aa822aeac5cb78815662ecbac80b8, cl-stdutils-20240503-4a4e5a4/stdutils.asd
 string-case, ghcr.io/ocicl/string-case@sha256:9db2d4160b76ce1ed9f754d12f679c665593a9a436177d36380a1a8a176ec16a, string-case-20240503-718c761/string-case.asd
 swank, ghcr.io/ocicl/swank@sha256:691e78c2a3d33479ccf5a1e38b684f2d026a227831487218c126ac4bea28a63c, slime-2.32/swank.asd
 swap-bytes, ghcr.io/ocicl/swap-bytes@sha256:06edc17deb0f27cdf6290689711ece670a8282dfd07b732a9adc541af1ce7ed6, swap-bytes-20240503-43ab141/swap-bytes.asd

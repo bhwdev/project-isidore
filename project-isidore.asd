@@ -30,7 +30,6 @@
   :depends-on ("project-isidore/webserver"
                "project-isidore/van-booking"
                "project-isidore/slack-bot"
-               "project-isidore/garmin-org"
                )
   :in-order-to ((asdf:test-op (asdf:test-op "project-isidore/tests")))
   :build-operation "program-op"

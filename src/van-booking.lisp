@@ -30,6 +30,7 @@
    #:add-passengers #:create-booking #:book #:print-trip
    #:read-range #:write-range #:main
    #:fetch-all-trips #:known-destinations
+   #:sheet-tabs #:week-sheets
    #:book-natural
    #:remind-driver
    #:view-schedule
@@ -40,7 +41,10 @@
   - parse-schedule — reads the full sheet, filters CSV artifacts, extracts 72 trip
   structs with correct sheet row numbers
   - find-trips — filters by day and/or destination (substring, case-insensitive)
-  - fetch-all-trips — reads and parses every week in *weeks* (or one week)
+  - sheet-tabs / week-sheets — list the spreadsheet's tabs (scraped from its public
+  HTML view) and the subset whose names are week ranges such as \"Aug 31-Sep 6\";
+  the week list is cached briefly and can be pinned by binding *weeks*
+  - fetch-all-trips — reads and parses every week sheet (or one week)
   - book — top-level entry point:
     - Existing trip found → adds passengers to both dep and ret columns
     - No match + times provided → creates new booking with vehicle priority DGH → LGH →
@@ -58,13 +62,20 @@
 
 (defparameter *gid* "367982190")
 
-(defparameter *weeks*
-  '(("Mar 30-Apr 5 (Holy wk)" "367982190")
-    ("Apr 6-12"               nil)
-    ("Apr 13-19 "             nil)
-    ("Apr 20-26"              nil)
-    ("Apr 27-May 3"         nil))
-  "List of (sheet-name gid-or-nil). GID is only needed for the default CSV read path.")
+(defparameter *weeks* nil
+  "Optional fixed list of (sheet-name gid-or-nil) week sheets.  NIL, the
+default, means WEEK-SHEETS discovers the current week tabs from the
+spreadsheet itself, so the code keeps working as new weeks are added.
+Bind or set this to a fixed list (e.g. '((\"Apr 20-26\" nil))) to bypass
+discovery; the tests do that.  GID is only needed for the default CSV read
+path.")
+
+(defparameter *week-sheets-cache-seconds* 300
+  "How long, in seconds, a discovered week-sheet list is reused by WEEK-SHEETS
+before the spreadsheet's tab list is fetched again.")
+
+(defvar *week-sheets-cache* nil
+  "(fetched-universal-time . week-sheets) from the last discovery, or NIL.")
 
 (defparameter *apps-script-url*
   "https://script.google.com/macros/s/AKfycbyR4Ffk5mjAUPUXOwQLIfjBiviyvm2rnNLpbBQvXAfTBNdAgEfR5KfE-45pPd2eTSz98g/exec")
@@ -333,11 +344,12 @@
     slot))
 
 (defun fetch-all-trips (&key week)
-  "Read and parse the schedule for every week in *WEEKS*, or only WEEK (a sheet
-   name such as \"Apr 20-26\") when given.  Returns a list of TRIP structs."
+  "Read and parse the schedule for every week sheet (see WEEK-SHEETS), or only
+   WEEK (a sheet name such as \"Apr 20-26\") when given.  Returns a list of
+   TRIP structs."
   (let ((weeks-to-search (if week
                              (list (list week nil))
-                             *weeks*)))
+                             (week-sheets))))
     (collect-append
      (map-fn 'list
              (lambda (w)
@@ -448,22 +460,46 @@ Matches case-insensitively as a prefix of *month-names*."
 (defun parse-week-range (sheet-name)
   "Parse SHEET-NAME like \"Apr 20-26\" or \"Mar 30-Apr 5 (Holy wk)\".
 Returns (values start-key end-key) as YYYYMMDD integers using the current
-year, or (values nil nil) if the name does not match the expected shape."
+year, or (values nil nil) if the name does not match the expected shape
+\(including names whose month word is not a month, e.g. \"Week 1-2\")."
   (cl-ppcre:register-groups-bind (sm sd em ed)
       ("^([A-Za-z]+)\\s+(\\d+)\\s*-\\s*(?:([A-Za-z]+)\\s+)?(\\d+)" sheet-name)
     (let* ((year (year-of (chronicity:parse "today")))
-           (start-month (month-abbrev-num sm))
-           (end-month (if em (month-abbrev-num em) start-month))
+           (start-month (ignore-errors (month-abbrev-num sm)))
+           (end-month (if em (ignore-errors (month-abbrev-num em)) start-month))
            (start-day (parse-integer sd))
            (end-day (parse-integer ed)))
-      (values (+ (* year 10000) (* start-month 100) start-day)
-              (+ (* year 10000) (* end-month 100) end-day)))))
+      (when (and start-month end-month)
+        (values (+ (* year 10000) (* start-month 100) start-day)
+                (+ (* year 10000) (* end-month 100) end-day))))))
+
+(defun discover-week-sheets ()
+  "Return the (sheet-name gid) tabs of the spreadsheet whose names parse as a
+week range (see PARSE-WEEK-RANGE), in tab order.  Helper tabs such as
+\"Dates\" or \"Blank Temp\" are dropped so they are never read as schedules."
+  (remove-if-not (lambda (tab) (parse-week-range (first tab)))
+                 (sheet-tabs)))
+
+(defun week-sheets (&key refresh)
+  "Return the list of (sheet-name gid-or-nil) week sheets to search.
+When *WEEKS* is non-NIL it is returned as is.  Otherwise the week tabs are
+discovered from the spreadsheet (DISCOVER-WEEK-SHEETS) and cached for
+*WEEK-SHEETS-CACHE-SECONDS*; REFRESH forces a new fetch."
+  (or *weeks*
+      (let ((now (get-universal-time))
+            (cache *week-sheets-cache*))
+        (if (and cache (not refresh)
+                 (< (- now (car cache)) *week-sheets-cache-seconds*))
+            (cdr cache)
+            (let ((sheets (discover-week-sheets)))
+              (setf *week-sheets-cache* (cons now sheets))
+              sheets)))))
 
 (defun find-week-sheet (target-dt)
-  "Return the sheet-name from *weeks* whose date range covers TARGET-DT
+  "Return the sheet-name from WEEK-SHEETS whose date range covers TARGET-DT
 \(inclusive), or NIL if none match."
   (let ((target-key (current-year-date-key target-dt)))
-    (loop for entry in *weeks*
+    (loop for entry in (week-sheets)
           for name = (first entry)
           do (multiple-value-bind (start end) (parse-week-range name)
                (when (and start (<= start target-key end))
@@ -568,8 +604,8 @@ Combines today's date with TRIP-DEPARTURE's HH:MM (12h format)."
        (error nil nil)))))
 
 (defun find-week-sheets-in-range (start-key end-key)
-  "Return the sheet names from *weeks* whose date range overlaps [START-KEY, END-KEY]."
-  (loop for entry in *weeks*
+  "Return the sheet names from WEEK-SHEETS whose date range overlaps [START-KEY, END-KEY]."
+  (loop for entry in (week-sheets)
         for name = (first entry)
         append (multiple-value-bind (ws we) (parse-week-range name)
                  (when (and ws we (<= ws end-key) (>= we start-key))
@@ -705,6 +741,51 @@ Combines today's date with TRIP-DEPARTURE's HH:MM (12h format)."
                                     start-label end-label))))
               (format t "~a" out)
               out))))))
+
+(defun decode-js-string (s)
+  "Decode the escapes Google uses inside the JavaScript string literal S:
+\\xNN and \\uNNNN hex escapes and single-character escapes such as \\/ or \\\"."
+  (with-output-to-string (out)
+    (let ((i 0) (n (length s)))
+      (loop while (< i n)
+            do (let ((c (char s i)))
+                 (cond
+                   ((and (char= c #\\) (< (1+ i) n))
+                    (let ((e (char s (1+ i))))
+                      (flet ((hex-char (digits)
+                               (let ((end (+ i 2 digits)))
+                                 (when (<= end n)
+                                   (let ((code (parse-integer s :start (+ i 2) :end end
+                                                                :radix 16 :junk-allowed t)))
+                                     (when code
+                                       (write-char (code-char code) out)
+                                       (setf i end)
+                                       t))))))
+                        (cond
+                          ((and (char-equal e #\x) (hex-char 2)))
+                          ((and (char-equal e #\u) (hex-char 4)))
+                          (t (write-char e out) (incf i 2))))))
+                   (t (write-char c out) (incf i))))))))
+
+(defun sheet-tabs ()
+  "Return the spreadsheet's tabs as a list of (sheet-name gid) strings, in
+tab order.  There is no unauthenticated API for this, so the public
+\"htmlview\" page is fetched and the tab list embedded in its script
+\(entries like {name: \"Aug 31-Sep 6\", pageUrl: ..., gid: \"1696388518\"})
+is extracted.  Signals an error if no tabs can be found, since a silently
+empty list would look like a spreadsheet with no weeks."
+  (let* ((url (format nil "https://docs.google.com/spreadsheets/d/~a/htmlview"
+                      *spreadsheet-id*))
+         (html (dex:get url))
+         (tabs '()))
+    (cl-ppcre:do-register-groups (name gid)
+        ("\\{\\s*name:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"[^{}]*?gid:\\s*\"(\\d+)\"" html)
+      (push (list (decode-js-string name) gid) tabs))
+    (when (null tabs)
+      (error "Could not find any sheet tabs in the HTML view of spreadsheet ~a; ~
+              Google may have changed the page format."
+             *spreadsheet-id*))
+    (nreverse tabs)))
 
 (defun read-range (range &key sheet-name)
   "Read cells from the public Google Sheet via CSV export. Returns a list of rows.

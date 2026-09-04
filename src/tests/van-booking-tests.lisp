@@ -59,6 +59,20 @@ parsing itself is covered in booking-nlp-tests."))
     (append (list title-row steward-row)
             (apply #'append blocks))))
 
+(defparameter *sample-weeks*
+  '(("Mar 30-Apr 5 (Holy wk)" "367982190")
+    ("Apr 6-12"               nil)
+    ("Apr 13-19 "             nil)
+    ("Apr 20-26"              nil)
+    ("Apr 27-May 3"           nil))
+  "A fixed week-sheet list bound to VB::*WEEKS* by tests that look sheets up
+by date, so they neither depend on the live spreadsheet's tabs nor fetch them.")
+
+(defparameter *htmlview-fixture*
+  "<html><head><script nonce=\"x\">var items = [{name: \"Aug 31-Sep 6\", pageUrl: \"https:\\/\\/docs.google.com\\/spreadsheets\\/d\\/id\\/htmlview\\/sheet?headers\\x3dtrue&gid=1696388518\", gid: \"1696388518\",initialSheet: (\"1696388518\" == gid)},{name: \"Sep 7-13\", pageUrl: \"u\", gid: \"217444495\",initialSheet: false},{name: \"Mar 30-Apr 5 (Holy wk)\", pageUrl: \"u\", gid: \"367982190\"},{name: \"St\\x27s \\/ Dates\", pageUrl: \"u\", gid: \"1762101409\"},{name: \"Apr 13-19 \", pageUrl: \"u\", gid: \"5\"}];</script></head><body></body></html>"
+  "A cut-down copy of the spreadsheet's public htmlview page: the tab list
+Google embeds as JavaScript object literals, with the escapes it uses.")
+
 ;;; --- Unit tests: utility functions ---
 
 (define-test utilities
@@ -506,27 +520,38 @@ parsing itself is covered in booking-nlp-tests."))
   (define-test parse-week-range-no-match
     (multiple-value-bind (start end) (vb::parse-week-range "garbage")
       (false start)
+      (false end))
+    ;; Right shape but the month word is not a month (a helper tab, say)
+    (multiple-value-bind (start end) (vb::parse-week-range "Week 1-2")
+      (false start)
       (false end))))
 
 (define-test find-week-sheet
+  ;; Each child pins VB::*WEEKS* to *SAMPLE-WEEKS* so the lookup is
+  ;; deterministic and never fetches the live tab list.
   (define-test mid-week-match
-    (let* ((year (chronicity:year-of (chronicity:parse "today")))
+    (let* ((vb::*weeks* *sample-weeks*)
+           (year (chronicity:year-of (chronicity:parse "today")))
            (target (chronicity:parse (format nil "April 22 ~D" year))))
       (is string= "Apr 20-26" (vb::find-week-sheet target))))
   (define-test boundary-match-start
-    (let* ((year (chronicity:year-of (chronicity:parse "today")))
+    (let* ((vb::*weeks* *sample-weeks*)
+           (year (chronicity:year-of (chronicity:parse "today")))
            (target (chronicity:parse (format nil "April 20 ~D" year))))
       (is string= "Apr 20-26" (vb::find-week-sheet target))))
   (define-test boundary-match-end
-    (let* ((year (chronicity:year-of (chronicity:parse "today")))
+    (let* ((vb::*weeks* *sample-weeks*)
+           (year (chronicity:year-of (chronicity:parse "today")))
            (target (chronicity:parse (format nil "April 26 ~D" year))))
       (is string= "Apr 20-26" (vb::find-week-sheet target))))
   (define-test cross-month-match
-    (let* ((year (chronicity:year-of (chronicity:parse "today")))
+    (let* ((vb::*weeks* *sample-weeks*)
+           (year (chronicity:year-of (chronicity:parse "today")))
            (target (chronicity:parse (format nil "April 1 ~D" year))))
       (is string= "Mar 30-Apr 5 (Holy wk)" (vb::find-week-sheet target))))
   (define-test find-week-sheet-no-match
-    (let* ((year (chronicity:year-of (chronicity:parse "today")))
+    (let* ((vb::*weeks* *sample-weeks*)
+           (year (chronicity:year-of (chronicity:parse "today")))
            (target (chronicity:parse (format nil "December 25 ~D" year))))
       (false (vb::find-week-sheet target)))))
 
@@ -543,23 +568,27 @@ parsing itself is covered in booking-nlp-tests."))
       (setf (symbol-function 'vb::read-range) original))))
 
 (define-test remind-driver-tests
-    (define-test golden-path-multi-passenger
-        (let* ((day-str (vb::format-booking-day (chronicity:parse "April 22")))
-               (block (make-block (format nil "~A           ~A" day-str day-str)
-                                  '(:dgh "X location")
-                                  '(:dgh ("12:00 pm" "2:00 pm"))
-                                  '(:dgh (("BW" "CG" "GG") ("BW" "CG" "GG")))))
-               (sheet (make-test-sheet block)))
-          (call-with-mock-read-range sheet
-                                     (lambda ()
-                                       (let ((result (remind-driver "BW" "April 22")))
-                                         (true (search "BW is the driver" result))
-                                         (true (search "X location" result))
-                                         (true (search "12:00 pm" result))
-                                         (true (search "CG, GG are passengers" result))))))
-      )
+  ;; Each child pins VB::*WEEKS* to *SAMPLE-WEEKS* (which cover April 22) so
+  ;; the sheet lookup is deterministic and never fetches the live tab list.
+  (define-test golden-path-multi-passenger
+      (let* ((vb::*weeks* *sample-weeks*)
+             (day-str (vb::format-booking-day (chronicity:parse "April 22")))
+             (block (make-block (format nil "~A           ~A" day-str day-str)
+                                '(:dgh "X location")
+                                '(:dgh ("12:00 pm" "2:00 pm"))
+                                '(:dgh (("BW" "CG" "GG") ("BW" "CG" "GG")))))
+             (sheet (make-test-sheet block)))
+        (call-with-mock-read-range sheet
+                                   (lambda ()
+                                     (let ((result (remind-driver "BW" "April 22")))
+                                       (true (search "BW is the driver" result))
+                                       (true (search "X location" result))
+                                       (true (search "12:00 pm" result))
+                                       (true (search "CG, GG are passengers" result)))))))
+
   (define-test single-other-passenger-grammar
-      (let* ((day-str (vb::format-booking-day (chronicity:parse "April 22")))
+      (let* ((vb::*weeks* *sample-weeks*)
+             (day-str (vb::format-booking-day (chronicity:parse "April 22")))
              (block (make-block (format nil "~A           ~A" day-str day-str)
                                 '(:dgh "Pool")
                                 '(:dgh ("8:00 am" "10:00 am"))
@@ -572,7 +601,8 @@ parsing itself is covered in booking-nlp-tests."))
                                        (false (search "are passengers" result)))))))
 
   (define-test no-other-passengers-clause
-      (let* ((day-str (vb::format-booking-day (chronicity:parse "April 22")))
+      (let* ((vb::*weeks* *sample-weeks*)
+             (day-str (vb::format-booking-day (chronicity:parse "April 22")))
              (block (make-block (format nil "~A           ~A" day-str day-str)
                                 '(:dgh "SHMS")
                                 '(:dgh ("12:35 pm" "2:35 pm"))
@@ -584,7 +614,8 @@ parsing itself is covered in booking-nlp-tests."))
                                        (true (search "with no other passengers" result)))))))
 
   (define-test multiple-trips-same-day
-      (let* ((day-str (vb::format-booking-day (chronicity:parse "April 22")))
+      (let* ((vb::*weeks* *sample-weeks*)
+             (day-str (vb::format-booking-day (chronicity:parse "April 22")))
              (b1 (make-block (format nil "~A           ~A" day-str day-str)
                              '(:dgh "SHMS")
                              '(:dgh ("12:35 pm" "2:35 pm"))
@@ -604,7 +635,8 @@ parsing itself is covered in booking-nlp-tests."))
                                        (true (search "CG is a passenger" result)))))))
 
   (define-test driver-not-first-is-not-driver
-      (let* ((day-str (vb::format-booking-day (chronicity:parse "April 22")))
+      (let* ((vb::*weeks* *sample-weeks*)
+             (day-str (vb::format-booking-day (chronicity:parse "April 22")))
              (block (make-block (format nil "~A           ~A" day-str day-str)
                                 '(:dgh "SHMS")
                                 '(:dgh ("8:00 am" "10:00 am"))
@@ -617,7 +649,8 @@ parsing itself is covered in booking-nlp-tests."))
                                        (true (search day-str result)))))))
 
   (define-test driver-match-case-insensitive
-      (let* ((day-str (vb::format-booking-day (chronicity:parse "April 22")))
+      (let* ((vb::*weeks* *sample-weeks*)
+             (day-str (vb::format-booking-day (chronicity:parse "April 22")))
              (block (make-block (format nil "~A           ~A" day-str day-str)
                                 '(:dgh "SHMS")
                                 '(:dgh ("8:00 am" "10:00 am"))
@@ -629,21 +662,17 @@ parsing itself is covered in booking-nlp-tests."))
                                        (true (search "bw is the driver" result)))))))
 
   (define-test no-sheet-covers-day
-      (let ((called nil))
-        (let ((original (symbol-function 'vb::read-range)))
-          (unwind-protect
-               (progn
-                 (setf (symbol-function 'vb::read-range)
-                       (lambda (range &key sheet-name)
-                         (declare (ignore range sheet-name))
-                         (setf called t)
-                         nil))
-                 (let* ((year (chronicity:year-of (chronicity:parse "today")))
-                        (result (remind-driver
-                                 "BW" (format nil "December 25 ~D" year))))
-                   (true (search "No schedule sheet covers" result))
-                   (false called)))
-            (setf (symbol-function 'vb::read-range) original))))))
+      (let ((vb::*weeks* *sample-weeks*)
+            (called nil))
+        (with-mocked-functions ((vb::read-range (lambda (range &key sheet-name)
+                                                  (declare (ignore range sheet-name))
+                                                  (setf called t)
+                                                  nil)))
+          (let* ((year (chronicity:year-of (chronicity:parse "today")))
+                 (result (remind-driver
+                          "BW" (format nil "December 25 ~D" year))))
+            (true (search "No schedule sheet covers" result))
+            (false called))))))
 
 (define-test view-schedule-tests
     (define-test split-range-phrase
@@ -682,7 +711,8 @@ parsing itself is covered in booking-nlp-tests."))
     (false (vb::trip-date-key (make-trip :day "garbage words here"))))
 
   (define-test find-week-sheets-in-range
-      (let ((year (chronicity:year-of (chronicity:parse "today"))))
+      (let ((vb::*weeks* *sample-weeks*)
+            (year (chronicity:year-of (chronicity:parse "today"))))
         ;; Fully inside one week
         (is equal '("Apr 20-26")
             (vb::find-week-sheets-in-range (+ (* year 10000) 421)
@@ -786,21 +816,14 @@ parsing itself is covered in booking-nlp-tests."))
 
   (define-test view-schedule-default-today
       ;; With an empty sheet, view-schedule returns the "no trips" message.
-      ;; Uses a sheet whose range covers today so find-week-sheets-in-range returns it.
-      (let* ((year (chronicity:year-of (chronicity:parse "today")))
-             (today-key (vb::date-key (chronicity:parse "today")))
-             (covered (loop for entry in vb::*weeks*
-                            for name = (first entry)
-                            thereis (multiple-value-bind (s e)
-                                        (vb::parse-week-range name)
-                                      (and s (<= s today-key e) name)))))
-        (declare (ignore year))
-        (when covered
-          (let ((sheet (make-test-sheet)))
-            (call-with-mock-read-range sheet
-                                       (lambda ()
-                                         (let ((out (view-schedule)))
-                                           (true (search "No trips scheduled" out)))))))))
+      ;; Pins a week range covering every day of the year so the default
+      ;; "today" always finds a sheet, whatever today's date is.
+      (let ((vb::*weeks* '(("Jan 1-Dec 31" nil)))
+            (sheet (make-test-sheet)))
+        (call-with-mock-read-range sheet
+                                   (lambda ()
+                                     (let ((out (view-schedule)))
+                                       (true (search "No trips scheduled" out)))))))
 
   (define-test view-schedule-renders-trips
       (let* ((day-str (vb::format-booking-day (chronicity:parse "April 22")))
@@ -811,7 +834,8 @@ parsing itself is covered in booking-nlp-tests."))
              (sheet (make-test-sheet block)))
         (call-with-mock-read-range sheet
                                    (lambda ()
-                                     (let ((out (view-schedule "April 22")))
+                                     (let ((out (let ((vb::*weeks* *sample-weeks*))
+                                                  (view-schedule "April 22"))))
                                        (true (search "SHMS" out))
                                        (true (search "8:35 am" out))
                                        (true (search "DGH" out))
@@ -830,7 +854,8 @@ parsing itself is covered in booking-nlp-tests."))
                        (declare (ignore range sheet-name))
                        (setf called t)
                        nil))
-               (let ((out (view-schedule (format nil "December 25 ~D" year))))
+               (let ((out (let ((vb::*weeks* *sample-weeks*))
+                            (view-schedule (format nil "December 25 ~D" year)))))
                  (true (search "No schedule sheets cover" out))
                  (false called)))
           (setf (symbol-function 'vb::read-range) original))))
@@ -849,7 +874,8 @@ parsing itself is covered in booking-nlp-tests."))
              (sheet (make-test-sheet block)))
         (call-with-mock-read-range sheet
                                    (lambda ()
-                                     (let* ((out (view-schedule "April 22"))
+                                     (let* ((out (let ((vb::*weeks* *sample-weeks*))
+                                                   (view-schedule "April 22")))
                                             (morning-pos (search "Morning" out))
                                             (afternoon-pos (search "Afternoon" out)))
                                        (true morning-pos)
@@ -1237,6 +1263,92 @@ BOOKING-INCOMPLETE signalled, if any."
         (true (search "range=A1:B2" (first urls)))
         (true (search (format nil "gid=~a" vb::*gid*) (first urls)))))))
 
+(define-test sheet-discovery-tests
+  ;; The week tabs are discovered from the spreadsheet's public htmlview
+  ;; page rather than hardcoded, so /view keeps working as weeks are added.
+  (define-test decode-js-string
+    (is string= "Mar 30-Apr 5 (Holy wk)" (vb::decode-js-string "Mar 30-Apr 5 (Holy wk)"))
+    (is string= "St's / A \"q\"" (vb::decode-js-string "St\\x27s \\/ \\u0041 \\\"q\\\""))
+    (is string= "back\\slash" (vb::decode-js-string "back\\\\slash"))
+    ;; a dangling backslash or a bad hex escape is passed through, not an error
+    (is string= "trailing\\" (vb::decode-js-string "trailing\\"))
+    (is string= "badxZZ" (vb::decode-js-string "bad\\xZZ")))
+
+  (define-test sheet-tabs-parses-htmlview
+    (let ((urls '()))
+      (with-mocked-functions ((dexador:get (lambda (uri &rest args)
+                                             (declare (ignore args))
+                                             (push uri urls)
+                                             *htmlview-fixture*)))
+        ;; every tab, in tab order, names decoded and trailing space kept
+        (is equal '(("Aug 31-Sep 6" "1696388518")
+                    ("Sep 7-13" "217444495")
+                    ("Mar 30-Apr 5 (Holy wk)" "367982190")
+                    ("St's / Dates" "1762101409")
+                    ("Apr 13-19 " "5"))
+            (vb:sheet-tabs))
+        (is = 1 (length urls))
+        (true (search "/htmlview" (first urls)))
+        (true (search vb::*spreadsheet-id* (first urls))))))
+
+  (define-test sheet-tabs-errors-without-tabs
+    (with-mocked-functions ((dexador:get (lambda (uri &rest args)
+                                           (declare (ignore uri args))
+                                           "<html><body>Sign in</body></html>")))
+      (fail (vb:sheet-tabs) error)))
+
+  (define-test week-sheets-filters-caches-and-refreshes
+    (let ((fetches 0)
+          (vb::*weeks* nil)
+          (vb::*week-sheets-cache* nil)
+          (vb::*week-sheets-cache-seconds* 300))
+      (with-mocked-functions ((vb:sheet-tabs
+                               (lambda ()
+                                 (incf fetches)
+                                 (if (= fetches 1)
+                                     '(("Aug 31-Sep 6" "1") ("Fall 2026" "2") ("Sep 7-13" "3")
+                                       ("Dates" "4") ("Blank Temp" "5") ("Week 1-2" "6"))
+                                     '(("Sep 14-20" "7"))))))
+        ;; only week-shaped tab names survive, in tab order
+        (is equal '(("Aug 31-Sep 6" "1") ("Sep 7-13" "3")) (vb:week-sheets))
+        (is = 1 fetches)
+        ;; a second call within the TTL reuses the cache
+        (is equal '(("Aug 31-Sep 6" "1") ("Sep 7-13" "3")) (vb:week-sheets))
+        (is = 1 fetches)
+        ;; :refresh forces a new fetch
+        (is equal '(("Sep 14-20" "7")) (vb:week-sheets :refresh t))
+        (is = 2 fetches)
+        ;; an expired cache is fetched again
+        (let ((vb::*week-sheets-cache-seconds* 0))
+          (is equal '(("Sep 14-20" "7")) (vb:week-sheets))
+          (is = 3 fetches))
+        ;; a fixed *weeks* bypasses discovery entirely
+        (let ((vb::*weeks* '(("Apr 20-26" nil))))
+          (is equal '(("Apr 20-26" nil)) (vb:week-sheets))
+          (is = 3 fetches)))))
+
+  (define-test lookups-use-discovered-weeks
+    ;; The regression behind "No schedule sheets cover Friday September 4":
+    ;; a week present in the spreadsheet but absent from any hardcoded list.
+    (let ((vb::*weeks* nil)
+          (vb::*week-sheets-cache* nil)
+          (year (chronicity:year-of (chronicity:parse "today"))))
+      (with-mocked-functions ((vb:sheet-tabs
+                               (lambda () '(("Aug 31-Sep 6" "1") ("Dates" "2") ("Sep 7-13" "3")))))
+        (is string= "Aug 31-Sep 6"
+            (vb::find-week-sheet (chronicity:parse (format nil "September 4 ~D" year))))
+        (is equal '("Aug 31-Sep 6" "Sep 7-13")
+            (vb::find-week-sheets-in-range (+ (* year 10000) 904) (+ (* year 10000) 908)))
+        (false (vb::find-week-sheet (chronicity:parse (format nil "December 25 ~D" year))))
+        ;; fetch-all-trips reads exactly the discovered week sheets
+        (let ((reads '()))
+          (with-mocked-functions ((vb::read-range (lambda (range &key sheet-name)
+                                                    (declare (ignore range))
+                                                    (push sheet-name reads)
+                                                    (make-test-sheet))))
+            (vb:fetch-all-trips)
+            (is equal '("Aug 31-Sep 6" "Sep 7-13") (reverse reads))))))))
+
 (define-test driver-helpers
   (define-test departure-universal-time
     (let ((ut (vb::trip-departure-universal-time (make-trip :departure "8:35 am"))))
@@ -1305,6 +1417,7 @@ BOOKING-INCOMPLETE signalled, if any."
   (test 'book-tests)
   (test 'book-natural-tests)
   (test 'sheet-io-tests)
+  (test 'sheet-discovery-tests)
   (test 'driver-helpers)
   (test 'month-abbrev-num)
   (test 'date-key)

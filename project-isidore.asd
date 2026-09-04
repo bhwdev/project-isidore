@@ -17,23 +17,49 @@
 ;; an ancient copy of split-sequence whose DEFPACKAGE also exports PARTITION,
 ;; PARTITION-IF and PARTITION-IF-NOT.  Those exports clash with
 ;; SERAPEUM:PARTITION inside SERAPEUM/BUNDLE (which re-exports both serapeum
-;; and split-sequence) whichever of serapeum or stdutils loads first.  The two
-;; PERFORM methods below resolve the clash around that one file: before it
-;; loads, SERAPEUM/BUNDLE (if it already exists) keeps serapeum's PARTITION
-;; explicitly; after it loads, the stray exports are removed so a later
-;; serapeum load sees the split-sequence 2.x API it expects.
+;; and split-sequence) whichever of serapeum or stdutils loads first.  The
+;; PERFORM methods below resolve the clash around that one file: before it is
+;; compiled or loaded, SERAPEUM/BUNDLE (if it already exists) keeps serapeum's
+;; PARTITION explicitly; after it loads, the stray exports are removed so a
+;; later serapeum load sees the split-sequence 2.x API it expects.
+;;
+;; DEFPACKAGE takes effect at compile time as well, so the "before" step must
+;; wrap COMPILE-OP too, not only LOAD-OP: a machine that has never compiled
+;; stdutils (a fresh deploy, or a cleared fasl cache) otherwise hits the
+;; NAME-CONFLICT inside COMPILE-FILE, before any LOAD-OP hook can run.
 (defun stdutils-split-sequence-file-p (component)
   (and (typep component 'asdf:cl-source-file)
        (string= (asdf:component-name component) "split-sequence")
        (string-equal (asdf:component-name (asdf:component-system component)) "stdutils")))
 
-(defmethod asdf:perform :before ((op asdf:load-op) (component asdf:cl-source-file))
+(defun keep-serapeum-partition-in-bundle (component)
   (when (stdutils-split-sequence-file-p component)
     (let ((bundle (find-package "SERAPEUM/BUNDLE"))
           (partition (and (find-package "SERAPEUM")
                           (find-symbol "PARTITION" "SERAPEUM"))))
       (when (and bundle partition)
         (shadowing-import partition bundle)))))
+
+(defmethod asdf:perform :before ((op asdf:compile-op) (component asdf:cl-source-file))
+  (keep-serapeum-partition-in-bundle component))
+
+(defmethod asdf:perform :before ((op asdf:load-op) (component asdf:cl-source-file))
+  (keep-serapeum-partition-in-bundle component))
+
+;; SBCL's bundled ASDF makes any full WARNING raised while compiling a file
+;; fatal (*COMPILE-FILE-FAILURE-BEHAVIOUR* is :ERROR there; upstream ASDF
+;; defaults to :WARN).  Vendored dependencies are not ours to fix -- e.g.
+;; cl-langutils' tokenize.lisp warns that a derived type conflicts with its
+;; asserted type -- and a fresh machine compiles all of them, so a production
+;; build died on that warning.  Keep the strict setting for project-isidore's
+;; own files only; dependency warnings are still printed, just not fatal.
+(defmethod asdf:perform :around ((op asdf:compile-op) (component asdf:cl-source-file))
+  (let ((asdf:*compile-file-failure-behaviour*
+          (if (string-equal (asdf:primary-system-name (asdf:component-system component))
+                            "project-isidore")
+              asdf:*compile-file-failure-behaviour*
+              :warn)))
+    (call-next-method)))
 
 (defmethod asdf:perform :after ((op asdf:load-op) (component asdf:cl-source-file))
   (when (stdutils-split-sequence-file-p component)

@@ -39,7 +39,9 @@ the local machine in ~/.ssh/config."
   (cmd:single "test -d /usr/local/src/project-isidore/.git && git -C /usr/local/src/project-isidore reset --hard HEAD || true")
   (git:pulled "https://gitlab.com/bhw/project-isidore.git"
               (pathname "/usr/local/src/project-isidore/"))
-  (cmd:single "ocicl setup")
+  ;; ocicl lives in root's ~/.local/bin, which a non-interactive ssh shell
+  ;; does not put on PATH ("sh: ocicl: not found" otherwise).
+  (cmd:single "PATH=\"$HOME/.local/bin:$PATH\" ocicl setup")
   ;; Dependency pinning lives in ocicl.csv at the project root, brought in by
   ;; the git:pulled step above. make.lisp loads ocicl-runtime; ocicl auto-fetches
   ;; any system listed in ocicl.csv that's missing from the local ocicl/ dir on

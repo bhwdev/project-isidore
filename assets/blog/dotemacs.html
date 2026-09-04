@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- 2026-09-01 Tue 13:49 -->
+<!-- 2026-09-04 Fri 09:08 -->
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>BHW Emacs Configuration</title>
@@ -66,10 +66,10 @@
                                     </div>
                                     <h1 class="title">BHW Emacs Configuration</h1>
                                     <p class="subtitle">My literate Emacs config dotfile</p> <br/>
-                                    <p class="updated"><a href="/contact#article-history">Updated:</a> 2026-09-01 Tue 13:49</p>
+                                    <p class="updated"><a href="/contact#article-history">Updated:</a> 2026-09-04 Fri 09:04</p>
 </div>
 <div id="content" class="content">
-<div class="abstract" id="org33e1a8a">
+<div class="abstract" id="orgaa16a2c">
 <p>
 
 </p>
@@ -651,7 +651,7 @@ anything ever displaces the `</span><span class="org-doc"><span class="org-const
 </div>
 <div id="outline-container-ID-20260901T134925.976638" class="outline-5">
 <h5 id="ID-20260901T134925.976638">Consult Config</h5>
-<div class="outline-text-5" id="text-org05b77fd">
+<div class="outline-text-5" id="text-orgfe46186">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp"><code><span class="org-comment-delimiter">;;</span><span class="org-comment">---------------------------------------------------------------------------
 </span>(<span class="org-keyword">after!</span> consult
@@ -970,7 +970,7 @@ For a guide, see <a href="https://github.com/noctuid/evil-guide#keybindings-and-
 </div>
 <div id="outline-container-ID-20260901T134926.004984" class="outline-5">
 <h5 id="ID-20260901T134926.004984">Savehist Config (unused)</h5>
-<div class="outline-text-5" id="text-org588c4a7">
+<div class="outline-text-5" id="text-org388eb83">
 <p>
 <a href="https://www.emacswiki.org/emacs/SessionManagement">For more session management solutions.</a>
 <a href="https://emacs.stackexchange.com/questions/12086/high-cpu-memory-usage-and-abnormally-large-savehist-file">spacemacs - High CPU/memory usage and abnormally large savehist file? - Emacs&hellip;</a>
@@ -1047,10 +1047,10 @@ offset for each variable, and just look for any really big jumps:
 <div class="org-src-container">
 <pre class="src src-emacs-lisp"><code><span class="org-comment-delimiter">;;</span><span class="org-comment">---------------------------------------------------------------------------
 </span>(<span class="org-keyword">after!</span> dirvish
-  (<span class="org-keyword">setq</span> <span class="org-variable-name">dirvish-hide-details</span> t))
+  (<span class="org-keyword">setq</span> dirvish-hide-details t))
 
 (<span class="org-keyword">map!</span> <span class="org-builtin">:after</span> dirvish                    <span class="org-comment-delimiter">; </span><span class="org-comment">Doom overrides Dired with Dirvish.
-</span>      <span class="org-builtin">:map</span> <span class="org-variable-name">dirvish-mode-map</span>
+</span>      <span class="org-builtin">:map</span> dirvish-mode-map
       <span class="org-builtin">:n</span> <span class="org-string">";"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">consult-line</span>
       <span class="org-builtin">:n</span> <span class="org-string">"A"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">bhw/org-attach-visit-headline-from-dired</span>)
 
@@ -1291,7 +1291,7 @@ theme switch away from ef-owl/modus-themes.
 </div>
 <div id="outline-container-ID-88e3726e-0317-4bf6-846c-0630da77d0ad" class="outline-5">
 <h5 id="ID-88e3726e-0317-4bf6-846c-0630da77d0ad">Projectile Config</h5>
-<div class="outline-text-5" id="text-orgddab960">
+<div class="outline-text-5" id="text-orgf1ac8a6">
 <p>
 <span class="timestamp-wrapper"><time class="timestamp" datetime="2026-08-19T15:52:00">[2026-08-19 Wed 15:52]</time></span> &lt;- <a href="#ID-585facc9-22e3-4705-bb67-0e32727cab9a">Emacs Navigation &amp; Searching</a>
 </p>
@@ -1322,7 +1322,7 @@ project while skipping remote (TRAMP) projects entirely.
 </div>
 <div id="outline-container-ID-e50476d7-33f3-4961-8438-3c8d7156598a" class="outline-5">
 <h5 id="ID-e50476d7-33f3-4961-8438-3c8d7156598a">Pdf-Tools Config</h5>
-<div class="outline-text-5" id="text-org61db809">
+<div class="outline-text-5" id="text-orgeecc3cb">
 <ul class="org-ul">
 <li><a href="https://news.ycombinator.com/item?id=37110628">More PDF tools from HN</a></li>
 <li><a href="https://breezepdf.com/">https://breezepdf.com/</a></li>
@@ -1444,7 +1444,7 @@ See regex list here: <a href="https://www.debuggex.com/cheatsheet/regex/pcre">PC
         <span class="org-highlight-quoted-quote">'</span>(<span class="org-variable-name">pdf-view-dark-minor-mode</span>
           <span class="org-variable-name">pdf-history-minor-mode</span>
           <span class="org-variable-name">pdf-isearch-minor-mode</span>
-          <span class="org-variable-name">pdf-links-minor-mode</span>
+          pdf-links-minor-mode
           <span class="org-variable-name">pdf-misc-minor-mode</span>
           <span class="org-variable-name">pdf-misc-size-indication-minor-mode</span>
           <span class="org-variable-name">pdf-occur-global-minor-mode</span>))
@@ -1547,7 +1547,7 @@ Old config:
 </div>
 <div id="outline-container-ID-20260901T134926.054322" class="outline-5">
 <h5 id="ID-20260901T134926.054322">Magit Config</h5>
-<div class="outline-text-5" id="text-orga6ee3e4">
+<div class="outline-text-5" id="text-orgda19791">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp"><code><span class="org-comment-delimiter">;;</span><span class="org-comment">---------------------------------------------------------------------------
 </span>(<span class="org-keyword">after!</span> magit
@@ -1635,7 +1635,7 @@ awesome. Might just replace `SPC g f l (magit-log-buffer-file)` and `C-x v g
 </div>
 <div id="outline-container-ID-20260901T134926.059685" class="outline-6">
 <h6 id="ID-20260901T134926.059685">Magit Layer</h6>
-<div class="outline-text-6" id="text-org705598d">
+<div class="outline-text-6" id="text-orge5e41b3">
 <p>
 use <b>magit-file-rename</b> to rename files already tracked by git.
 Once again, <a href="https://www.youtube.com/watch?v=NDP91RNgT4A">Git in Spacemacs/Emacs with Magit - YouTube</a> .
@@ -1696,7 +1696,7 @@ Once again, <a href="https://www.youtube.com/watch?v=NDP91RNgT4A">Git in Spacema
 </div>
 <div id="outline-container-ID-b930cf24-7e9e-4284-ac77-fadc8c4ea7d0" class="outline-6">
 <h6 id="ID-b930cf24-7e9e-4284-ac77-fadc8c4ea7d0">Github Tutorial</h6>
-<div class="outline-text-6" id="text-org7d82bac">
+<div class="outline-text-6" id="text-org63c4162">
 <p>
 <span class="timestamp-wrapper"><time class="timestamp" datetime="2026-03-11T17:28:00">[2026-03-11 Wed 17:28]</time></span> &lt;- <a href="../dotfiles.html#ID-20220411T153602.241466">Dotfiles &amp; Configuration Files</a>
 </p>
@@ -1910,7 +1910,7 @@ On Windows:
 </div>
 <div id="outline-container-ID-20260901T134926.065060" class="outline-7">
 <h7 id="ID-20260901T134926.065060">Conventional Commits</h7>
-<div class="outline-text-7" id="text-org52e787a">
+<div class="outline-text-7" id="text-orgaf682f6">
 <p>
 Keeps my commit history tidy. Able to be used as extracted changelogs. Like
 essay or citation conventions.
@@ -1986,7 +1986,7 @@ essay or citation conventions.
 </div>
 <div id="outline-container-ID-20260901T134926.071555" class="outline-6">
 <h6 id="ID-20260901T134926.071555">Magit Forged</h6>
-<div class="outline-text-6" id="text-org00fcd9a">
+<div class="outline-text-6" id="text-orgd60b6ef">
 <p>
 Magit Forged is a way to view/and compose issues and pull requests of a
 particular git repository while remaining in Emacs.
@@ -2019,7 +2019,7 @@ to see that Forge commands are listed under <code>@</code></li>
 </div>
 <div id="outline-container-ID-20260901T134926.076318" class="outline-5">
 <h5 id="ID-20260901T134926.076318">Claude Code IDE Config</h5>
-<div class="outline-text-5" id="text-org2e3a0b7">
+<div class="outline-text-5" id="text-org8202621">
 <p>
 How to pick which Claude model to optimize for efficiency?
 <a href="https://deepswe.datacurve.ai/">https://deepswe.datacurve.ai/</a>
@@ -2562,7 +2562,7 @@ Case-insensitive over citekey, author, and title; LIMIT default 20."</span>
            (<span class="org-keyword">when</span> (<span class="org-function-name">bhw/claude-mcp--match-all-p</span> tokens haystack)
              (<span class="org-keyword">push</span> (<span class="org-constant">format</span> <span class="org-string">"@%s | %s | %s | %s"</span> key author year title)
                    matches))))
-       (<span class="org-constant">citar-get-entries</span>))
+       (citar-get-entries))
       (<span class="org-keyword">if</span> matches
           (<span class="org-function-name">bhw/claude-mcp--join-capped</span> (<span class="org-constant">nreverse</span> matches) max)
         (<span class="org-constant">format</span> <span class="org-string">"No bibliography matches for %S"</span> query))))
@@ -2949,7 +2949,7 @@ With ERRORS_ONLY, keep only lines that look like errors or warnings."</span>
 </div>
 <div id="outline-container-ID-20260901T134926.084686" class="outline-5">
 <h5 id="ID-20260901T134926.084686">Lexic Config</h5>
-<div class="outline-text-5" id="text-org52a9d08">
+<div class="outline-text-5" id="text-org8847d0b">
 <p>
 <a href="https://web.archive.org/web/20230622042529/http://download.huzheng.org/">https://web.archive.org/web/20230622042529/http://download.huzheng.org/</a>
 </p>
@@ -3011,7 +3011,7 @@ With ERRORS_ONLY, keep only lines that look like errors or warnings."</span>
 </div>
 <div id="outline-container-ID-20260901T134926.091972" class="outline-6">
 <h6 id="ID-20260901T134926.091972">Lexic Installation &amp; Background</h6>
-<div class="outline-text-6" id="text-orga449591">
+<div class="outline-text-6" id="text-org2e00f9a">
 <p>
 <a href="http://jsomers.net/blog/dictionary">You’re probably using the wrong dictionary</a>. The first place I looked was Oleh
 Krehel&rsquo;s <a href="https://github.com/abo-abo/define-word">defined word package</a>. It does not allow you to query multiple
@@ -3113,7 +3113,7 @@ Check out <code>lexic-dictionary-help</code>
 </div>
 <div id="outline-container-ID-20260901T134926.097248" class="outline-6">
 <h6 id="ID-20260901T134926.097248">Lexic Order of Dictionaries</h6>
-<div class="outline-text-6" id="text-orgd3b509e">
+<div class="outline-text-6" id="text-org6c19195">
 <ol class="org-ol">
 <li>The golden mean, the dictionary that has the first say, the lovingly crafted life&rsquo;s work of Noah Webster: Webster Unabridged 1913</li>
 <li>Thesauri - Synonyms
@@ -3174,7 +3174,7 @@ The distinction between dictionary and encyclopedia is a theoretically-based dis
 </div>
 <div id="outline-container-ID-23b4e9e1-7828-47e5-a39a-8612662b95bf" class="outline-5">
 <h5 id="ID-23b4e9e1-7828-47e5-a39a-8612662b95bf">Biblio Config</h5>
-<div class="outline-text-5" id="text-orga664912">
+<div class="outline-text-5" id="text-org4e18e5c">
 <p>
 <span class="timestamp-wrapper"><time class="timestamp" datetime="2026-03-11T16:41:00">[2026-03-11 Wed 16:41]</time></span> &lt;- <a href="../cpb.html#ID-3e8c244e-8a39-4ffd-a30c-cc4c7abcad6c">Project Jerome</a>
 </p>
@@ -3192,9 +3192,9 @@ The distinction between dictionary and encyclopedia is a theoretically-based dis
 
 (<span class="org-keyword">after!</span> citar
   (<span class="org-keyword">setf</span>
-   <span class="org-variable-name">citar-bibliography</span> (<span class="org-constant">list</span> (<span class="org-constant">concat</span> <span class="org-variable-name">+project-maria-dir+</span> <span class="org-string">"project-jerome.bib"</span>))
-   <span class="org-variable-name">citar-notes-paths</span> (<span class="org-constant">list</span> (<span class="org-constant">concat</span> <span class="org-variable-name">+project-maria-dir+</span> <span class="org-string">"bibtex-notes"</span>))
-   <span class="org-variable-name">citar-library-paths</span>
+   citar-bibliography (<span class="org-constant">list</span> (<span class="org-constant">concat</span> <span class="org-variable-name">+project-maria-dir+</span> <span class="org-string">"project-jerome.bib"</span>))
+   citar-notes-paths (<span class="org-constant">list</span> (<span class="org-constant">concat</span> <span class="org-variable-name">+project-maria-dir+</span> <span class="org-string">"bibtex-notes"</span>))
+   citar-library-paths
    <span class="org-comment-delimiter">;; </span><span class="org-comment">Excluded trees are pruned DURING the walk (the PREDICATE arg stops
 </span>   <span class="org-comment-delimiter">;; </span><span class="org-comment">recursion), not filtered after it: email-archive alone holds tens of
 </span>   <span class="org-comment-delimiter">;; </span><span class="org-comment">thousands of files that the old post-hoc filter walked and then threw
@@ -3305,7 +3305,7 @@ A dynamic `</span><span class="org-doc"><span class="org-constant">let</span></s
 </div>
 <div id="outline-container-ID-20240306T235804.739944" class="outline-5">
 <h5 id="ID-20240306T235804.739944">Ledger Config</h5>
-<div class="outline-text-5" id="text-org0c7f8ae">
+<div class="outline-text-5" id="text-orgc65ad39">
 <p>
 <span class="timestamp-wrapper"><time class="timestamp" datetime="2026-03-11T17:25:00">[2026-03-11 Wed 17:25]</time></span> &lt;- <a href="../dotfiles.html#ID-20240306T235430.268976">ledgerrc</a>
 <span class="timestamp-wrapper"><time class="timestamp" datetime="2026-03-11T17:25:00">[2026-03-11 Wed 17:25]</time></span> &lt;- <a href="../cpb.html#ID-1c1f443b-b063-4a0c-a260-77904a5cfd4f">Personal Economics</a>
@@ -3366,7 +3366,7 @@ Quick reports to run:
 </div>
 <div id="outline-container-ID-0d5cd091-ec8a-420d-9585-8d6ed856a00c" class="outline-5">
 <h5 id="ID-0d5cd091-ec8a-420d-9585-8d6ed856a00c">Common Lisp Config</h5>
-<div class="outline-text-5" id="text-orge497227">
+<div class="outline-text-5" id="text-org924bd53">
 <p>
 <span class="timestamp-wrapper"><time class="timestamp" datetime="2026-03-11T16:57:00">[2026-03-11 Wed 16:57]</time></span> &lt;- <a href="project-isidore-doc.html#ID-1fa799f3-260a-44df-acbb-f6f22bdfaf6a">Common Lisp Environment Setup</a>
 </p>
@@ -3392,7 +3392,7 @@ Quick reports to run:
 </div>
 <div id="outline-container-ID-dcaa7b2f-cffc-41c1-812e-56b6ef02454b" class="outline-5">
 <h5 id="ID-dcaa7b2f-cffc-41c1-812e-56b6ef02454b">Org Mode Config</h5>
-<div class="outline-text-5" id="text-org48d7918">
+<div class="outline-text-5" id="text-orgbf6ad95">
 <ul class="org-ul">
 <li><a href="https://github.com/novoid/org-mode-workshop">Org Mode Workshop Example Config</a></li>
 <li><a href="http://ehneilsen.net/notebook/orgExamples/org-examples.html#sec-5">Particle Physics Researcher - Advanced Emacs org-mode examples and cookbook</a></li>
@@ -3472,7 +3472,7 @@ M-RET to create next list item.
 </div>
 <div id="outline-container-ID-c6afcb5e-172f-49c6-b912-fe4c0440d98e" class="outline-6">
 <h6 id="ID-c6afcb5e-172f-49c6-b912-fe4c0440d98e">Org Agenda Config</h6>
-<div class="outline-text-6" id="text-orga540905">
+<div class="outline-text-6" id="text-orgbb9fd8f">
 <p>
 <span class="timestamp-wrapper"><time class="timestamp" datetime="2026-02-22T15:28:00">[2026-02-22 Sun 15:28]</time></span> &lt;- <a href="../cpb.html#ID-4571337d-b13e-4ce0-9b22-4d615e21ae0f">Task Mangement</a>
 </p>
@@ -3561,7 +3561,7 @@ priorities.
 </div>
 <div id="outline-container-ID-20260901T134926.112814" class="outline-7">
 <h7 id="ID-20260901T134926.112814">Conflict detection</h7>
-<div class="outline-text-7" id="text-orga7eb9de">
+<div class="outline-text-7" id="text-org6564268">
 <p>
 Double-booking is caught at the moment the timestamp is written rather than
 later by eye. <code>C-c C-c</code> on an active timestamp runs
@@ -4626,12 +4626,30 @@ otherwise return nil.  PROJ headings themselves are never skipped."</span>
       ((<span class="org-variable-name">org-agenda-tag-filter-preset</span> <span class="org-highlight-quoted-quote">'</span>(<span class="org-string">"-SDAY"</span> <span class="org-string">"-lat211"</span> <span class="org-string">"-phl225"</span>))
        (<span class="org-variable-name">org-agenda-skip-function</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">bhw/org-agenda-skip-proj-descendants</span>))))
    <span class="org-variable-name">org-agenda-window-setup</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">current-window</span>)
-  <span class="org-comment-delimiter">;; </span><span class="org-comment">NOTE: must be `</span><span class="org-comment"><span class="org-constant">:nm</span></span><span class="org-comment">', not `</span><span class="org-comment"><span class="org-constant">:m</span></span><span class="org-comment">'.  `</span><span class="org-comment"><span class="org-constant">evil-collection-org-agenda</span></span><span class="org-comment">' calls
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">(evil-set-initial-state 'org-agenda-mode 'normal), so agenda buffers open
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">in normal state, and it binds "s" to `</span><span class="org-comment"><span class="org-constant">org-agenda-schedule</span></span><span class="org-comment">' in the
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">normal-state auxiliary map of `</span><span class="org-comment"><span class="org-constant">org-agenda-mode-map</span></span><span class="org-comment">'.  Evil orders aux maps
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">for the *current* state ahead of maps for inherited states, so a
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">motion-only binding here loses to that normal-state binding.
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">NOTE: must be `</span><span class="org-comment"><span class="org-constant">:nm</span></span><span class="org-comment">', not `</span><span class="org-comment"><span class="org-constant">:m</span></span><span class="org-comment">'.  `</span><span class="org-comment"><span class="org-constant">evil-org-agenda-set-keys</span></span><span class="org-comment">' binds
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">everything in *motion* state and calls
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">(evil-set-initial-state 'org-agenda-mode 'motion), but
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">evil-collection-org-agenda</span></span><span class="org-comment">' loads later and resets that to 'normal, so
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">agenda buffers open in normal state.  Evil then orders the *entire* normal
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">group in `</span><span class="org-comment"><span class="org-constant">evil-mode-map-alist</span></span><span class="org-comment">' ahead of the entire motion group &#8212; the
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">global `</span><span class="org-comment"><span class="org-constant">evil-normal-state-map</span></span><span class="org-comment">' included.  A motion-only binding here
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">therefore loses not just to evil-collection's normal-state bindings in
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">org-agenda-mode-map</span></span><span class="org-comment">' but to Doom's plain global normal-state bindings.
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">Order for "gd" in a live agenda buffer:
+</span>  <span class="org-comment-delimiter">;;</span><span class="org-comment">
+</span>  <span class="org-comment-delimiter">;;   </span><span class="org-comment">evil-org-agenda-mode (normal aux)   nil
+</span>  <span class="org-comment-delimiter">;;   </span><span class="org-comment">org-agenda-mode-map  (normal aux)   nil
+</span>  <span class="org-comment-delimiter">;;   </span><span class="org-comment">evil-normal-state-map               +lookup/definition    &lt;- wins
+</span>  <span class="org-comment-delimiter">;;   </span><span class="org-comment">evil-org-agenda-mode (motion aux)   org-agenda-goto-date  &lt;- unreachable
+</span>  <span class="org-comment-delimiter">;;</span><span class="org-comment">
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">~30 of `</span><span class="org-comment"><span class="org-constant">evil-org-agenda</span></span><span class="org-comment">'s motion bindings are dead this way.  Revived
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">below are the ones whose live normal-state binding is `</span><span class="org-comment"><span class="org-constant">ignore</span></span><span class="org-comment">', unbound,
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">or meaningless in a read-only agenda buffer.  Deliberately NOT revived,
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">because evil-collection's binding is the better one: H/L (agenda span
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">earlier/later &#8212; nothing else is bound to those), J (goto-date), K, A
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">(archive), m/u (bulk mark/unmark), x (exit), gt (workspace switch), 0,
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">S-RET, and the "d&#8230;" prefix (bare "d" is already `</span><span class="org-comment"><span class="org-constant">org-agenda-kill</span></span><span class="org-comment">'; making
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">it a prefix here would swallow the bare key).
 </span>  (<span class="org-keyword">map!</span> <span class="org-builtin">:after</span> evil-org-agenda
         <span class="org-builtin">:map</span> <span class="org-variable-name">evil-org-agenda-mode-map</span>
         <span class="org-builtin">:nm</span> <span class="org-string">"s"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">avy-goto-word-or-subword-1</span>
@@ -4639,7 +4657,30 @@ otherwise return nil.  PROJ headings themselves are never skipped."</span>
 </span>        <span class="org-comment-delimiter">;; </span><span class="org-comment">family is already shadowed by the avy binding above.
 </span>        <span class="org-builtin">:nm</span> <span class="org-string">"S"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">bhw/org-schedule-with-effort</span>
         <span class="org-comment-delimiter">;; </span><span class="org-comment">Shadows `</span><span class="org-comment"><span class="org-constant">org-timer-set-timer</span></span><span class="org-comment">' on ";" in `</span><span class="org-comment"><span class="org-constant">org-agenda-mode-map</span></span><span class="org-comment">'.
-</span>        <span class="org-builtin">:nm</span> <span class="org-string">";"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">consult-line</span>)
+</span>        <span class="org-builtin">:nm</span> <span class="org-string">";"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">consult-line</span>
+        <span class="org-comment-delimiter">;; </span><span class="org-comment">--- revived from `</span><span class="org-comment"><span class="org-constant">evil-org-agenda</span></span><span class="org-comment">'s motion map ---
+</span>        <span class="org-comment-delimiter">;; </span><span class="org-comment">evil-collection also has "J" for goto-date; "gd" is the
+</span>        <span class="org-comment-delimiter">;; </span><span class="org-comment">evil-org-agenda spelling and the one muscle memory expects.
+</span>        <span class="org-builtin">:nm</span> <span class="org-string">"gd"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">org-agenda-goto-date</span>
+        <span class="org-builtin">:nm</span> <span class="org-string">"gc"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">org-agenda-goto-calendar</span>      <span class="org-comment-delimiter">; </span><span class="org-comment">was `</span><span class="org-comment"><span class="org-constant">evilnc-comment-operator</span></span><span class="org-comment">'
+</span>        <span class="org-builtin">:nm</span> <span class="org-string">"gD"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">org-agenda-view-mode-dispatch</span> <span class="org-comment-delimiter">; </span><span class="org-comment">was `</span><span class="org-comment"><span class="org-constant">+lookup/references</span></span><span class="org-comment">'
+</span>        <span class="org-comment-delimiter">;; </span><span class="org-comment">These four sit on keys evil-collection remaps to `</span><span class="org-comment"><span class="org-constant">ignore</span></span><span class="org-comment">'.
+</span>        <span class="org-builtin">:nm</span> <span class="org-string">"C"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">org-agenda-capture</span>
+        <span class="org-builtin">:nm</span> <span class="org-string">"P"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">org-agenda-show-the-flagging-note</span>
+        <span class="org-builtin">:nm</span> <span class="org-string">"a"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">org-agenda-add-note</span>
+        <span class="org-builtin">:nm</span> <span class="org-string">"i"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">org-agenda-diary-entry</span>
+        <span class="org-builtin">:nm</span> <span class="org-string">"~"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">org-agenda-bulk-toggle-all</span>
+        <span class="org-comment-delimiter">;; </span><span class="org-comment">Takes "p" from `</span><span class="org-comment"><span class="org-constant">org-agenda-priority</span></span><span class="org-comment">', which stays on the
+</span>        <span class="org-comment-delimiter">;; </span><span class="org-comment">localleader (", p").
+</span>        <span class="org-builtin">:nm</span> <span class="org-string">"p"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">org-agenda-date-prompt</span>
+        <span class="org-comment-delimiter">;; </span><span class="org-comment">Bare "c" is `</span><span class="org-comment"><span class="org-constant">evil-change</span></span><span class="org-comment">' -&gt; `</span><span class="org-comment"><span class="org-constant">ignore</span></span><span class="org-comment">' here, so the clock prefix is
+</span>        <span class="org-comment-delimiter">;; </span><span class="org-comment">free.  "c e" in particular is `</span><span class="org-comment"><span class="org-constant">org-agenda-set-effort</span></span><span class="org-comment">'.
+</span>        <span class="org-builtin">:nm</span> <span class="org-string">"cc"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">org-agenda-clock-cancel</span>
+        <span class="org-builtin">:nm</span> <span class="org-string">"ce"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">org-agenda-set-effort</span>
+        <span class="org-builtin">:nm</span> <span class="org-string">"cg"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">org-agenda-clock-goto</span>
+        <span class="org-builtin">:nm</span> <span class="org-string">"cr"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-variable-name">org-agenda-clockreport-mode</span>
+        <span class="org-builtin">:nm</span> <span class="org-string">"ct"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">org-agenda-set-tags</span>
+        <span class="org-builtin">:nm</span> <span class="org-string">"cT"</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">org-timer-set-timer</span>)
   (<span class="org-keyword">map!</span> <span class="org-builtin">:after</span> org-agenda
         <span class="org-builtin">:map</span> <span class="org-variable-name">org-agenda-mode-map</span>
         <span class="org-builtin">:localleader</span>
@@ -4694,7 +4735,7 @@ otherwise return nil.  PROJ headings themselves are never skipped."</span>
 </div>
 <div id="outline-container-ID-20260901T134926.120596" class="outline-7">
 <h7 id="ID-20260901T134926.120596">Organizational Buckets i.e. inbox dumps</h7>
-<div class="outline-text-7" id="text-orgd5acff8">
+<div class="outline-text-7" id="text-org641f720">
 <p>
 Tasks are broken down into kinds. Because humans cannot bi-locate, all tasks needs to have a valid <b>contextual location</b> in which to accomplish them. This is done with tags which are prefixed with &ldquo;@&rdquo;,
 errand - Tasks that must be completed out and about
@@ -4782,7 +4823,7 @@ Difference between 0someday items and WAIT keyword items is the intersection bet
 </div>
 <div id="outline-container-ID-8457b1b9-e8e8-4050-9e7e-22ac1b1488da" class="outline-6">
 <h6 id="ID-8457b1b9-e8e8-4050-9e7e-22ac1b1488da">Org Attach Config</h6>
-<div class="outline-text-6" id="text-org1b6ed43">
+<div class="outline-text-6" id="text-orgea0a7f6">
 <ul class="org-ul">
 <li><a href="https://medium.com/@James86768479/org-id-org-attach-better-folder-names-3905f3841044">Org ID, Org Attach &amp; Better Folder Names | by Josh<sub>Rbot</sub> | Medium</a></li>
 </ul>
@@ -4822,7 +4863,7 @@ delete attachments after you have deleted their associated headline</a>.
 </div>
 <div id="outline-container-ID-20260901T134926.124923" class="outline-6">
 <h6 id="ID-20260901T134926.124923">Org Edna Config</h6>
-<div class="outline-text-6" id="text-org44f5909">
+<div class="outline-text-6" id="text-org091f975">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp"><code><span class="org-comment-delimiter">;;</span><span class="org-comment">---------------------------------------------------------------------------
 </span><span class="org-comment-delimiter">;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">org-depend</span></span><span class="org-comment">' (org-contrib) is Edna's deprecated predecessor.  It claims the
@@ -4882,7 +4923,7 @@ delete attachments after you have deleted their associated headline</a>.
 </div>
 <div id="outline-container-ID-20260901T134926.129339" class="outline-6">
 <h6 id="ID-20260901T134926.129339">Org Mem Config</h6>
-<div class="outline-text-6" id="text-org084f30b">
+<div class="outline-text-6" id="text-org74a866b">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp"><code><span class="org-comment-delimiter">;;</span><span class="org-comment">---------------------------------------------------------------------------
 </span>(<span class="org-keyword">use-package!</span> org-mem
@@ -4939,7 +4980,7 @@ infinite-loop footgun upstream warns about."</span>
 </div>
 <div id="outline-container-ID-20260901T134926.133720" class="outline-6">
 <h6 id="ID-20260901T134926.133720">Org Node Config</h6>
-<div class="outline-text-6" id="text-orgea2f7bd">
+<div class="outline-text-6" id="text-orgf2e42ca">
 <p>
 <a href="https://github.com/d12frosted/vulpea">GitHub - d12frosted/vulpea: Database layer for org-mode notes with async inde&hellip;</a>
 </p>
@@ -5001,7 +5042,7 @@ target's backlink points back to it precisely."</span>
 </div>
 <div id="outline-container-ID-20260901T134926.138702" class="outline-6">
 <h6 id="ID-20260901T134926.138702">Org Noter Config</h6>
-<div class="outline-text-6" id="text-org12ddc7e">
+<div class="outline-text-6" id="text-org6e68f33">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp"><code><span class="org-comment-delimiter">;;</span><span class="org-comment">---------------------------------------------------------------------------
 </span>(<span class="org-keyword">after!</span> org-noter
@@ -5105,7 +5146,7 @@ With prefix argument, fall back to the original `</span><span class="org-doc"><s
 </div>
 <div id="outline-container-ID-20260901T134926.143843" class="outline-6">
 <h6 id="ID-20260901T134926.143843">Org Transclusion Config</h6>
-<div class="outline-text-6" id="text-org986b108">
+<div class="outline-text-6" id="text-org256c391">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp"><code><span class="org-comment-delimiter">;;</span><span class="org-comment">---------------------------------------------------------------------------
 </span>(<span class="org-keyword">use-package!</span> org-transclusion
@@ -5119,7 +5160,7 @@ With prefix argument, fall back to the original `</span><span class="org-doc"><s
 </div>
 <div id="outline-container-ID-6d3d787b-9a20-426f-bb71-97a63bee6597" class="outline-6">
 <h6 id="ID-6d3d787b-9a20-426f-bb71-97a63bee6597">Org Mode Export</h6>
-<div class="outline-text-6" id="text-orgc7326b8">
+<div class="outline-text-6" id="text-org35b4091">
 <ul class="org-ul">
 <li><a href="https://github.com/thi-ng/org-spec">An Org-mode template for technical specification documents and HTML publishing</a></li>
 <li><a href="http://yummymelon.com/devnull/running-sql-queries-on-org-tables.html">nfdn: Running SQL Queries on Org Tables</a></li>
@@ -5130,9 +5171,21 @@ With prefix argument, fall back to the original `</span><span class="org-doc"><s
 </div>
 <div id="outline-container-ID-20260901T134926.148923" class="outline-6">
 <h6 id="ID-20260901T134926.148923">Ob Tangle Sync Config</h6>
-<div class="outline-text-6" id="text-org453ffc9">
+<div class="outline-text-6" id="text-org17a22c9">
 <p>
 <a href="https://list.orgmode.org/orgmode/CAHHeYzJ6koLOr9=K82bjGX3fo6RHRJcvgdhJ6Ym08uPavuXnXQ@mail.gmail.com/">{ANN} lisp/ob-tangle-sync.el - Mehmet Tekman</a>
+</p>
+
+<p>
+Two directions, two mechanisms. <i>Tangling</i> on save is mine and deliberately
+narrow: <code>bhw/org-babel-tangle-on-save</code> runs a full <code>org-babel-tangle</code> after
+saving, but only for the files in <code>bhw/org-tangle-on-save-files</code> &mdash; this file
+and <code>dotfiles.org</code>. Since <code>after-save-hook</code> is global, that list <b>is</b> the
+allowlist; every other Org file in <code>project-maria</code> is left alone no matter what
+its <code>:tangle</code> headers say. /De/tangling stays with <code>ob-tangle-sync</code>: saving a
+generated file (<code>config.el</code>, <code>packages.el</code>) pushes the edit back into its source
+block here. Advice suppresses ob-tangle-sync&rsquo;s own org-to-file leg for the two
+allowlisted files, so a save parses this 460 KB file once rather than twice.
 </p>
 
 <div class="org-src-container">
@@ -5145,14 +5198,94 @@ With prefix argument, fall back to the original `</span><span class="org-doc"><s
   (<span class="org-keyword">load!</span> <span class="org-string">"private-packages/ob-tangle-sync.el"</span>)
   (<span class="org-keyword">setf</span> <span class="org-variable-name">org-babel-tangle-sync-files</span>
         (<span class="org-constant">list</span> (<span class="org-constant">concat</span> <span class="org-variable-name">+project-maria-dir+</span> <span class="org-string">"blog/dotemacs.org"</span>)))
-  (<span class="org-variable-name">org-babel-tangle-sync-mode</span>))
+  (<span class="org-variable-name">org-babel-tangle-sync-mode</span>)
+
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">ob-tangle-sync's org-&gt;file leg re-tangles the block-at-point's target on
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">the same save: a second parse of the file for a subset of what
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">bhw/org-babel-tangle-on-save</span></span><span class="org-comment">' has already written.  Suppress it for the
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">allowlisted files.  The file-&gt;org (detangle) leg is untouched -- that one
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">runs in the *tangled* buffer (config.el, packages.el, ...), which is never
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">a member of the allowlist.
+</span>  (<span class="org-keyword">define-advice</span> <span class="org-function-name">org-babel-tangle-sync-synchronize</span>
+      (<span class="org-builtin">:around</span> (fn <span class="org-type">&amp;rest</span> args) bhw/tangle-on-save-supersedes)
+    (<span class="org-keyword">unless</span> (<span class="org-function-name">bhw/org-tangle-on-save-file-p</span>)
+      (<span class="org-constant">apply</span> fn args))))
+
+(<span class="org-keyword">defvar</span> <span class="org-variable-name">bhw/org-tangle-on-save-files</span>
+  (<span class="org-constant">mapcar</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">file-truename</span>
+          (<span class="org-constant">list</span> (<span class="org-constant">concat</span> <span class="org-variable-name">+project-maria-dir+</span> <span class="org-string">"blog/dotemacs.org"</span>)
+                (<span class="org-constant">concat</span> <span class="org-variable-name">+project-maria-dir+</span> <span class="org-string">"dotfiles.org"</span>)))
+  <span class="org-doc">"Org files tangled in full by `</span><span class="org-doc"><span class="org-constant">bhw/org-babel-tangle-on-save</span></span><span class="org-doc">'.
+
+`</span><span class="org-doc"><span class="org-constant">after-save-hook</span></span><span class="org-doc">' is global, so this list is the entire allowlist: no other
+Org file auto-tangles on save, whatever its :tangle headers say."</span>)
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">bhw/org-tangle-on-save-file-p</span> ()
+  <span class="org-doc">"Non-nil when the current buffer visits a `</span><span class="org-doc"><span class="org-constant">bhw/org-tangle-on-save-files</span></span><span class="org-doc">' member."</span>
+  (<span class="org-keyword">and</span> <span class="org-variable-name">buffer-file-name</span>
+       (<span class="org-constant">member</span> (<span class="org-constant">file-truename</span> <span class="org-variable-name">buffer-file-name</span>) <span class="org-variable-name">bhw/org-tangle-on-save-files</span>)))
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">bhw/org-babel-tangle-on-save</span> ()
+  <span class="org-doc">"Tangle the whole buffer after saving, for the allowlisted files only.
+
+Errors are demoted to a warning rather than signalled: this runs from
+`</span><span class="org-doc"><span class="org-constant">after-save-hook</span></span><span class="org-doc">', where a signal aborts every hook queued behind it (org-mem's
+incremental index, for one).  dotfiles.org makes that concrete --- one of its
+targets, /mnt/c/ProgramData/Microsoft/WSL/.wslgconfig, is read-only from WSL,
+so the day that block diverges from the file the whole save would come down
+with it."</span>
+  (<span class="org-keyword">when</span> (<span class="org-function-name">bhw/org-tangle-on-save-file-p</span>)
+    (<span class="org-keyword">condition-case</span> err
+        (<span class="org-keyword">let</span> ((<span class="org-variable-name">org-confirm-babel-evaluate</span> nil))
+          (<span class="org-keyword">dolist</span> (file (<span class="org-constant">org-babel-tangle</span>))
+            <span class="org-comment-delimiter">;; </span><span class="org-comment">ob-tangle writes targets with `</span><span class="org-comment"><span class="org-constant">write-region</span></span><span class="org-comment">', so a buffer
+</span>            <span class="org-comment-delimiter">;; </span><span class="org-comment">already visiting one keeps its pre-tangle text and would clobber
+</span>            <span class="org-comment-delimiter">;; </span><span class="org-comment">the fresh output on its next save.  Revert the clean ones; a
+</span>            <span class="org-comment-delimiter">;; </span><span class="org-comment">modified buffer is left alone rather than silently losing
+</span>            <span class="org-comment-delimiter">;; </span><span class="org-comment">unsaved edits.
+</span>            (<span class="org-keyword">when-let*</span> ((buf (<span class="org-constant">get-file-buffer</span> file)))
+              (<span class="org-keyword">with-current-buffer</span> buf
+                (<span class="org-keyword">unless</span> (<span class="org-constant">buffer-modified-p</span>)
+                  (<span class="org-constant">revert-buffer</span> <span class="org-builtin">:ignore-auto</span> <span class="org-builtin">:noconfirm</span>))))))
+      (<span class="org-constant">error</span>
+       <span class="org-comment-delimiter">;; </span><span class="org-comment">Both channels on purpose: the echo area is where a save is watched,
+</span>       <span class="org-comment-delimiter">;; </span><span class="org-comment">*Warnings* is what survives the next message.
+</span>       (<span class="org-constant">message</span> <span class="org-string">"Tangle-on-save FAILED for %s: %s"</span>
+                (<span class="org-constant">abbreviate-file-name</span> <span class="org-variable-name">buffer-file-name</span>)
+                (<span class="org-constant">error-message-string</span> err))
+       (<span class="org-constant">display-warning</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">bhw/org-babel-tangle-on-save</span>
+                        (<span class="org-constant">format</span> <span class="org-string">"tangling %s failed: %s"</span>
+                                (<span class="org-constant">abbreviate-file-name</span> <span class="org-variable-name">buffer-file-name</span>)
+                                (<span class="org-constant">error-message-string</span> err))
+                        <span class="org-builtin">:error</span>)))))
+
+(<span class="org-constant">add-hook</span> <span class="org-highlight-quoted-quote">'</span><span class="org-variable-name">after-save-hook</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">bhw/org-babel-tangle-on-save</span>)
+
+(<span class="org-keyword">defun</span> <span class="org-function-name">bhw/touch-tangled-files</span> (files)
+  <span class="org-doc">"Bump the mtime of FILES, the value `</span><span class="org-doc"><span class="org-constant">org-babel-tangle</span></span><span class="org-doc">' returns.
+
+ob-tangle skips the `</span><span class="org-doc"><span class="org-constant">write-region</span></span><span class="org-doc">' for a target whose content is unchanged
+(see the `</span><span class="org-doc"><span class="org-constant">compare-buffer-substrings</span></span><span class="org-doc">' guard in `</span><span class="org-doc"><span class="org-constant">org-babel-tangle</span></span><span class="org-doc">'), but still
+collects it.  So an edit confined to prose or a property drawer -- publishing
+the blog stamps ID drawers through dotemacs.org, for one -- leaves every
+target older than the org source permanently, which is exactly the state
+`</span><span class="org-doc"><span class="org-constant">bhw/config-test--tangle-fresh</span></span><span class="org-doc">' reads as a never-tangled edit.
+
+Touching them makes \"newest target is at least as new as the source\" mean
+what that test assumes it means: a tangle has run since the last edit."</span>
+  (<span class="org-keyword">dolist</span> (file files)
+    (<span class="org-keyword">when</span> (<span class="org-constant">file-writable-p</span> file)
+      (<span class="org-constant">set-file-times</span> file)))
+  files)
+
+(<span class="org-constant">advice-add</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">org-babel-tangle</span> <span class="org-builtin">:filter-return</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">bhw/touch-tangled-files</span>)
 </code></pre>
 </div>
 </div>
 </div>
 <div id="outline-container-ID-20260901T134926.153870" class="outline-6">
 <h6 id="ID-20260901T134926.153870">Office to Org Config</h6>
-<div class="outline-text-6" id="text-org76f1b39">
+<div class="outline-text-6" id="text-orgbc50f71">
 <p>
 To read docx comments: <a href="https://github.com/nick-maderight/docx-view">https://github.com/nick-maderight/docx-view</a>
 </p>
@@ -5187,7 +5320,7 @@ most of their ZIP/XML and rendering plumbing. Behaviour is tunable via
 </div>
 <div id="outline-container-ID-20260901T134926.158554" class="outline-6">
 <h6 id="ID-20260901T134926.158554">Org Clock Analyzer Config</h6>
-<div class="outline-text-6" id="text-org012c53d">
+<div class="outline-text-6" id="text-org467e6c4">
 <p>
 A homegrown clock analyzer, <code>private-packages/org-clock-analyzer.el</code> &ndash; hand-written,
 not tangled (the <a href="#ID-20260901T134926.153870">Office to Org Config</a> precedent).  It draws what
@@ -5218,7 +5351,7 @@ SPC n c → p forecasts that subtree. Dynamic block: #+BEGIN: clock-analyzer :vi
 tags :range this-year :limit 5.
 </p>
 
-<pre class="example" id="org6dfd712">
+<pre class="example" id="org1fc2b6e">
 B=~/.config/emacs/.local/straight/build-30.1
 emacs -Q --batch -L $B/org -L $B/compat -L $B/cond-let -L $B/llama \
   -L $B/magit-section -L $B/transient -L $B/org-edna \
@@ -5289,7 +5422,7 @@ emacs -Q --batch -L $B/org -L $B/compat -L $B/cond-let -L $B/llama \
 </div>
 <div id="outline-container-ID-20260901T134926.163010" class="outline-6">
 <h6 id="ID-20260901T134926.163010">Org Contacts Config</h6>
-<div class="outline-text-6" id="text-orgb973c5c">
+<div class="outline-text-6" id="text-org1c6944b">
 <p>
 A flat file of org headings is the simplest and in the unlikely case that I
 exceed dunbar&rsquo;s number, there is <a href="https://github.com/girzel/ebdb">GitHub - girzel/ebdb: An EIEIO port of BBDB,
@@ -5318,7 +5451,7 @@ Install the below if we&rsquo;re going to import contacts into Emacs.
 </div>
 <div id="outline-container-ID-20260901T134926.166381" class="outline-6">
 <h6 id="ID-20260901T134926.166381">Org Download Config</h6>
-<div class="outline-text-6" id="text-org75cbe15">
+<div class="outline-text-6" id="text-org7083dd6">
 <p>
 I don&rsquo;t like the fixed image width setting for images. So, I wrote a custom function for a bit more dynamic rescaling of images:
 </p>
@@ -5406,7 +5539,7 @@ xclip/wl-paste on gnu/linux."</span>
 </div>
 <div id="outline-container-ID-20240219T122532.621724" class="outline-6">
 <h6 id="ID-20240219T122532.621724">Ox Publish Config</h6>
-<div class="outline-text-6" id="text-org1fa1a7b">
+<div class="outline-text-6" id="text-org8bcf1c8">
 <ul class="org-ul">
 <li><a href="https://gongzhitaao.org/orgcss/">CSS for Org-exported HTML</a></li>
 </ul>
@@ -5654,7 +5787,7 @@ on each rebuild.  Use the same date the sitemap does instead."</span>
 </div>
 <div id="outline-container-ID-20260901T134926.170026" class="outline-6">
 <h6 id="ID-20260901T134926.170026">Org Re Reveal Config</h6>
-<div class="outline-text-6" id="text-orge86fc40">
+<div class="outline-text-6" id="text-org1e5a587">
 <p>
 <a href="https://beameratelier.com/ltx-talk.html">ltx-talk — Beamer Atelier</a>
 Add audio to presentation? <a href="https://gitlab.com/oer/emacs-reveal">oer / emacs-reveal · GitLab</a>
@@ -5673,7 +5806,7 @@ Add audio to presentation? <a href="https://gitlab.com/oer/emacs-reveal">oer / e
 </div>
 <div id="outline-container-ID-20260901T134926.173539" class="outline-5">
 <h5 id="ID-20260901T134926.173539">Cdlatex Config</h5>
-<div class="outline-text-5" id="text-orgeb0d1dd">
+<div class="outline-text-5" id="text-org6fd0753">
 <p>
 <a href="https://mathpix.com/snipping-tool">Mathpix: Snipping Tool</a>
 <a href="https://karthinks.com/software/latex-input-for-impatient-scholars/#fnref:5">LaTeX Input for Impatient Scholars | Karthinks</a>
@@ -5682,7 +5815,7 @@ Add audio to presentation? <a href="https://gitlab.com/oer/emacs-reveal">oer / e
 </div>
 <div id="outline-container-ID-90492a6c-28d8-49cc-936e-16f598c592d1" class="outline-5">
 <h5 id="ID-90492a6c-28d8-49cc-936e-16f598c592d1">Plantuml Config</h5>
-<div class="outline-text-5" id="text-org663c6ec">
+<div class="outline-text-5" id="text-org8f39f02">
 <p>
 <span class="timestamp-wrapper"><time class="timestamp" datetime="2026-03-11T21:46:00">[2026-03-11 Wed 21:46]</time></span> &lt;- <a href="../cpb.html#ID-951faff8-8ea3-4a95-b8e1-bf025b4d0da3">Plant UML</a>
 </p>
@@ -5719,7 +5852,7 @@ Old config:
 </div>
 <div id="outline-container-ID-36fa755a-d77f-4959-a503-cc1a4803659e" class="outline-5">
 <h5 id="ID-36fa755a-d77f-4959-a503-cc1a4803659e">Python Config</h5>
-<div class="outline-text-5" id="text-org43835eb">
+<div class="outline-text-5" id="text-org2b195d2">
 <ul class="org-ul">
 <li><a href="../cpb.html#ID-9b4047b9-4cf7-4882-9355-467786362d30">&lt;&ndash;Python</a></li>
 </ul>
@@ -5762,107 +5895,103 @@ is also where claude-code-ide&rsquo;s <code>getDiagnostics</code> MCP tool reads
 <li><a href="https://www.bounga.org/emacs/2026/06/30/sign-always-encrypt-when-possible-in-mu4e/">Sign Always, Encrypt When Possible: Automatic GPG in mu4e - Bounga’s Home</a></li>
 </ul>
 <ol class="org-ol">
-<li>Re-auth the M365 token (the cached refresh token has expired — device-code sign-in as bwang@archtoronto.org):</li>
+<li>Re-auth the M365 token (the cached refresh token has expired — device-code
+sign-in as the Microsoft 365 identity being refreshed):</li>
 </ol>
 <div class="org-src-container">
-<pre class="src src-sh"><code>~/.local/bin/uv run ~/.config/oauth2/m365-token.py --login
+<pre class="src src-sh"><code>~/.local/bin/uv run ~/.config/oauth2/m365-token.py --account companions --login
 </code></pre>
 </div>
 
 <p>
-bwang@archtoronto.org is full send+receive (2026-07-17):
+Only one maildir is synced (<code>/gmail</code>).  Every non-Gmail identity below is
+<b>send-only</b>: its incoming mail is redirected or forwarded into the Gmail
+mailbox and arrives through the single <code>gmail</code> mbsync channel, so none has an
+mbsync channel, maildir, or mu4e context of its own.
 </p>
-
-<ul class="org-ul">
-<li>Receive: mbsync <code>archtoronto</code> channel (dotfiles.org §mbsyncrc) — XOAUTH2 via
-the <code>libsasl2-modules-kdexoauth2</code> SASL plugin + PassCmd token helper — into
-<code>email-archive/archtoronto/</code>.</li>
-<li>Send: unchanged — SMTP switching advice (bhw/set-smtp-from-identity) + the
-xoauth2 cl-defmethod below; token helper ~/.config/oauth2/m365-token.py;
-smtp.office365.com authinfo line; bwang@archtoronto.org in
-bhw/mu4e-address-routing.</li>
-<li>mu4e-contexts <code>personal=/=work</code> keyed on maildir (/archtoronto*): contexts
-carry only the default From; both contexts file drafts/sent/trash/refile
-into the Gmail folders (one archive).</li>
-<li>The Outlook-side forward-to-Gmail rule is disabled (work mail arrives only
-via IMAP).</li>
-</ul>
 
 <p>
-bwang@companionscross.org is <b>send-only</b> (2026-07-23):
+Note on placeholders: the addresses and domains in this section are
+placeholders (<code>me@gmail.com</code>, <code>work.example</code>, <code>school.example</code>).  The real
+values live in <code>personal-info.el</code> (dotfiles.org §personal-info), which is not
+published.
+</p>
+
+<p>
+me@work.example is <b>send-only</b> (2026-07-23):
 </p>
 
 <ul class="org-ul">
-<li>Receive: nothing in Emacs. An Outlook redirect rule on the Companions tenant
-forwards everything to benedicthanshenwang@gmail.com, so it lands in <code>/gmail</code>
+<li>Receive: nothing in Emacs. An Outlook redirect rule on the work tenant
+forwards everything to me@gmail.com, so it lands in <code>/gmail</code>
 through the existing mbsync channel. Redirect (unlike forward) preserves the
 original <code>To:</code>, which is what lets <code>bhw/mu4e-set-from-address-dwim</code> put the
 right From on a reply. No mbsync channel, maildir, or mu4e context of its own.</li>
-<li>Send: smtp.office365.com:587 XOAUTH2, same path as archtoronto —
+<li>Send: smtp.office365.com:587 XOAUTH2 —
 <code>bhw/m365-accounts</code> maps the From address to <code>m365-token.py --account
   companions</code>, whose cache is separate so the two refresh tokens are
 independent. Seed it once with
 <code>uv run ~/.config/oauth2/m365-token.py --account companions --login</code>.</li>
 <li>The address was already in <code>bhw/mu4e-address-routing</code> territory and in the
 <code>mu init --my-address</code> list below, so no store re-init was needed.</li>
-<li>companionscross.org is Microsoft 365 (MX → companionscross-org.mail.
+<li>work.example is Microsoft 365 (MX → work-example.mail.
 protection.outlook.com), SPF <code>-all</code>, DMARC <code>p=none</code>. Sending through M365
-rather than Gmail keeps DKIM aligned (<code>d=companionscross.org</code>).</li>
+rather than Gmail keeps DKIM aligned (<code>d=work.example</code>).</li>
 <li>Verified end-to-end <span class="timestamp-wrapper"><time class="timestamp" datetime="2026-07-23">[2026-07-23 Thu]</time></span>. Outbound: Gmail stamps <code>dkim=pass
-  header.i=@companionscross.org header.s=selector1</code>, <code>spf=pass</code>, <code>dmarc=pass</code>.
-Inbound: a message addressed to bwang@companionscross.org lands in the Gmail
+  header.i=@work.example header.s=selector1</code>, <code>spf=pass</code>, <code>dmarc=pass</code>.
+Inbound: a message addressed to me@work.example lands in the Gmail
 inbox via the redirect. Caveat found while testing — a redirect re-sends
-under a companionscross.org envelope, so if the <b>original</b> sender domain
+under a work.example envelope, so if the <b>original</b> sender domain
 publishes DMARC <code>p=reject</code> (e.g. bhw.name), the forwarded copy gets
 <code>dmarc=fail ... dis=QUARANTINE</code> at the far end; Microsoft&rsquo;s ARC seal is what
 keeps Gmail delivering it anyway. Ordinary third-party senders are unaffected.</li>
 </ul>
 
 <p>
-wang.hanshen@shms.edu is <b>send-only</b> (2026-09-01):
+me@school.example is <b>send-only</b> (2026-09-01):
 </p>
 
 <ul class="org-ul">
 <li>Symptom: mail composed in mu4e as this address landed in the Spam folder of
-shms.edu recipients (e.g. the 2026 Fall Organ Lesson Scheduling thread).</li>
+school.example recipients (a staff thread).</li>
 <li>Cause: the address is only a Gmail &ldquo;Send mail as&rdquo; alias, so
 <code>bhw/set-smtp-from-identity</code> fell through to the <code>t</code> branch and submitted it
 on the <b>personal</b> Gmail login.  Gmail then rewrites the envelope of an alias
 send to the authenticated account and signs DKIM <code>d=gmail.com</code>.  Confirmed by
-probe <span class="timestamp-wrapper"><time class="timestamp" datetime="2026-09-01">[2026-09-01 Tue]</time></span>: a submission with <code>MAIL FROM:&lt;wang.hanshen@shms.edu&gt;</code>
-came back stored with <code>Return-Path: &lt;benedicthanshenwang@gmail.com&gt;</code>.  With
-neither SPF nor DKIM aligned to <code>From: ...@shms.edu</code>, DMARC fails, and
-shms.edu publishes <code>p=quarantine; sp=quarantine; pct=100</code> (DMARCLY-managed) &ndash;
+probe <span class="timestamp-wrapper"><time class="timestamp" datetime="2026-09-01">[2026-09-01 Tue]</time></span>: a submission with <code>MAIL FROM:&lt;me@school.example&gt;</code>
+came back stored with <code>Return-Path: &lt;me@gmail.com&gt;</code>.  With
+neither SPF nor DKIM aligned to <code>From: ...@school.example</code>, DMARC fails, and
+school.example publishes <code>p=quarantine; sp=quarantine; pct=100</code> (DMARCLY-managed) &ndash;
 and the recipients are on the <b>same</b> Google Workspace tenant, which treats
 unauthenticated mail claiming its own domain harshly.</li>
 <li>Fix: <code>bhw/google-workspace-senders</code> routes the address to smtp.gmail.com under
 its <b>own</b> login (Google app password in ~/.authinfo).  Google then uses an
-shms.edu envelope &ndash; SPF passes and aligns, since shms.edu&rsquo;s SPF is
+school.example envelope &ndash; SPF passes and aligns, since school.example&rsquo;s SPF is
 <code>include:_spf.google.com</code> plus a DMARCLY include covering Google&rsquo;s netblocks &ndash;
-and signs with the tenant&rsquo;s DKIM key (<code>google._domainkey.shms.edu</code> is
-published; older mail shows the default <code>shms-edu.20230601.gappssmtp.com</code>).</li>
-<li>No inbox of its own: shms.edu already forwards to benedicthanshenwang@gmail.com
-(<code>X-Forwarded-For: wang.hanshen@shms.edu benedicthanshenwang@gmail.com</code>), so
+and signs with the tenant&rsquo;s DKIM key (<code>google._domainkey.school.example</code> is
+published; older mail shows the default <code>school-example.20230601.gappssmtp.com</code>).</li>
+<li>No inbox of its own: school.example already forwards to me@gmail.com
+(<code>X-Forwarded-For: me@school.example me@gmail.com</code>), so
 incoming mail arrives through the existing <code>gmail</code> mbsync channel.  Sent copies
-go to the <b>shms.edu</b> account&rsquo;s Sent folder upstream; the local archive copy is
+go to the <b>school.example</b> account&rsquo;s Sent folder upstream; the local archive copy is
 mu4e&rsquo;s own (<code>mu4e-sent-messages-behavior</code> defaults to <code>sent</code>).</li>
-<li>App password prerequisites on the shms.edu Google account: 2-Step Verification
+<li>App password prerequisites on the school.example Google account: 2-Step Verification
 on, and the Workspace admin must leave IMAP/SMTP client access enabled.</li>
 <li>Verified end-to-end <span class="timestamp-wrapper"><time class="timestamp" datetime="2026-09-01">[2026-09-01 Tue]</time></span> through <code>smtpmail-send-it</code> with the advice
-live.  Delivered copy: <code>Return-Path: &lt;wang.hanshen@shms.edu&gt;</code>, <code>spf=pass ...
-  smtp.mailfrom=wang.hanshen@shms.edu</code>, <code>dmarc=pass (p=QUARANTINE sp=QUARANTINE
-  dis=NONE) header.from=shms.edu</code>.  Controlled before/after on the same
-recipient (bwang@companionscross.org, whose Outlook redirect bounces mail back
+live.  Delivered copy: <code>Return-Path: &lt;me@school.example&gt;</code>, <code>spf=pass ...
+  smtp.mailfrom=me@school.example</code>, <code>dmarc=pass (p=QUARANTINE sp=QUARANTINE
+  dis=NONE) header.from=school.example</code>.  Controlled before/after on the same
+recipient (me@work.example, whose Outlook redirect bounces mail back
 to Gmail): the old alias path never reached that inbox at all in 15 minutes &ndash;
 M365 junked it, so the redirect rule never fired &ndash; while the fixed path was
 delivered and redirected back inside 30 seconds.</li>
-<li>DMARC here rests on <b>SPF</b> alignment, not DKIM: shms.edu&rsquo;s outbound DKIM is
-Google&rsquo;s default <code>d=shms-edu.20230601.gappssmtp.com</code>, whose organizational
-domain does not align with shms.edu under relaxed alignment.  That is fine for
+<li>DMARC here rests on <b>SPF</b> alignment, not DKIM: school.example&rsquo;s outbound DKIM is
+Google&rsquo;s default <code>d=school-example.20230601.gappssmtp.com</code>, whose organizational
+domain does not align with school.example under relaxed alignment.  That is fine for
 direct delivery but means a <b>forwarded</b> copy (SPF broken by the forwarder,
 DKIM unaligned) fails DMARC unless the forwarder ARC-seals it.  A custom DKIM
-key is published at <code>google._domainkey.shms.edu</code>; if the admin has switched
-the tenant to it, outbound is signed <code>d=shms.edu</code> and alignment no longer
+key is published at <code>google._domainkey.school.example</code>; if the admin has switched
+the tenant to it, outbound is signed <code>d=school.example</code> and alignment no longer
 depends on the envelope.</li>
 </ul>
 
@@ -5881,17 +6010,17 @@ Use gmail&rsquo;s send as feature with porkbun.
 </p>
 
 <p>
-Run the below when Office 365 breaks (send failures or <code>mbsync archtoronto</code>
-auth errors — &ldquo;silent token failed&rdquo; means the refresh token died),
+Run the below when Office 365 sending breaks (&ldquo;silent token failed&rdquo; means the
+refresh token died),
 </p>
 <div class="org-src-container">
-<pre class="src src-sh"><code> uv run ~/.config/oauth2/m365-token.py --login
+<pre class="src src-sh"><code> uv run ~/.config/oauth2/m365-token.py --account companions --login
 </code></pre>
 </div>
 </div>
 <div id="outline-container-ID-20260901T134926.177520" class="outline-5">
 <h5 id="ID-20260901T134926.177520">Gmail Configuration Tips</h5>
-<div class="outline-text-5" id="text-org93ff862">
+<div class="outline-text-5" id="text-orgd77def0">
 <p>
 Use POP3 forwarding on proper emails. Then check box enabling us to send as
 those addresses. Inbox options should be default with all categories checked
@@ -5917,7 +6046,7 @@ maildir, by using <code>mb2md</code> in the debian apt repositories.
 </div>
 <div id="outline-container-ID-20260901T134926.181741" class="outline-5">
 <h5 id="ID-20260901T134926.181741">Mu4e Config</h5>
-<div class="outline-text-5" id="text-orgf1d1e0d">
+<div class="outline-text-5" id="text-org5531177">
 <ul class="org-ul">
 <li><p>
 Updating Inbox &amp; Sorting Mail
@@ -6023,14 +6152,16 @@ below. <code>;</code> switches context in the main/headers view; <code>C-c C-;</
 To add/remove an address from the mu store, re-init it (mu4e must NOT be
 running — quit it first; the maildir itself is untouched):
 </p>
-<pre class="example" id="org55c6151">
+<pre class="example" id="org0ec5fee">
   mu init --maildir=/home/ben/project-jerome/email-archive \
-    --my-address=benedicthanshenwang@gmail.com --my-address=wang.hanshen@shms.edu \
-    --my-address=ben@bhw.name --my-address=foss@bhw.name --my-address=seneschal@bhw.name \
-    --my-address=hwang5@udmercy.edu --my-address=hwang065@my.madonna.edu \
-    --my-address=bwang@companionscross.org --my-address=bwang@archtoronto.org
+    --my-address=me@gmail.com --my-address=me@school.example \
+    --my-address=alias1@bhw.name --my-address=alias2@bhw.name \
+    --my-address=alias3@bhw.name --my-address=old1@school2.example \
+    --my-address=old2@school3.example --my-address=me@work.example
 </pre>
 <p>
+(Placeholders — the real address list is <code>bhw/mu4e-address-routing</code> in
+<code>personal-info.el</code>, dotfiles.org §personal-info.)
 then <code>mbsync -a</code> and <code>mu index</code>. Now in emacs `M-x mu4e&rsquo; should work.
 </p></li>
 </ul>
@@ -6171,25 +6302,23 @@ New mail (no parent) or no match: keep the context's default From."</span>
         <span class="org-variable-name">mu4e-bookmarks</span> <span class="org-highlight-quoted-quote">'</span>((<span class="org-string">"maildir:/gmail/inbox"</span> <span class="org-string">"Inbox"</span> 105 )
                          (<span class="org-string">"\"maildir:/gmail/[Gmail]/All Mail\" and flag:unread"</span> <span class="org-string">"Unread"</span> 85)
                          (<span class="org-string">"\"maildir:/gmail/[Gmail]/All Mail\""</span> <span class="org-string">"All Mail"</span> 97)
-                         (<span class="org-string">"\"maildir:/gmail/[Gmail]/Sent Mail\""</span> <span class="org-string">"Sent Mail"</span> 115)
-                         (<span class="org-string">"maildir:/archtoronto/Inbox"</span> <span class="org-string">"Work Inbox"</span> 119))
+                         (<span class="org-string">"\"maildir:/gmail/[Gmail]/Sent Mail\""</span> <span class="org-string">"Sent Mail"</span> 115))
         <span class="org-variable-name">user-mail-address</span> <span class="org-variable-name">bhw/default-mail-address</span>
         <span class="org-variable-name">user-full-name</span> <span class="org-string">"Ben H. W."</span>
         <span class="org-comment-delimiter">;; </span><span class="org-comment">mu4e-compose-signature
 </span>        <span class="org-variable-name">mail-user-agent</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">mu4e-user-agent</span>
-        <span class="org-variable-name">mu4e-attachment-dir</span> <span class="org-string">"/mnt/c/Users/bened/Downloads/"</span>
-        <span class="org-comment-delimiter">;; </span><span class="org-comment">Work mail (bwang@archtoronto.org) is received over IMAP into
-</span>        <span class="org-comment-delimiter">;; </span><span class="org-comment">/archtoronto*, but drafts/sent/trash/refile for BOTH contexts
-</span>        <span class="org-comment-delimiter">;; </span><span class="org-comment">deliberately keep filing into the Gmail folders: one archive.
-</span>        <span class="org-comment-delimiter">;; </span><span class="org-comment">(These moves are local-only mirrors -- neither mbsync channel
-</span>        <span class="org-comment-delimiter">;; </span><span class="org-comment">pushes new messages upstream -- exactly like the pre-context
-</span>        <span class="org-comment-delimiter">;; </span><span class="org-comment">behaviour.)
+        <span class="org-comment-delimiter">;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">bhw/windows-download-dir</span></span><span class="org-comment">' is defined in personal-info.el
+</span>        <span class="org-comment-delimiter">;; </span><span class="org-comment">(dotfiles.org &#167;personal-info): it embeds the Windows user name.
+</span>        <span class="org-variable-name">mu4e-attachment-dir</span> <span class="org-variable-name">bhw/windows-download-dir</span>
+        <span class="org-comment-delimiter">;; </span><span class="org-comment">Every identity files drafts/sent/trash/refile into the Gmail
+</span>        <span class="org-comment-delimiter">;; </span><span class="org-comment">folders: one archive.  (These moves are local-only mirrors -- the
+</span>        <span class="org-comment-delimiter">;; </span><span class="org-comment">mbsync channel does not push new messages upstream.)
 </span>        <span class="org-variable-name">mu4e-drafts-folder</span> <span class="org-string">"/gmail/[Gmail]/Drafts"</span>
         <span class="org-variable-name">mu4e-sent-folder</span> <span class="org-string">"/gmail/[Gmail]/Sent Mail"</span>
         <span class="org-variable-name">mu4e-trash-folder</span> <span class="org-string">"/gmail/[Gmail]/Trash"</span>
         <span class="org-variable-name">mu4e-refile-folder</span> <span class="org-string">"/gmail/[Gmail]/All Mail"</span>
         <span class="org-comment-delimiter">;; </span><span class="org-comment">Use a real domain in Message-IDs; otherwise message.el derives
-</span>        <span class="org-comment-delimiter">;; </span><span class="org-comment">them from the WSL hostname (@bhw-yoga.localdomain), and Google's
+</span>        <span class="org-comment-delimiter">;; </span><span class="org-comment">them from the WSL hostname (@&lt;host&gt;.localdomain), and Google's
 </span>        <span class="org-comment-delimiter">;; </span><span class="org-comment">sender guidelines want an RFC 5322 Message-ID on a valid domain.
 </span>        <span class="org-variable-name">message-user-fqdn</span> <span class="org-string">"bhw.name"</span>
         <span class="org-variable-name">send-mail-function</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">smtpmail-send-it</span>
@@ -6235,32 +6364,19 @@ New mail (no parent) or no match: keep the context's default From."</span>
 </span>        <span class="org-variable-name">mu4e-split-view</span> nil
         <span class="org-variable-name">mu4e-notification-function</span> nil)
 
-  <span class="org-comment-delimiter">;; </span><span class="org-comment">--- Contexts: personal (gmail) / work (archtoronto) ---------------------
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">Honest scope: both contexts share the folder vars and bookmarks above
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">(everything files into the Gmail folders), so the contexts only carry
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">the default From.  They give us: correct From on replies by maildir,
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">mu4e-compose-context-switch</span></span><span class="org-comment">' (C-c C-;) in compose buffers, and the
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">context indicator / `;' switcher in the main view.  Personal aliases
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">(bhw.name etc.) are refined on top by `</span><span class="org-comment"><span class="org-constant">bhw/mu4e-set-from-address-dwim</span></span><span class="org-comment">';
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">transport is still chosen per-From by `</span><span class="org-comment"><span class="org-constant">bhw/set-smtp-from-identity</span></span><span class="org-comment">'.
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">--- Context: personal ---------------------------------------------------
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">Only one maildir is synced (/gmail), so there is a single context and it
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">carries just the default From; every other identity is send-only.
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">Aliases are refined on top by `</span><span class="org-comment"><span class="org-constant">bhw/mu4e-set-from-address-dwim</span></span><span class="org-comment">'; transport
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">is chosen per-From by `</span><span class="org-comment"><span class="org-constant">bhw/set-smtp-from-identity</span></span><span class="org-comment">'.  Kept as a context
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">rather than folded into the global `</span><span class="org-comment"><span class="org-constant">user-mail-address</span></span><span class="org-comment">' so that adding a
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">second receiving account later is a one-entry change.
 </span>  (<span class="org-keyword">setf</span> <span class="org-variable-name">mu4e-contexts</span>
         (<span class="org-constant">list</span>
          (<span class="org-constant">make-mu4e-context</span>
           <span class="org-builtin">:name</span> <span class="org-string">"personal"</span>
-          <span class="org-builtin">:match-func</span> (<span class="org-keyword">lambda</span> (msg)
-                        (<span class="org-keyword">when</span> msg
-                          (<span class="org-constant">not</span> (<span class="org-constant">string-prefix-p</span>
-                                <span class="org-string">"/archtoronto"</span>
-                                (<span class="org-constant">mu4e-message-field</span> msg <span class="org-builtin">:maildir</span>)))))
-          <span class="org-builtin">:vars</span> <span class="org-highlight-quoted-quote">`</span>((<span class="org-variable-name">user-mail-address</span> . ,<span class="org-variable-name">bhw/default-mail-address</span>)))
-         (<span class="org-constant">make-mu4e-context</span>
-          <span class="org-builtin">:name</span> <span class="org-string">"work"</span>
-          <span class="org-builtin">:match-func</span> (<span class="org-keyword">lambda</span> (msg)
-                        (<span class="org-keyword">when</span> msg
-                          (<span class="org-constant">string-prefix-p</span>
-                           <span class="org-string">"/archtoronto"</span>
-                           (<span class="org-constant">mu4e-message-field</span> msg <span class="org-builtin">:maildir</span>))))
-          <span class="org-builtin">:vars</span> <span class="org-highlight-quoted-quote">'</span>((<span class="org-variable-name">user-mail-address</span> . <span class="org-string">"bwang@archtoronto.org"</span>)))))
+          <span class="org-builtin">:match-func</span> (<span class="org-keyword">lambda</span> (_msg) t)
+          <span class="org-builtin">:vars</span> <span class="org-highlight-quoted-quote">`</span>((<span class="org-variable-name">user-mail-address</span> . ,<span class="org-variable-name">bhw/default-mail-address</span>)))))
 
   <span class="org-comment-delimiter">;; </span><span class="org-comment">Appended (t) so it runs after `</span><span class="org-comment"><span class="org-constant">org-msg-post-setup</span></span><span class="org-comment">' on this hook.
 </span>  (<span class="org-constant">add-hook</span> <span class="org-highlight-quoted-quote">'</span><span class="org-variable-name">mu4e-compose-mode-hook</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">bhw/mu4e-set-from-address-dwim</span> t)
@@ -6290,15 +6406,14 @@ New mail (no parent) or no match: keep the context's default From."</span>
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">smtpmail-smtp-user', so several may share the host, but it skips
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">authentication outright if auth-source yields no secret; hence the
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">placeholder password. The real bearer token comes from the helper below.
-</span>  (<span class="org-keyword">defvar</span> <span class="org-variable-name">bhw/m365-accounts</span>
-    <span class="org-highlight-quoted-quote">'</span>((<span class="org-string">"bwang@archtoronto.org"</span>     . <span class="org-string">"archtoronto"</span>)
-      (<span class="org-string">"bwang@companionscross.org"</span> . <span class="org-string">"companions"</span>))
-    <span class="org-doc">"Alist of From address -&gt; `m365-token.py --account' name.
-Addresses sent through Microsoft 365 with XOAUTH2, mapped to the token
-cache/identity the helper refreshes for them.  bwang@companionscross.org
-is send-only: its incoming mail reaches Gmail through an Outlook redirect
-rule, so it has no mbsync channel, maildir, or mu4e context of its own."</span>)
-
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">bhw/m365-accounts</span></span><span class="org-comment">' -- an alist of From address -&gt; `m365-token.py
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">--account' name, mapping each Microsoft 365 address to the token
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">cache/identity the helper refreshes for it -- is defined in
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">personal-info.el (dotfiles.org &#167;personal-info) to keep the real
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">addresses out of this published file.  Every entry is send-only: its
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">incoming mail reaches Gmail through an Outlook redirect rule, so it has
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">no mbsync channel, maildir, or mu4e context of its own.
+</span>
   <span class="org-comment-delimiter">;; </span><span class="org-comment">Quoted specializer: Emacs 30's smtpmail ships its own `(eql 'xoauth2)'
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">method (it would send the authinfo placeholder password as the bearer
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">token). The same quoted form makes this definition replace the built-in
@@ -6328,33 +6443,34 @@ token helper account via `</span><span class="org-doc"><span class="org-constant
 
   <span class="org-comment-delimiter">;; </span><span class="org-comment">Google Workspace mailboxes that authenticate to Gmail's SMTP *as
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">themselves* rather than riding the personal Gmail login below.  Sending
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">them through the `</span><span class="org-comment"><span class="org-constant">t</span></span><span class="org-comment">' branch is what put mail to shms.edu staff in Spam:
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">them through the `</span><span class="org-comment"><span class="org-constant">t</span></span><span class="org-comment">' branch is what put mail to school.example staff in Spam:
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">for a "Send mail as" alias Gmail rewrites the envelope to the
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">authenticated account -- verified [2026-09-01 Tue], a submission with
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">MAIL FROM:<a href="mailto:wang.hanshen%40shms.edu">&lt;wang.hanshen@shms.edu&gt;</a> came back stamped `Return-Path:
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment"><a href="mailto:benedicthanshenwang%40gmail.com">&lt;benedicthanshenwang@gmail.com&gt;</a>' -- and signs DKIM d=gmail.com.  Neither
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">identifier aligns with `From: ...@shms.edu', so DMARC fails, and shms.edu
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">MAIL FROM:<a href="mailto:me%40school.example">&lt;me@school.example&gt;</a> came back stamped `Return-Path:
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment"><a href="mailto:me%40gmail.com">&lt;me@gmail.com&gt;</a>' -- and signs DKIM d=gmail.com.  Neither
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">identifier aligns with `From: ...@school.example', so DMARC fails, and school.example
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">publishes p=quarantine (sp=quarantine, pct=100).  Authenticating as the
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">Workspace mailbox restores an shms.edu envelope (SPF pass and aligned --
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">shms.edu's SPF includes _spf.google.com) plus an shms.edu DKIM signature.
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">Workspace mailbox restores an school.example envelope (SPF pass and aligned --
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">school.example's SPF includes _spf.google.com) plus an school.example DKIM signature.
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">Needs a Google app password on that account:
-</span>  <span class="org-comment-delimiter">;;   </span><span class="org-comment">machine smtp.gmail.com login wang.hanshen@shms.edu port 587 password &lt;app-pw&gt;
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">Send-only, like bwang@companionscross.org: incoming shms.edu mail already
+</span>  <span class="org-comment-delimiter">;;   </span><span class="org-comment">machine smtp.gmail.com login me@school.example port 587 password &lt;app-pw&gt;
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">Send-only, like me@work.example: incoming school.example mail already
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">reaches /gmail through the Workspace forward-to-Gmail rule, so this adds
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">no mbsync channel, maildir, or mu4e context.
-</span>  (<span class="org-keyword">defvar</span> <span class="org-variable-name">bhw/google-workspace-senders</span> <span class="org-highlight-quoted-quote">'</span>(<span class="org-string">"wang.hanshen@shms.edu"</span>)
-    <span class="org-doc">"From addresses submitted to smtp.gmail.com under their own login.
-Each needs a `machine smtp.gmail.com login ADDR port 587' line in
-~/.authinfo holding a Google app password."</span>)
-
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">bhw/google-workspace-senders</span></span><span class="org-comment">' -- From addresses submitted to
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">smtp.gmail.com under their own login -- is defined in personal-info.el
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">(dotfiles.org &#167;personal-info).  Each needs a `machine smtp.gmail.com
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">login ADDR port 587' line in ~/.authinfo holding a Google app password.
+</span>
   <span class="org-comment-delimiter">;; </span><span class="org-comment">From addresses registered as OCI Email Delivery "Approved Senders". Only
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">these may be MAIL FROM through OCI; add one *after* approving it in the OCI
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">console, or OCI refuses the envelope sender. Relaying bhw.name mail through
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">OCI (vs. Gmail's app-password path) gets it DKIM-signed d=bhw.name -- see
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">the DKIM note above.
-</span>  (<span class="org-keyword">defvar</span> <span class="org-variable-name">bhw/oci-approved-senders</span> <span class="org-highlight-quoted-quote">'</span>(<span class="org-string">"seneschal@bhw.name"</span> <span class="org-string">"foss@bhw.name"</span> <span class="org-string">"ben@bhw.name"</span>)
-    <span class="org-doc">"From addresses relayed through OCI Email Delivery instead of Gmail."</span>)
-
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">bhw/oci-approved-senders</span></span><span class="org-comment">' -- From addresses relayed through OCI Email
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">Delivery instead of Gmail -- is defined in personal-info.el
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">(dotfiles.org &#167;personal-info), alongside the other real addresses.
+</span>
   (<span class="org-keyword">defun</span> <span class="org-function-name">bhw/set-smtp-from-identity</span> (<span class="org-type">&amp;rest</span> _)
     <span class="org-doc">"Choose SMTP server + auth mechanism from the From: header before sending.
 Installed as `</span><span class="org-doc"><span class="org-constant">:before</span></span><span class="org-doc">' advice on `</span><span class="org-doc"><span class="org-constant">smtpmail-send-it</span></span><span class="org-doc">' (see below), not on
@@ -6400,7 +6516,7 @@ Takes &amp;rest args so it is usable as advice on a no-arg function."</span>
               <span class="org-variable-name">smtpmail-stream-type</span>    <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">starttls</span>
               <span class="org-variable-name">smtpmail-auth-supported</span> <span class="org-highlight-quoted-quote">'</span>(login plain)))
        (t
-        (<span class="org-keyword">setq</span> <span class="org-variable-name">smtpmail-smtp-user</span>      <span class="org-string">"benedicthanshenwang@gmail.com"</span>
+        (<span class="org-keyword">setq</span> <span class="org-variable-name">smtpmail-smtp-user</span>      <span class="org-variable-name">bhw/default-mail-address</span>
               <span class="org-variable-name">smtpmail-smtp-server</span>    <span class="org-string">"smtp.gmail.com"</span>
               <span class="org-variable-name">smtpmail-smtp-service</span>   587
               <span class="org-variable-name">smtpmail-stream-type</span>    <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">starttls</span>
@@ -6412,29 +6528,12 @@ Takes &amp;rest args so it is usable as advice on a no-arg function."</span>
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">the final From:, so selecting here can't inherit stale state.
 </span>  (<span class="org-constant">advice-add</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">smtpmail-send-it</span> <span class="org-builtin">:before</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">bhw/set-smtp-from-identity</span>)
 
-  <span class="org-comment-delimiter">;; </span><span class="org-comment">The hourly background `mbsync -a' (mu4e-update-interval) reports only a
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">generic "non-zero exit code" when the M365 refresh token dies (the
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">archtoronto PassCmd exits non-zero, mbsync skips the account). Scan the
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">update buffer before the sentinel kills it and leave an actionable
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">message in *Messages*.
-</span>  (<span class="org-keyword">defun</span> <span class="org-function-name">bhw/mu4e-warn-on-m365-token-failure</span> (proc _msg)
-    <span class="org-doc">"Shout in *Messages* when a mail update failed because the M365 token died."</span>
-    (<span class="org-keyword">when</span> (<span class="org-keyword">and</span> (<span class="org-constant">memq</span> (<span class="org-constant">process-status</span> proc) <span class="org-highlight-quoted-quote">'</span>(exit signal))
-               (<span class="org-constant">/=</span> (<span class="org-constant">process-exit-status</span> proc) 0)
-               (<span class="org-constant">buffer-live-p</span> (<span class="org-constant">process-buffer</span> proc))
-               (<span class="org-keyword">with-current-buffer</span> (<span class="org-constant">process-buffer</span> proc)
-                 (<span class="org-keyword">save-excursion</span>
-                   (<span class="org-constant">goto-char</span> (<span class="org-constant">point-min</span>))
-                   (<span class="org-constant">re-search-forward</span>
-                    <span class="org-string">"silent token failed</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">PassCmd exited with status"</span> nil t))))
-      <span class="org-comment-delimiter">;; </span><span class="org-comment">Pinned to archtoronto: it is the only account mbsync pulls (the
-</span>      <span class="org-comment-delimiter">;; </span><span class="org-comment">companions identity is send-only, see `</span><span class="org-comment"><span class="org-constant">bhw/m365-accounts</span></span><span class="org-comment">').
-</span>      (<span class="org-constant">message</span> (<span class="org-constant">concat</span> <span class="org-string">"mu4e: M365 token refresh FAILED -- work mail is not "</span>
-                       <span class="org-string">"syncing. Re-authenticate with: uv run "</span>
-                       <span class="org-string">"~/.config/oauth2/m365-token.py --account archtoronto --login"</span>))))
-  (<span class="org-constant">advice-add</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">mu4e--update-sentinel-func</span>
-              <span class="org-builtin">:before</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">bhw/mu4e-warn-on-m365-token-failure</span>)
-
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">(Removed with the last IMAP-synced Microsoft 365 account: an advice on
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">mu4e--update-sentinel-func</span></span><span class="org-comment">' used to scan the `mbsync -a' output for a
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">dead M365 refresh token.  No M365 identity is pulled by mbsync any more
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">-- they are all send-only -- so a dying token now surfaces at send time,
+</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">where `</span><span class="org-comment"><span class="org-constant">smtpmail-try-auth-method</span></span><span class="org-comment">' raises it directly.)
+</span>
   <span class="org-comment-delimiter">;; </span><span class="org-comment">Leave the From: header empty for brand-new messages so the sending
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">identity must be chosen explicitly. Replies/forwards/edits keep the
 </span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">From set by the context + `</span><span class="org-comment"><span class="org-constant">bhw/mu4e-set-from-address-dwim</span></span><span class="org-comment">' above (the
@@ -6696,7 +6795,7 @@ The search stops at LIMIT; continuation lines are included."</span>
 </div>
 <div id="outline-container-ID-20260901T134926.186015" class="outline-5">
 <h5 id="ID-20260901T134926.186015">Consult-Mu Config</h5>
-<div class="outline-text-5" id="text-org0c33f35">
+<div class="outline-text-5" id="text-org60890b6">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp"><code><span class="org-comment-delimiter">;;</span><span class="org-comment">---------------------------------------------------------------------------
 </span>(<span class="org-keyword">use-package!</span> consult-mu
@@ -6797,7 +6896,7 @@ The search stops at LIMIT; continuation lines are included."</span>
 </div>
 <div id="outline-container-ID-20260704T165939.380852" class="outline-5">
 <h5 id="ID-20260704T165939.380852">bhw.name email config</h5>
-<div class="outline-text-5" id="text-org69beb8d">
+<div class="outline-text-5" id="text-orgecb5031">
 <p>
 Any email addressed to the bhw.name domain is forwarded to my personal gmail
 address through DNS records set on Porkbun. Any email sent from the bhw.name
@@ -6813,7 +6912,7 @@ Email Delivery service limits to 60MB as 2MB is the default.</a>
 </div>
 <div id="outline-container-ID-20220829T170201.833199" class="outline-5">
 <h5 id="ID-20220829T170201.833199">Elfeed Config</h5>
-<div class="outline-text-5" id="text-org237bf15">
+<div class="outline-text-5" id="text-orgf422aac">
 <ul class="org-ul">
 <li><a href="communication-setup-in-emacs.html#ID-20220829T170034.331688">&lt;&ndash;Communication in Emacs</a></li>
 <li><a href="https://github.com/larrasket/rssc">GitHub - larrasket/rssc: rssc provides a real-time, self-hostable regex-orien&hellip;</a></li>
@@ -6910,7 +7009,7 @@ subtitles more effectively.</li>
 </div>
 <div id="outline-container-ID-20220829T170131.891099" class="outline-5">
 <h5 id="ID-20220829T170131.891099">Ement Config</h5>
-<div class="outline-text-5" id="text-org0f0e3fb">
+<div class="outline-text-5" id="text-orgaea71a0">
 <p>
 <span class="timestamp-wrapper"><time class="timestamp" datetime="2026-03-11T17:28:00">[2026-03-11 Wed 17:28]</time></span> &lt;- <a href="communication-setup-in-emacs.html#ID-20220829T170034.331688">Communication in Emacs</a>
 </p>
@@ -7859,7 +7958,7 @@ event structs -- that `</span><span class="org-doc"><span class="org-constant">e
 <span class="org-comment-delimiter">;;; </span><span class="org-comment">--- Room picker: network labels, liveness filter, recency sort ------------
 </span><span class="org-comment-delimiter">;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">ement-complete-room</span></span><span class="org-comment">' offers `</span><span class="org-comment"><span class="org-constant">ement--format-room</span></span><span class="org-comment">' output, which for a
 </span><span class="org-comment-delimiter">;; </span><span class="org-comment">bridged DM is just the remote contact's display name plus an opaque room
-</span><span class="org-comment-delimiter">;; </span><span class="org-comment">ID: four rooms read "Gabriel Gauthier (&lt;!...&gt;): \"\"" with nothing to
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">ID: four rooms read "John Doe (&lt;!...&gt;): \"\"" with nothing to
 </span><span class="org-comment-delimiter">;; </span><span class="org-comment">choose between them.  The three additions below are independent:
 </span><span class="org-comment-delimiter">;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">bhw/ement-room-label</span></span><span class="org-comment">' names the network, `</span><span class="org-comment"><span class="org-constant">bhw/ement-room-live-p</span></span><span class="org-comment">' drops
 </span><span class="org-comment-delimiter">;; </span><span class="org-comment">per-call portals, and the completion table sorts by recency and annotates
@@ -7878,7 +7977,7 @@ event structs -- that `</span><span class="org-doc"><span class="org-constant">e
   <span class="org-doc">"Short tags for `</span><span class="org-doc"><span class="org-constant">m.bridge</span></span><span class="org-doc">' protocol ids.
 Used only when the bridge reports no network name; Slack and the other
 multi-tenant bridges name their workspace, which is more useful than the
-protocol (\"CC Formation House\", not \"Slack\")."</span>)
+protocol (\"Acme Workspace\", not \"Slack\")."</span>)
 
 (<span class="org-keyword">defun</span> <span class="org-function-name">bhw/ement--room-state-event</span> (room type)
   <span class="org-doc">"Return the newest state event of TYPE in ROOM, or nil.
@@ -7910,8 +8009,8 @@ bridge reports one, else the short tag from `</span><span class="org-doc"><span 
 
 (<span class="org-keyword">defun</span> <span class="org-function-name">bhw/ement-room-label</span> (room)
   <span class="org-doc">"Return ROOM's display name suffixed with the network it lives on.
-\"Collin Gallimore\" becomes \"Collin Gallimore (GV)\" on Google Voice and
-\"Collin Gallimore (CC Formation House)\" on Slack.  WhatsApp and Slack
+\"Jane Doe\" becomes \"Jane Doe (GV)\" on Google Voice and
+\"Jane Doe (Acme Workspace)\" on Slack.  WhatsApp and Slack
 already append the tag themselves, so an existing suffix is absorbed rather
 than doubled; Slack group DMs, which repeat the workspace after every single
 member, collapse to one trailing suffix."</span>
@@ -8059,7 +8158,7 @@ so Vertico would otherwise fall back to `</span><span class="org-doc"><span clas
 
 <span class="org-comment-delimiter">;;; </span><span class="org-comment">--- Duplicate portal cleanup ---------------------------------------------
 </span><span class="org-comment-delimiter">;; </span><span class="org-comment">Rooms sharing a display name are usually NOT duplicates: Google Voice opens
-</span><span class="org-comment-delimiter">;; </span><span class="org-comment">one portal per call, and two WhatsApp contacts can both be named "Michael".
+</span><span class="org-comment-delimiter">;; </span><span class="org-comment">one portal per call, and two WhatsApp contacts can both be named "Sam".
 </span><span class="org-comment-delimiter">;; </span><span class="org-comment">The only sound identity for "the same remote conversation" is the m.bridge
 </span><span class="org-comment-delimiter">;; </span><span class="org-comment">triple of protocol, receiver and channel id.
 </span>
@@ -8143,7 +8242,7 @@ history -- so review `</span><span class="org-doc"><span class="org-constant">bh
 </div>
 <div id="outline-container-ID-20260731T202534.411560" class="outline-5">
 <h5 id="ID-20260731T202534.411560">Transmission Config</h5>
-<div class="outline-text-5" id="text-org885772d">
+<div class="outline-text-5" id="text-org4a727d1">
 <p>
 <a href="../cpb.html#ID-5fd1da06-3dfc-4c17-bc1a-5d32b4af9864">Piracy</a>
 </p>
@@ -8301,7 +8400,7 @@ probes with a non-blocking connect first and raises a <code>user-error</code> in
 </div>
 <div id="outline-container-ID-20260901T134926.197514" class="outline-5">
 <h5 id="ID-20260901T134926.197514">Calendar Config</h5>
-<div class="outline-text-5" id="text-org580df34">
+<div class="outline-text-5" id="text-org4c54a0a">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp"><code><span class="org-comment-delimiter">;;</span><span class="org-comment">---------------------------------------------------------------------------
 </span>(<span class="org-keyword">map!</span> <span class="org-builtin">:leader</span>
@@ -8312,7 +8411,7 @@ probes with a non-blocking connect first and raises a <code>user-error</code> in
 </div>
 <div id="outline-container-ID-20260901T134926.201988" class="outline-5">
 <h5 id="ID-20260901T134926.201988">Anki Editor Config</h5>
-<div class="outline-text-5" id="text-org5ee0e34">
+<div class="outline-text-5" id="text-org77257f2">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp"><code><span class="org-comment-delimiter">;;</span><span class="org-comment">---------------------------------------------------------------------------
 </span>(<span class="org-keyword">use-package!</span> anki-editor <span class="org-builtin">:defer</span> t)
@@ -8322,7 +8421,7 @@ probes with a non-blocking connect first and raises a <code>user-error</code> in
 </div>
 <div id="outline-container-ID-20260901T134926.205113" class="outline-5">
 <h5 id="ID-20260901T134926.205113">Biome Config</h5>
-<div class="outline-text-5" id="text-org3ac617b">
+<div class="outline-text-5" id="text-org155a0df">
 <div class="org-src-container">
 <pre class="src src-emacs-lisp"><code><span class="org-comment-delimiter">;;</span><span class="org-comment">---------------------------------------------------------------------------
 </span>(<span class="org-keyword">defun</span> <span class="org-function-name">bhw/biome-detroit</span> ()
@@ -8356,7 +8455,7 @@ The preset commands only exist after the `</span><span class="org-doc"><span cla
 </div>
 <div id="outline-container-ID-ee59a5dc-2d13-4417-8996-860711c1119e" class="outline-5">
 <h5 id="ID-ee59a5dc-2d13-4417-8996-860711c1119e">Casual Emacs Calc Config</h5>
-<div class="outline-text-5" id="text-orgdc1cc9c">
+<div class="outline-text-5" id="text-org867edbc">
 <ul class="org-ul">
 <li><a href="https://www.n16f.net/blog/using-units-in-emacs-calc/">Using Units in Emacs Calc</a></li>
 <li><a href="https://pjs64.wordpress.com/2020/12/07/worgsheet-calc-intro/">WorgSheet Calc Intro</a></li>
@@ -8434,7 +8533,7 @@ comprehensive tutorial outlined it, <a href="https://hansklav.home.xs4all.nl/rpn
 </div>
 <div id="outline-container-ID-20260901T134926.207924" class="outline-5">
 <h5 id="ID-20260901T134926.207924">Emacs Reader Config</h5>
-<div class="outline-text-5" id="text-org3beae01">
+<div class="outline-text-5" id="text-org603be4a">
 <p>
 Reinstall guide: <a href="https://codeberg.org/divyaranjan/emacs-reader/issues/122#issuecomment-9315806">#122 - Trouble Installing via VC - divyaranjan/emacs-reader - Codeberg.org</a>
 </p>
@@ -8593,6 +8692,29 @@ missing from it reads as a missed tangle and fails this test spuriously."</span>
                <span class="org-string">"private-packages/ement-config.el"</span>
                <span class="org-string">"tests/config-tests.el"</span>
                <span class="org-string">"tests/startup-deferral-check.sh"</span>)))))
+
+(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">bhw/config-test--tangle-on-save-allowlist</span> ()
+  <span class="org-doc">"Tangle-on-save is armed, and fires for dotemacs.org and dotfiles.org only.
+`</span><span class="org-doc"><span class="org-constant">after-save-hook</span></span><span class="org-doc">' is global, so `</span><span class="org-doc"><span class="org-constant">bhw/org-tangle-on-save-file-p</span></span><span class="org-doc">' is the only
+thing standing between the hook and a full `</span><span class="org-doc"><span class="org-constant">org-babel-tangle</span></span><span class="org-doc">' of every other
+Org file in project-maria."</span>
+  <span class="org-builtin">:tags</span> <span class="org-highlight-quoted-quote">'</span>(bhw-config)
+  (<span class="org-keyword">should</span> (<span class="org-constant">memq</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">bhw/org-babel-tangle-on-save</span> (<span class="org-constant">default-value</span> <span class="org-highlight-quoted-quote">'</span><span class="org-variable-name">after-save-hook</span>)))
+  (<span class="org-keyword">should</span> (<span class="org-constant">equal</span> <span class="org-variable-name">bhw/org-tangle-on-save-files</span>
+                 (<span class="org-constant">mapcar</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">file-truename</span>
+                         (<span class="org-constant">list</span> <span class="org-variable-name">bhw/config-tests--org-source</span>
+                               (<span class="org-constant">expand-file-name</span> <span class="org-string">"~/project-maria/dotfiles.org"</span>)))))
+  (<span class="org-keyword">pcase-dolist</span> (<span class="org-highlight-quoted-quote">`</span>(,file . ,tangles-p)
+                 <span class="org-highlight-quoted-quote">`</span>((,<span class="org-variable-name">bhw/config-tests--org-source</span> . t)
+                   (,(<span class="org-constant">expand-file-name</span> <span class="org-string">"~/project-maria/dotfiles.org"</span>) . t)
+                   (,(<span class="org-constant">expand-file-name</span> <span class="org-string">"~/project-maria/hq.org"</span>) . nil)
+                   (nil . nil)))
+    (<span class="org-keyword">with-temp-buffer</span>
+      (<span class="org-keyword">setq</span> <span class="org-variable-name">buffer-file-name</span> file)
+      (<span class="org-keyword">should</span> (<span class="org-constant">eq</span> (<span class="org-keyword">and</span> (<span class="org-function-name">bhw/org-tangle-on-save-file-p</span>) t) tangles-p))
+      <span class="org-comment-delimiter">;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">with-temp-buffer</span></span><span class="org-comment">' kills the buffer on exit; a non-nil
+</span>      <span class="org-comment-delimiter">;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">buffer-file-name</span></span><span class="org-comment">' would make that prompt about a visited file.
+</span>      (<span class="org-keyword">setq</span> <span class="org-variable-name">buffer-file-name</span> nil))))
 
 (<span class="org-keyword">defconst</span> <span class="org-variable-name">bhw/config-tests--must-defer</span>
   <span class="org-highlight-quoted-quote">'</span>(anki-editor ement elfeed citar lexic biome casual-calc
@@ -9528,7 +9650,7 @@ hook twice over one buffer is the whole test.
 <p>
 The Ement room picker offered <code>ement--format-room</code> output, which for a bridged
 DM is the contact&rsquo;s display name plus an opaque room ID — four rooms reading
-<code>Gabriel Gauthier (&lt;!...&gt;): ""</code> with nothing to choose between them.  Three
+<code>John Doe (&lt;!...&gt;): ""</code> with nothing to choose between them.  Three
 things fix that, and each can regress on its own: the network label, the
 liveness filter that drops Google Voice&rsquo;s per-call portals, and the completion
 table that keeps candidates unique.  Uniqueness is the one that fails
@@ -9563,27 +9685,27 @@ ARGS is a plist of :name, :protocol, :network, :channel and :messages."</span>
   <span class="org-builtin">:tags</span> <span class="org-highlight-quoted-quote">'</span>(bhw-config)
   (skip-unless (<span class="org-constant">featurep</span> <span class="org-highlight-quoted-quote">'</span><span class="org-constant">ement</span>))
   <span class="org-comment-delimiter">;; </span><span class="org-comment">Google Voice reports no network name, so the short tag is used.
-</span>  (<span class="org-keyword">should</span> (<span class="org-constant">equal</span> <span class="org-string">"Collin Gallimore (GV)"</span>
+</span>  (<span class="org-keyword">should</span> (<span class="org-constant">equal</span> <span class="org-string">"Jane Doe (GV)"</span>
                  (<span class="org-function-name">bhw/ement-room-label</span>
-                  (<span class="org-function-name">bhw/config-tests--ement-room</span> <span class="org-builtin">:name</span> <span class="org-string">"Collin Gallimore"</span>
+                  (<span class="org-function-name">bhw/config-tests--ement-room</span> <span class="org-builtin">:name</span> <span class="org-string">"Jane Doe"</span>
                                                 <span class="org-builtin">:protocol</span> <span class="org-string">"gvoice"</span> <span class="org-builtin">:channel</span> <span class="org-string">"t.+15551234"</span>))))
   <span class="org-comment-delimiter">;; </span><span class="org-comment">Slack names its workspace, which beats the protocol.
-</span>  (<span class="org-keyword">should</span> (<span class="org-constant">equal</span> <span class="org-string">"Collin Gallimore (CC Formation House)"</span>
+</span>  (<span class="org-keyword">should</span> (<span class="org-constant">equal</span> <span class="org-string">"Jane Doe (Acme Workspace)"</span>
                  (<span class="org-function-name">bhw/ement-room-label</span>
-                  (<span class="org-function-name">bhw/config-tests--ement-room</span> <span class="org-builtin">:name</span> <span class="org-string">"Collin Gallimore (CC Formation House)"</span>
-                                                <span class="org-builtin">:protocol</span> <span class="org-string">"slackgo"</span> <span class="org-builtin">:network</span> <span class="org-string">"CC Formation House"</span>
+                  (<span class="org-function-name">bhw/config-tests--ement-room</span> <span class="org-builtin">:name</span> <span class="org-string">"Jane Doe (Acme Workspace)"</span>
+                                                <span class="org-builtin">:protocol</span> <span class="org-string">"slackgo"</span> <span class="org-builtin">:network</span> <span class="org-string">"Acme Workspace"</span>
                                                 <span class="org-builtin">:channel</span> <span class="org-string">"T1-D1"</span>))))
   <span class="org-comment-delimiter">;; </span><span class="org-comment">A Slack group DM repeats the workspace after every member; collapse it.
-</span>  (<span class="org-keyword">should</span> (<span class="org-constant">equal</span> <span class="org-string">"Gabriel Gauthier, Manas (CC Formation House)"</span>
+</span>  (<span class="org-keyword">should</span> (<span class="org-constant">equal</span> <span class="org-string">"John Doe, Rita (Acme Workspace)"</span>
                  (<span class="org-function-name">bhw/ement-room-label</span>
                   (<span class="org-function-name">bhw/config-tests--ement-room</span>
-                   <span class="org-builtin">:name</span> <span class="org-string">"Gabriel Gauthier (CC Formation House), Manas (CC Formation House)"</span>
-                   <span class="org-builtin">:protocol</span> <span class="org-string">"slackgo"</span> <span class="org-builtin">:network</span> <span class="org-string">"CC Formation House"</span> <span class="org-builtin">:channel</span> <span class="org-string">"T1-C1"</span>))))
+                   <span class="org-builtin">:name</span> <span class="org-string">"John Doe (Acme Workspace), Rita (Acme Workspace)"</span>
+                   <span class="org-builtin">:protocol</span> <span class="org-string">"slackgo"</span> <span class="org-builtin">:network</span> <span class="org-string">"Acme Workspace"</span> <span class="org-builtin">:channel</span> <span class="org-string">"T1-C1"</span>))))
   <span class="org-comment-delimiter">;; </span><span class="org-comment">A room named after its own workspace must not become "X (X)".
-</span>  (<span class="org-keyword">should</span> (<span class="org-constant">equal</span> <span class="org-string">"SHMS Seminarians"</span>
+</span>  (<span class="org-keyword">should</span> (<span class="org-constant">equal</span> <span class="org-string">"Book Club"</span>
                  (<span class="org-function-name">bhw/ement-room-label</span>
-                  (<span class="org-function-name">bhw/config-tests--ement-room</span> <span class="org-builtin">:name</span> <span class="org-string">"SHMS Seminarians"</span>
-                                                <span class="org-builtin">:protocol</span> <span class="org-string">"whatsapp"</span> <span class="org-builtin">:network</span> <span class="org-string">"SHMS Seminarians"</span>
+                  (<span class="org-function-name">bhw/config-tests--ement-room</span> <span class="org-builtin">:name</span> <span class="org-string">"Book Club"</span>
+                                                <span class="org-builtin">:protocol</span> <span class="org-string">"whatsapp"</span> <span class="org-builtin">:network</span> <span class="org-string">"Book Club"</span>
                                                 <span class="org-builtin">:channel</span> <span class="org-string">"1@g.us"</span>))))
   <span class="org-comment-delimiter">;; </span><span class="org-comment">An unbridged Matrix room keeps its name untouched.
 </span>  (<span class="org-keyword">should</span> (<span class="org-constant">equal</span> <span class="org-string">"#emacs"</span> (<span class="org-function-name">bhw/ement-room-label</span>
@@ -9595,21 +9717,21 @@ ARGS is a plist of :name, :protocol, :network, :channel and :messages."</span>
   (skip-unless (<span class="org-constant">featurep</span> <span class="org-highlight-quoted-quote">'</span><span class="org-constant">ement</span>))
   <span class="org-comment-delimiter">;; </span><span class="org-comment">mautrix-gvoice opens a `</span><span class="org-comment"><span class="org-constant">c.</span></span><span class="org-comment">'-keyed portal per call, named after the contact.
 </span>  (<span class="org-keyword">should-not</span> (<span class="org-function-name">bhw/ement-room-live-p</span>
-               (<span class="org-function-name">bhw/config-tests--ement-room</span> <span class="org-builtin">:name</span> <span class="org-string">"Gabriel Gauthier"</span>
+               (<span class="org-function-name">bhw/config-tests--ement-room</span> <span class="org-builtin">:name</span> <span class="org-string">"John Doe"</span>
                                              <span class="org-builtin">:protocol</span> <span class="org-string">"gvoice"</span> <span class="org-builtin">:channel</span> <span class="org-string">"c.ABCDEF"</span>)))
   <span class="org-comment-delimiter">;; </span><span class="org-comment">The `</span><span class="org-comment"><span class="org-constant">t.</span></span><span class="org-comment">'-keyed thread carries the actual messages.
 </span>  (<span class="org-keyword">should</span> (<span class="org-function-name">bhw/ement-room-live-p</span>
-           (<span class="org-function-name">bhw/config-tests--ement-room</span> <span class="org-builtin">:name</span> <span class="org-string">"Gabriel Gauthier"</span>
-                                         <span class="org-builtin">:protocol</span> <span class="org-string">"gvoice"</span> <span class="org-builtin">:channel</span> <span class="org-string">"t.+13434626713"</span>
+           (<span class="org-function-name">bhw/config-tests--ement-room</span> <span class="org-builtin">:name</span> <span class="org-string">"John Doe"</span>
+                                         <span class="org-builtin">:protocol</span> <span class="org-string">"gvoice"</span> <span class="org-builtin">:channel</span> <span class="org-string">"t.+15550143"</span>
                                          <span class="org-builtin">:messages</span> 3)))
   <span class="org-comment-delimiter">;; </span><span class="org-comment">A call portal that did accumulate messages is kept.
 </span>  (<span class="org-keyword">should</span> (<span class="org-function-name">bhw/ement-room-live-p</span>
-           (<span class="org-function-name">bhw/config-tests--ement-room</span> <span class="org-builtin">:name</span> <span class="org-string">"Karl Hartmann"</span>
+           (<span class="org-function-name">bhw/config-tests--ement-room</span> <span class="org-builtin">:name</span> <span class="org-string">"Richard Roe"</span>
                                          <span class="org-builtin">:protocol</span> <span class="org-string">"gvoice"</span> <span class="org-builtin">:channel</span> <span class="org-string">"c.ABCDEF"</span> <span class="org-builtin">:messages</span> 1)))
   <span class="org-comment-delimiter">;; </span><span class="org-comment">Other protocols are never filtered on channel prefix.
 </span>  (<span class="org-keyword">should</span> (<span class="org-function-name">bhw/ement-room-live-p</span>
-           (<span class="org-function-name">bhw/config-tests--ement-room</span> <span class="org-builtin">:name</span> <span class="org-string">"Michael (WA)"</span>
-                                         <span class="org-builtin">:protocol</span> <span class="org-string">"whatsapp"</span> <span class="org-builtin">:channel</span> <span class="org-string">"c.14168232698@s.whatsapp.net"</span>))))
+           (<span class="org-function-name">bhw/config-tests--ement-room</span> <span class="org-builtin">:name</span> <span class="org-string">"Sam (WA)"</span>
+                                         <span class="org-builtin">:protocol</span> <span class="org-string">"whatsapp"</span> <span class="org-builtin">:channel</span> <span class="org-string">"c.15550143@s.whatsapp.net"</span>))))
 
 (<span class="org-keyword">ert-deftest</span> <span class="org-function-name">bhw/config-test--ement-picker-advice-is-idempotent</span> ()
   <span class="org-doc">"Reloading does not stack the picker advice, and non-completion callers are spared."</span>
@@ -9674,6 +9796,28 @@ session had no such command until something else pulled ox-publish in."</span>
     (<span class="org-constant">goto-char</span> (<span class="org-constant">point-min</span>))
     <span class="org-comment-delimiter">;; </span><span class="org-comment">Column 0, i.e. not nested inside the `</span><span class="org-comment"><span class="org-constant">after!</span></span><span class="org-comment">' form.
 </span>    (<span class="org-keyword">should</span> (<span class="org-constant">re-search-forward</span> <span class="org-string">"^(defun bhw/publish-blog ()"</span> nil t))))
+
+(<span class="org-keyword">ert-deftest</span> <span class="org-function-name">bhw/config-test--tangle-touches-unchanged-targets</span> ()
+  <span class="org-doc">"`</span><span class="org-doc"><span class="org-constant">org-babel-tangle</span></span><span class="org-doc">' leaves every target's mtime fresh, even when it skips it.
+Without this, an edit that produces byte-identical tangle output makes
+`</span><span class="org-doc"><span class="org-constant">bhw/config-test--tangle-fresh</span></span><span class="org-doc">' fail forever."</span>
+  <span class="org-builtin">:tags</span> <span class="org-highlight-quoted-quote">'</span>(bhw-config)
+  (<span class="org-keyword">should</span> (<span class="org-constant">advice-member-p</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">bhw/touch-tangled-files</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">org-babel-tangle</span>))
+  (<span class="org-keyword">let</span> ((n 0))
+    (<span class="org-constant">advice-mapc</span> (<span class="org-keyword">lambda</span> (f _props)
+                   (<span class="org-keyword">when</span> (<span class="org-constant">eq</span> f <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">bhw/touch-tangled-files</span>) (<span class="org-keyword">cl-incf</span> n)))
+                 <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">org-babel-tangle</span>)
+    (<span class="org-keyword">should</span> (<span class="org-constant">=</span> 1 n)))
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">The advice is a `</span><span class="org-comment"><span class="org-constant">:filter-return</span></span><span class="org-comment">', so it must hand the list back intact.
+</span>  (<span class="org-keyword">let</span> ((file (<span class="org-constant">make-temp-file</span> <span class="org-string">"bhw-touch"</span>)))
+    (<span class="org-keyword">unwind-protect</span>
+        (<span class="org-keyword">progn</span>
+          (<span class="org-constant">set-file-times</span> file 0)
+          (<span class="org-keyword">should</span> (<span class="org-constant">equal</span> (<span class="org-constant">list</span> file) (<span class="org-function-name">bhw/touch-tangled-files</span> (<span class="org-constant">list</span> file))))
+          (<span class="org-keyword">should</span> (<span class="org-constant">&gt;</span> (<span class="org-constant">float-time</span> (<span class="org-function-name">file-attribute-modification-time</span>
+                                  (<span class="org-constant">file-attributes</span> file)))
+                     0)))
+      (<span class="org-constant">delete-file</span> file))))
 
 (<span class="org-keyword">ert-deftest</span> <span class="org-function-name">bhw/config-test--headline-ids-are-timestamps</span> ()
   <span class="org-doc">"Headings get a timestamp `</span><span class="org-doc"><span class="org-constant">ID</span></span><span class="org-doc">'; an existing CUSTOM_ID is left alone.
@@ -10050,7 +10194,7 @@ Duck Duck go, Bing etc.
 </div>
 <div id="outline-container-ID-20c4bc2f-e467-48d7-9dd6-928c36457d26" class="outline-5">
 <h5 id="ID-20c4bc2f-e467-48d7-9dd6-928c36457d26">Web Scraping</h5>
-<div class="outline-text-5" id="text-org5800509">
+<div class="outline-text-5" id="text-org2704117">
 <ul class="org-ul">
 <li><a href="https://lispmethods.com/web-scraping.html">Web Scrape with Lisp</a></li>
 </ul>
@@ -10338,7 +10482,7 @@ Use the ^ character.
 </div>
 <div id="outline-container-ID-20230812T154052.248512" class="outline-5">
 <h5 id="ID-20230812T154052.248512">Regular Expressions</h5>
-<div class="outline-text-5" id="text-orgf792f25">
+<div class="outline-text-5" id="text-org176d46a">
 <p>
 The pattern that matches substrings in parentheses having no other ( and )
 characters in between (like (xyz 123) in Text (abc(xyz 123)) is
@@ -10437,7 +10581,7 @@ Details:
 </div>
 <div id="outline-container-ID-20260901T134926.230296" class="outline-5">
 <h5 id="ID-20260901T134926.230296">Major / Minor Mode</h5>
-<div class="outline-text-5" id="text-org0d827f4">
+<div class="outline-text-5" id="text-orgcefe9c9">
 <table>
 
 
@@ -10677,7 +10821,7 @@ Emacs 12.5 Documentation on Rectangles has useful information
 </div>
 <div id="outline-container-ID-0549a98a-a97c-42f9-84d0-a59a9c004541" class="outline-5">
 <h5 id="ID-0549a98a-a97c-42f9-84d0-a59a9c004541">Emacs Macro</h5>
-<div class="outline-text-5" id="text-orgb92e72f">
+<div class="outline-text-5" id="text-org9132dae">
 <p>
 The Emacs way to define macros is available behind the prefix: SPC K
 </p>
@@ -10798,7 +10942,7 @@ run <code>M-x spacemacs/recompile-elpa</code>.
 </div>
 <div id="outline-container-ID-20260901T134926.243037" class="outline-5">
 <h5 id="ID-20260901T134926.243037">Install Emacs from source</h5>
-<div class="outline-text-5" id="text-org8294ff7">
+<div class="outline-text-5" id="text-orgc788c23">
 <p>
 I wrote the initial tutorial for Windows 10, for Emacs was also my introduction
 into the world of UNIX and Lisp. That, combined with the desire to remind my

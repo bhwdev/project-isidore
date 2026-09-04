@@ -78,17 +78,32 @@ CONTENT-FN is called with the main content div as argument."
   (setf (title (html-document body)) "BHW.name")
   ;; Index page styles for slideshow overlay
   (let ((sb (create-style-block body)))
+    ;; global.css constrains BODY to a centred 900px column; the index page is
+    ;; full-bleed over the fixed-position slideshow, so widen it back out.
+    ;; Without the WIDTH override the 900px stays in force and MARGIN 0 pins
+    ;; the content flush left.
     (add-style sb :element "body"
                '(("background" "#000")
                  ("color" "#fff")
                  ("overflow-y" "scroll")
                  ("overflow-x" "hidden")
+                 ("width" "100%")
+                 ("max-width" "none")
                  ("margin" "0")
                  ("padding" "0")))
+    ;; MIN-HEIGHT (not HEIGHT) so a card taller than the viewport grows the
+    ;; container instead of overflowing past the top edge; the auto margins on
+    ;; the inner HEADER then collapse to 0 and the page simply scrolls.
     (add-style sb :element ".slideshow-content"
                '(("position" "relative")
                  ("z-index" "1")
-                 ("text-align" "center")))
+                 ("text-align" "center")
+                 ("display" "flex")
+                 ("flex-direction" "column")
+                 ("justify-content" "center")
+                 ("min-height" "100vh")
+                 ("box-sizing" "border-box")
+                 ("padding" "2rem 1rem")))
     (add-style sb :element ".slideshow-content header"
                '(("max-width" "30rem")
                  ("margin" "auto")
@@ -196,7 +211,7 @@ CONTENT-FN is called with the main content div as argument."
       (create-section main :h1 :content "Contact" :class "title")
       (create-section main :h1 :content "Ways to get in contact")
       (create-p main :content "Questions, comments, death threats? Don't hesitate to reach out to me via email at: <a class=\"cryptedmail\" data-name=\"seneschal\" data-domain=\"bhw\" data-tld=\"name\" onclick=\"window.location.href = 'mailto:' + this.dataset.name + '@' + this.dataset.domain + '.' + this.dataset.tld; return false;\" href=\"#\"></a>")
-      (create-p main :content "My PGP Key Fingerprint: 06DD A936 90F7 75E3 715B 628C CA94 9A6D 46BC 2BBE")
+      (create-p main :content "My PGP Key Fingerprint: 65F6 51E8 3146 3420 D414 BEFD C784 4C0B 25E7 A49F")
       (create-p main :content "My PGP Public Key is available <a target=\"_blank\" href=\"pubkey.asc\">here</a> and as a secondary source, at <a target=\"_blank\" href=\"https://keys.openpgp.org\">https://keys.openpgp.org.</a>")
       (create-p main :content "To receive blog article updates please use <a target=\"_blank\" href=\"https://bhw.name/assets/blog/atom.xml\">the Blog RSS Feed</a> or <a href=\"https://bhw.name/subscribe\">Subscribe to the Mailing List.</a>")
       (create-section main :h1 :content "Blog Article Transparency Policy")

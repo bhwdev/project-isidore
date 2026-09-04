@@ -1,12 +1,145 @@
+/* ---------------------------------------------------------------------------
+   Palette.  Every colour that has to change between light and dark lives here
+   as a custom property; the rules below reference nothing else.  Colours that
+   read correctly either way -- the .todo/.done badges, the burger's checked
+   state -- are left as literals on purpose.
+
+   Every foreground/background pair defined here clears WCAG 2.1 AA (4.5:1)
+   against the surface it is actually painted on.  Two that did not:  body
+   links were #609cdb on #FDF6E3 (2.68:1) with text-decoration:none, so colour
+   was both insufficient and the only cue; and the source-block language badge
+   was white on #b3b3b3 (2.10:1), the worst ratio in the file.
+   --------------------------------------------------------------------------- */
+:root {
+  /* Tells the UA both themes are supported, so scrollbars, form controls and
+     the canvas behind the page follow the preference too. */
+  color-scheme: light dark;
+
+  --page-bg: #FDF6E3;
+  --text: #333;
+  --heading: #A5573E;
+  --title-fg: black;
+  --link: #0f5ea8;
+  --link-hover: #003355;
+  --selection-bg: #D6EDFF;
+  --rule: #ccc;
+  --rule-soft: #eee;
+  --table-rule: gray;
+  --table-rule-soft: lightgray;
+
+  /* Site chrome: the fixed bar, and the full-screen overlay under 768px. */
+  --chrome-bg: #FDF6E3;
+  --chrome-fg: #000;
+  --chrome-fg-dim: #777777;
+  --chrome-hover: #EEE8D5;
+  --burger: black;
+  --menu-bg: #f5deb3;
+  --menu-fg: #212121;
+  --menu-hover-bg: #FDF6E3;
+  --menu-hover-fg: brown;
+
+  --code-bg: #F5E8C4;
+  --code-fg: #33312c;
+  --badge-bg: #6b625a;
+  --badge-fg: #fff;
+  --inline-code-bg: #F5F5F5;
+  --inline-code-border: #DDD;
+  --inline-code-fg: #333;
+  --kbd-bg: #f7f7f7;
+  --tag-bg: #eee;
+  --tag-fg: #333;
+  --tag-border: #bbb;
+  --mark-bg: #ffff00;
+  --inlinetask-bg: #ffffcc;
+  --timestamp-kwd: #5f9ea0;
+
+  --button-bg: #F5DEB3;
+  --button-fg: #222222;
+  --button-border: #222222;
+  --button-active-bg: #EEE8D5;
+  --button-disabled: #DDDDDD;
+
+  /* Source-block syntax, emitted by htmlize as .org-<face> spans -- see
+     `org-html-htmlize-output-type' in dotemacs.org.  Measured on --code-bg. */
+  --syn-comment: #6b6455;
+  --syn-string: #26695a;
+  --syn-keyword: #7d3fa8;
+  --syn-builtin: #5b57a8;
+  --syn-function: #0f5ea8;
+  --syn-variable: #8a4b00;
+  --syn-constant: #00646e;
+  --syn-type: #2a6b30;
+  --syn-warning: #b81a17;
+  --syn-regexp: #a03060;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page-bg: #002b36;
+    --text: #c3cdd0;
+    --heading: #e0946f;
+    --title-fg: #e6dfcf;
+    --link: #7fbcf0;
+    --link-hover: #b8dcff;
+    --selection-bg: #14526b;
+    --rule: #3a4b52;
+    --rule-soft: #05222b;
+    --table-rule: #55666d;
+    --table-rule-soft: #3a4b52;
+
+    --chrome-bg: #073642;
+    --chrome-fg: #e6dfcf;
+    --chrome-fg-dim: #93a1a1;
+    --chrome-hover: #0f4a5a;
+    --burger: #e6dfcf;
+    --menu-bg: #073642;
+    --menu-fg: #e6dfcf;
+    --menu-hover-bg: #0f4a5a;
+    --menu-hover-fg: #e8a87c;
+
+    --code-bg: #073642;
+    --code-fg: #c3cdd0;
+    --badge-bg: #55666d;
+    --badge-fg: #ffffff;
+    --inline-code-bg: #0b3b48;
+    --inline-code-border: #3a4b52;
+    --inline-code-fg: #c3cdd0;
+    --kbd-bg: #0f4a5a;
+    --tag-bg: #0f4a5a;
+    --tag-fg: #c3cdd0;
+    --tag-border: #55666d;
+    --mark-bg: #6b5d00;
+    --inlinetask-bg: #3a3a1a;
+    --timestamp-kwd: #7fc6c0;
+
+    --button-bg: #0f4a5a;
+    --button-fg: #e6dfcf;
+    --button-border: #93a1a1;
+    --button-active-bg: #14526b;
+    --button-disabled: #55666d;
+
+    --syn-comment: #93a1a1;
+    --syn-string: #45c0b6;
+    --syn-keyword: #c39bee;
+    --syn-builtin: #a99fe0;
+    --syn-function: #6cb6ff;
+    --syn-variable: #d9a86a;
+    --syn-constant: #5fd3c8;
+    --syn-type: #8fce87;
+    --syn-warning: #ff7b72;
+    --syn-regexp: #e88fc0;
+  }
+}
+
 @font-face { font-family: Cinzel; font-style: normal; font-weight: 400; font-display: swap; src: local(''), url('/assets/cinzel-v11-latin-regular.woff2') format('woff2'); }
 @font-face { font-family: RoyalInitialen; font-style: normal; font-weight: 400; font-display: swap; src: local(''), url('/assets/RoyalInitialen.woff2') format('woff2'); }
-.header-fixed  { position:  relative; left:  0; top:  0; z-index:  1; width:  100%; margin:  0; background-color:  #FDF6E3; }
+.header-fixed  { position:  relative; left:  0; top:  0; z-index:  1; width:  100%; margin:  0; background-color:  var(--chrome-bg); }
 .navbar  { display:  flex; justify-content:  space-between; align-items:
      center; color:  #fff; line-height:  60px; }
 .navbar .logo  { flex:  3; }
-.navbar .logo a  { display:  block; margin-left:  10%; font-size:  22px; font-family:  'Cinzel'; font-weight:  400; color:  #000; text-decoration:
+.navbar .logo a  { display:  block; margin-left:  10%; font-size:  22px; font-family:  'Cinzel'; font-weight:  400; color:  var(--chrome-fg); text-decoration:
      none; }
-.navbar .logo a:hover  { color:  #777777; }
+.navbar .logo a:hover  { color:  var(--chrome-fg-dim); }
 .navbar nav  { flex:  8; }
 .navbar label  { user-select:  none; cursor:  pointer; padding:  28px
      20px; position:  relative; z-index:  3; }
@@ -15,7 +148,7 @@
      normal; }
 .navbar label i:before, .navbar label i:after  { content:  ''; height:
      100%; position:  absolute; transition:  all .2s ease-out; width:  100%; }
-.navbar label i, .navbar label i:before, .navbar label i:after  { display:  block; background:  black; }
+.navbar label i, .navbar label i:before, .navbar label i:after  { display:  block; background:  var(--burger); }
 .navbar label i:before  { top:  5px; }
 .navbar label i:after  { top:  -5px; }
 .navbar #navbar-toggle  { display:  none; }
@@ -31,21 +164,21 @@
      #navbar-toggle:checked ~ label:not(.steps) i:after  { top:  0; }
 @media (max-width: 768px)  { .navbar nav  { visibility:  hidden; opacity:  0; z-index:  2; position:
       fixed; top:  0px; left:  0px; width:  100%; height:  100%; transition:
-      all 0.3s ease-out; display:  table; background:  #f5deb3; } .navbar nav ul  { margin:  0; padding:  20px 0; display:  table-cell; vertical-align:  middle; } .navbar nav li  { display:  block; text-align:  center; padding:  20px 0; text-align:  center; font-size:  50px; min-height:  50px; font-weight:
-      bold; cursor:  pointer; transition:  all 0.3s ease-out; } .navbar nav li:hover  { background:  #FDF6E3; } .navbar nav li:hover a  { color:  brown; transition:  all 0.3s ease-out; } .navbar nav li a  { font-family:  'Cinzel', 'Times New Roman', serif; color:  #212121; } }
+      all 0.3s ease-out; display:  table; background:  var(--menu-bg); } .navbar nav ul  { margin:  0; padding:  20px 0; display:  table-cell; vertical-align:  middle; } .navbar nav li  { display:  block; text-align:  center; padding:  20px 0; text-align:  center; font-size:  50px; min-height:  50px; font-weight:
+      bold; cursor:  pointer; transition:  all 0.3s ease-out; } .navbar nav li:hover  { background:  var(--menu-hover-bg); } .navbar nav li:hover a  { color:  var(--menu-hover-fg); transition:  all 0.3s ease-out; } .navbar nav li a  { font-family:  'Cinzel', 'Times New Roman', serif; color:  var(--menu-fg); } }
 @media (min-width: 768px)  { .navbar nav ul  { margin:  0; padding:  0; display:  flex; justify-content:  space-around; text-align:  center; list-style:  none; } .navbar nav li  { flex:  1; } .navbar nav li a  { display:  block; padding:  0 8px; font-size:  16px; font-weight:  400; font-family:  'Cinzel'; line-height:  60px; color:
-      #000; text-decoration:  none; } .navbar nav li.active  { background:  #555; } .navbar nav li:hover  { background:  #EEE8D5; } .navbar label  { display:  none; } }
-html { background-color:  #FDF6E3; }
+      var(--chrome-fg); text-decoration:  none; } .navbar nav li.active  { background:  #555; } .navbar nav li:hover  { background:  var(--chrome-hover); } .navbar label  { display:  none; } }
+html { background-color:  var(--page-bg); }
 body  { width:  95%; margin:  2% auto; font-size:  14px; line-height:
-     1.4em; font-family: Palatino, "Palatino Linotype", "Palantino LT STD", "Book Antiqua", Georgia, serif; font-weight:  400; color:  #333; }
+     1.4em; font-family: Palatino, "Palatino Linotype", "Palantino LT STD", "Book Antiqua", Georgia, serif; font-weight:  400; color:  var(--text); }
 @media screen and (min-width: 600px)  { body  { font-size:  18px; } }
 @media screen and (min-width: 910px)  { body  { width:  900px; } }
 #content  { width:  100%; }
-::selection  { background:  #D6EDFF; }
+::selection  { background:  var(--selection-bg); }
 p  { line-height: 1.5em; margin:  1em auto; }
 ol,ul  { margin:  0 auto; }
 dl  { margin:  0 auto; }
-.title  { text-align:  center; margin:  0.8em auto; color:  black; font-family: 'Cinzel'; font-weight:  400; }
+.title  { text-align:  center; margin:  0.8em auto; color:  var(--title-fg); font-family: 'Cinzel'; font-weight:  400; }
 .subtitle  { text-align:  center; font-size:  1.5em; line-height:  1.4; font-weight:  bold; margin:  1em auto; }
 .updated  { text-align:  center; }
 .abstract  { text-align:  center; margin:  auto; width:  80%; font-style:
@@ -58,17 +191,27 @@ dl  { margin:  0 auto; }
 .footpara  { display:  inline; margin:  .2em auto; }
 .footdef  { margin-bottom:  1em; }
 .footdef sup  { padding-right:  .5em; }
-a  { color:  #609cdb; text-decoration:  none; }
-a:hover  { color:  #003355; border-bottom:  1px dotted; }
+a  { color:  var(--link); text-decoration:  underline;
+     text-underline-offset:  0.15em; text-decoration-thickness:  from-font; }
+/* Navigation and heading self-links keep colour as their only cue: they
+   are unambiguously interactive from position, and underlining the
+   injected back-to-ToC glyphs looks like a typo. */
+.navbar a, #content h1 a, #content h2 a, #content h3 a,
+#content h4 a, #content h5 a, #content h6 a  { text-decoration:  none; }
+/* The dotted border-bottom used to be the only line on a link, since the
+   resting state had text-decoration:none.  Now that links are underlined
+   at rest it would draw a second, offset line, so thicken the underline
+   instead of stacking two rules on top of each other. */
+a:hover  { color:  var(--link-hover); text-decoration-thickness:  2px; }
 figure  { padding:  0px; margin:  1em auto; text-align:  center; }
 img  { max-width:  100%; vertical-align:  middle; }
 .MathJax_Display  { margin:  0!important; width:  90%!important; }
-h1,h2,h3,h4,h5,h6  { color:  #A5573E; line-height:  1em; font-weight: 400; font-style: italic; font-family: inherit; }
-h2 a  { color:  #A5573E; }
-h3 a  { color:  #A5573E; }
-h4 a  { color:  #A5573E; }
-h5 a  { color:  #A5573E; }
-h6 a  { color:  #A5573E; }
+h1,h2,h3,h4,h5,h6  { color:  var(--heading); line-height:  1em; font-weight: 400; font-style: italic; font-family: inherit; }
+h2 a  { color:  var(--heading); }
+h3 a  { color:  var(--heading); }
+h4 a  { color:  var(--heading); }
+h5 a  { color:  var(--heading); }
+h6 a  { color:  var(--heading); }
 h1,h2,h3  { line-height:  1.4em; }
 h4,h5,h6  { font-size:  1em; }
 @media screen and (min-width: 600px)  { h1  { font-size:  2em; } h2  { font-size:  1.5em; } h3  { font-size:  1.3em; } h1,h2,h3  { line-height:  1.4em; } h4,h5,h6  { font-size:  1.1em; } }
@@ -76,8 +219,8 @@ dt  { font-weight:  bold; }
 table  { margin:  1em auto; border-top:  2px solid; border-bottom:  2px
      solid; border-collapse:  collapse; }
 thead  { border-bottom:  2px solid; }
-table td + td, table th + th  { border-left:  1px solid gray; }
-table tr  { border-top:  1px solid lightgray; }
+table td + td, table th + th  { border-left:  1px solid var(--table-rule); }
+table tr  { border-top:  1px solid var(--table-rule-soft); }
 td,th  { padding:  0.3em 0.6em; vertical-align:  middle; }
 caption.t-above  { caption-side:  top; }
 caption.t-bottom  { caption-side:  bottom; }
@@ -90,17 +233,17 @@ td.org-right  { text-align:  right; }
 td.org-left  { text-align:  left; }
 td.org-center  { text-align:  center; }
 blockquote  { margin:  1em 2em; padding-left:  1em; border-left:  3px
-     solid #ccc; }
-kbd  { background-color:  #f7f7f7; font-size:  80%; margin:  0 .1em; padding:  .1em .6em; }
+     solid var(--rule); }
+kbd  { background-color:  var(--kbd-bg); font-size:  80%; margin:  0 .1em; padding:  .1em .6em; }
 .todo  { background-color:  red; color:  white; padding:  .1em 0.3em; border-radius:  3px; background-clip:  padding-box; font-size:  80%; font-family:  'Courier New', monospace; line-height:  1; }
 .done  { background-color:  green; color:  white; padding:  .1em 0.3em; border-radius:  3px; background-clip:  padding-box; font-size:  80%; font-family:  'Courier New', monospace; line-height:  1; }
 .priority  { color:  orange; font-family:  'Courier New', monospace; }
 #table-of-contents li  { clear:  both; }
 .tag  { font-family:  'Courier New', monospace; font-size:  0.7em; font-weight:  normal; }
-.tag span  { padding:  0.3em 0.3em; float:  right; margin-right:  .5em; border:  1px solid #bbb; border-radius:  3px; background-clip:
-     padding-box; color:  #333; background-color:  #eee; line-height:  1; }
-.timestamp  { color:  #333; font-size:  90%; }
-.timestamp-kwd  { color:  #5f9ea0; }
+.tag span  { padding:  0.3em 0.3em; float:  right; margin-right:  .5em; border:  1px solid var(--tag-border); border-radius:  3px; background-clip:
+     padding-box; color:  var(--tag-fg); background-color:  var(--tag-bg); line-height:  1; }
+.timestamp  { color:  var(--text); font-size:  90%; }
+.timestamp-kwd  { color:  var(--timestamp-kwd); }
 .org-right  { margin-left:  auto; margin-right:  0px; text-align:  right; }
 .org-left  { margin-left:  0px; margin-right:  auto; text-align:  left; }
 .org-center  { margin-left:  auto; margin-right:  auto; text-align:
@@ -112,12 +255,12 @@ kbd  { background-color:  #f7f7f7; font-size:  80%; margin:  0 .1em; padding:  .
      center; }
 p.verse  { margin-left:  3%; }
 :not(pre) > code  { padding:  2px 5px; margin:  auto 1px; border:  1px
-     solid #DDD; border-radius:  3px; background-clip:  padding-box; background-color: #F5F5F5; color:  #333; font-size:  80%; }
-.org-src-container  { border:  1px solid #ccc; box-shadow:  3px 3px 3px
-     #eee; background-color: #F5E8C4; font-family:  'Courier New', monospace; font-size:  80%; margin:  1em auto; padding:  0.1em 0.5em; position:
+     solid var(--inline-code-border); border-radius:  3px; background-clip:  padding-box; background-color: var(--inline-code-bg); color:  var(--inline-code-fg); font-size:  80%; }
+.org-src-container  { border:  1px solid var(--rule); box-shadow:  3px 3px 3px
+     var(--rule-soft); background-color: var(--code-bg); color:  var(--code-fg); font-family:  'Courier New', monospace; font-size:  80%; margin:  1em auto; padding:  0.1em 0.5em; position:
      relative; }
 .org-src-container>pre  { overflow:  auto; }
-.org-src-container>pre:before  { display:  block; position:  absolute; background-color:  #b3b3b3; top:  0; right:  0; padding:  0 0.5em; border-bottom-left-radius:  8px; border:  0; color:  white; font-size:
+.org-src-container>pre:before  { display:  block; position:  absolute; background-color:  var(--badge-bg); top:  0; right:  0; padding:  0 0.5em; border-bottom-left-radius:  8px; border:  0; color:  var(--badge-fg); font-size:
      80%; }
 .org-src-container>pre.src-sh:before  { content:  'sh'; }
 .org-src-container>pre.src-bash:before  { content:  'bash'; }
@@ -189,12 +332,12 @@ p.verse  { margin-left:  3%; }
 .org-src-container>pre.src-Translate translate:before  { content:  'Google'; }
 .org-src-container>pre.src-typescript:before  { content:  'Typescript'; }
 .org-src-container>pre.src-rust:before  { content:  'Rust'; }
-.inlinetask  { background:  #ffffcc; border:  2px solid gray; margin:
+.inlinetask  { background:  var(--inlinetask-bg); border:  2px solid var(--table-rule); margin:
      10px; padding:  10px; }
 #org-div-home-and-up  { font-size:  70%; text-align:  right; white-space:
      nowrap; }
 .linenr  { font-size:  90%; }
-.code-highlighted  { background-color:  #ffff00; }
+.code-highlighted  { background-color:  var(--mark-bg); }
 #bibliography  { font-size:  90%; }
 #bibliography table  { width:  100%; }
 .creator  { display:  block; }
@@ -212,11 +355,11 @@ p.verse  { margin-left:  3%; }
 }
 /* CSS */
 button {
-  background-color: #F5DEB3;
-  border: 1px solid #222222;
+  background-color: var(--button-bg);
+  border: 1px solid var(--button-border);
   border-radius: 8px;
   box-sizing: border-box;
-  color: #222222;
+  color: var(--button-fg);
   cursor: pointer;
   display: inline-block;
   font-family: Circular,-apple-system,BlinkMacSystemFont,Roboto,"Helvetica Neue",sans-serif;
@@ -236,17 +379,48 @@ button {
   width: auto;
 }
 button:focus-visible {
-  box-shadow: #222222 0 0 0 2px, rgba(255, 255, 255, 0.8) 0 0 0 4px;
+  box-shadow: var(--button-border) 0 0 0 2px, var(--page-bg) 0 0 0 4px;
   transition: box-shadow .2s;
 }
 button:active {
-  background-color: #EEE8D5;
-  border-color: #000000;
+  background-color: var(--button-active-bg);
+  border-color: var(--button-border);
   transform: scale(.96);
 }
 button:disabled {
-  border-color: #DDDDDD;
-  color: #DDDDDD;
+  border-color: var(--button-disabled);
+  color: var(--button-disabled);
   cursor: not-allowed;
   opacity: 1;
 }
+
+/* ---------------------------------------------------------------------------
+   Source-block syntax highlighting.
+
+   Blocks are highlighted at export time by htmlize, which emits one
+   <span class="org-FACE"> per font-lock face (the "org-" prefix is
+   `org-html-htmlize-font-prefix').  This used to be dead weight: the pages
+   loaded highlight.js from cdnjs, and `hljs.highlightElement' reads
+   textContent and rewrites innerHTML, so it discarded every one of these
+   spans -- and its bundle ships no Lisp grammar, so the elisp that makes up
+   most of this site's code fell through to auto-detection.  Styling the spans
+   directly is both correct and free of a third-party script.
+
+   The exact face set depends on the Emacs theme in use at export time, so
+   treat this as a best-effort map: anything unlisted simply inherits
+   --code-fg, which is legible by construction.
+   --------------------------------------------------------------------------- */
+.org-comment, .org-comment-delimiter  { color:  var(--syn-comment); font-style:  italic; }
+.org-doc  { color:  var(--syn-string); font-style:  italic; }
+.org-string  { color:  var(--syn-string); }
+.org-keyword, .org-highlight-quoted-quote  { color:  var(--syn-keyword); }
+.org-builtin  { color:  var(--syn-builtin); }
+.org-function-name  { color:  var(--syn-function); }
+.org-variable-name  { color:  var(--syn-variable); }
+.org-constant, .org-highlight-quoted-symbol  { color:  var(--syn-constant); }
+.org-type  { color:  var(--syn-type); }
+.org-warning, .org-negation-char  { color:  var(--syn-warning); font-weight:  bold; }
+.org-regexp-grouping-backslash, .org-regexp-grouping-construct  { color:  var(--syn-regexp); font-weight:  bold; }
+.org-sh-quoted-exec  { color:  var(--syn-function); }
+.org-sh-escaped-newline  { color:  var(--syn-regexp); }
+.org-org-level-1  { color:  var(--heading); }

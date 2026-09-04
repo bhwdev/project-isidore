@@ -3,6 +3,7 @@ acclimation-temperature, ghcr.io/ocicl/acclimation@sha256:f6f7b6782ea4fa53b86f23
 agnostic-lizard, ghcr.io/ocicl/agnostic-lizard@sha256:ba53fa8902631ec0f06f04d0e0ee609a1d01080390bd7d6f133620c26e7961b1, agnostic-lizard-20240503-fe1a1d7/agnostic-lizard.asd
 agnostic-lizard-debugger-prototype, ghcr.io/ocicl/agnostic-lizard@sha256:ba53fa8902631ec0f06f04d0e0ee609a1d01080390bd7d6f133620c26e7961b1, agnostic-lizard-20240503-fe1a1d7/agnostic-lizard-debugger-prototype.asd
 alexandria, ghcr.io/ocicl/alexandria@sha256:e433c2e076ed3bcf8641b97b00192680db2201d305efac9293539dee88c7fbf7, alexandria-20240503-8514d8e/alexandria.asd
+anaphora, ghcr.io/ocicl/anaphora@sha256:55f1c61b7826c5451a60b4b4522e35e770504bbfa2036d8becbf21f6d654925a, anaphora-20240503-bcf0f74/anaphora.asd
 asdf-package-system, ghcr.io/ocicl/asdf-package-system@sha256:dfacc260786f4e9e2aa13a797a7b326b58e08ea5db778421a9985b9c67362df1, asdf-package-system-20240503-61776f2/asdf-package-system.asd
 atomics, ghcr.io/ocicl/atomics@sha256:47645f75191931211547cdcf578a40b24019d58f48c83d93e9055aec79c877fd, atomics-20260218-ce398c4/atomics.asd
 atomics-test, ghcr.io/ocicl/atomics@sha256:47645f75191931211547cdcf578a40b24019d58f48c83d93e9055aec79c877fd, atomics-20260218-ce398c4/atomics-test.asd
@@ -33,6 +34,8 @@ cl-csv-clsql, ghcr.io/ocicl/cl-csv@sha256:01600afb8570e45cfd2e1486138c844b13d940
 cl-csv-data-table, ghcr.io/ocicl/cl-csv@sha256:01600afb8570e45cfd2e1486138c844b13d940a1070140ff9341f6ec98b8e9c6, cl-csv-20240127-2d64d41/cl-csv-data-table.asd
 cl-dbi, ghcr.io/ocicl/cl-dbi@sha256:831b6c4b26fcd003cd1ed4a2e42a5620128bd577ff077d4c6400a076e41bbff8, cl-dbi-20250928-be4df4f/cl-dbi.asd
 cl-fad, ghcr.io/ocicl/cl-fad@sha256:c0aaffc859e419e0a94cedb08f48c2484da404363fb0fe4ffd6e09a80aadafe1, cl-fad-0.7.6/cl-fad.asd
+cl-heredoc, ghcr.io/ocicl/cl-heredoc@sha256:f106693d877b12450eed9813109937c1244afa0470985e55542767b8e854a0c1, cl-heredoc-20240503-f09f98b/cl-heredoc.asd
+cl-heredoc-test, ghcr.io/ocicl/cl-heredoc@sha256:f106693d877b12450eed9813109937c1244afa0470985e55542767b8e854a0c1, cl-heredoc-20240503-f09f98b/cl-heredoc-test.asd
 cl-interpol, ghcr.io/ocicl/cl-interpol@sha256:bf02bce744361792150a04310b24a623596b99190a9f85a1c2ebf35f12b2288c, cl-interpol-2.0.7/cl-interpol.asd
 cl-isaac, ghcr.io/ocicl/cl-isaac@sha256:9240ff7f4374b7063138e16b8e5cf4d2de86416751e6970cf38ede64c0b744d5, cl-isaac-20240503-51ee060/cl-isaac.asd
 cl-json, ghcr.io/ocicl/cl-json@sha256:54c4d00901c2c5b0ea9da11eed8f0104fc5819e1ed9a29d1f3364503a720a868, cl-json-20240907-994dd38/cl-json.asd
@@ -57,6 +60,7 @@ clog, ghcr.io/ocicl/clog@sha256:712416d27c5748262c06bfbbc1cc81002f7ef53c97dd63df
 closer-mop, ghcr.io/ocicl/closer-mop@sha256:39ec579e68118a8be57a7882812ff31094a031f88b77f11cf4434a92261f1126, closer-mop-20260329-04db182/closer-mop.asd
 com.inuoe.jzon, ghcr.io/ocicl/com.inuoe.jzon@sha256:b0cfbc3d8fb3c09526d92575b40b13a68ad93be7edeb48fd69dcea053c5611a5, jzon-20251113-f05afbb/com.inuoe.jzon.asd
 com.inuoe.jzon-tests, ghcr.io/ocicl/com.inuoe.jzon@sha256:b0cfbc3d8fb3c09526d92575b40b13a68ad93be7edeb48fd69dcea053c5611a5, jzon-20251113-f05afbb/com.inuoe.jzon-tests.asd
+consfigurator, ghcr.io/ocicl/consfigurator@sha256:83085ea84d3add6a17648189d8f77df8212e79aa40b6fda4ccc26e4fb91c2b1b, consfigurator-20260604-53083f5/consfigurator.asd
 dbd-mysql, ghcr.io/ocicl/cl-dbi@sha256:831b6c4b26fcd003cd1ed4a2e42a5620128bd577ff077d4c6400a076e41bbff8, cl-dbi-20250928-be4df4f/dbd-mysql.asd
 dbd-null, ghcr.io/ocicl/cl-dbi@sha256:831b6c4b26fcd003cd1ed4a2e42a5620128bd577ff077d4c6400a076e41bbff8, cl-dbi-20250928-be4df4f/dbd-null.asd
 dbd-postgres, ghcr.io/ocicl/cl-dbi@sha256:831b6c4b26fcd003cd1ed4a2e42a5620128bd577ff077d4c6400a076e41bbff8, cl-dbi-20250928-be4df4f/dbd-postgres.asd

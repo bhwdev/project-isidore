@@ -6,6 +6,7 @@
   (:mix #:common-lisp #:series #:alexandria #:serapeum)
   (:mix-reexport #:clog #:clog-web #:hunchentoot)
   (:import-from #:ironclad)
+  (:import-from #:bordeaux-threads)
   (:local-nicknames
    (#:conn      #:clog-connection)
    (#:bible     #:project-isidore/bible)
@@ -610,25 +611,42 @@ submission and url-rewrite for shareable URLs."
 ;;; Server Lifecycle
 
 (defun wait-for-port-ready (port &key (host "127.0.0.1") (timeout 5.0) (interval 0.05))
-  "Block until something is accepting TCP connections on HOST:PORT, or
-TIMEOUT seconds elapse. Returns T on success, NIL on timeout. CLOG's
-INITIALIZE returns as soon as clack:clackup hands back a handler struct,
-but the underlying hunchentoot acceptor finishes START in a separate
-thread. If TERMINATE-APPLICATION runs before that thread has populated
-HUNCHENTOOT::ACCEPTOR-PROCESS, clack's BT2:DESTROY-THREAD cleanup hits
-UNBOUND-SLOT and crashes the handler thread. Polling here closes that
-window."
+  "Block until the web server on HOST:PORT has fully started, or TIMEOUT
+seconds elapse.  Returns T on success, NIL on timeout.
+
+CLOG's INITIALIZE returns as soon as clack:clackup hands back a handler
+struct, but the underlying hunchentoot acceptor finishes START in a separate
+thread, in two steps: START-LISTENING binds the socket, so the port accepts
+connections, and only then does EXECUTE-ACCEPTOR store the listener thread in
+the taskmaster's ACCEPTOR-PROCESS slot.  If TERMINATE-APPLICATION runs between
+those steps, clack's BT2:DESTROY-THREAD cleanup calls HUNCHENTOOT:STOP, whose
+SHUTDOWN reads the still-unbound slot and signals UNBOUND-SLOT in that thread;
+under \"sbcl --script\" (the production build, which runs the test suite) an
+unhandled error in any thread terminates the whole process.  The 2026-09-04
+deploy died exactly there.  So this waits for both signs: the port accepting
+connections and a \"hunchentoot-listener-HOST:PORT\" thread existing, plus one
+more INTERVAL for the slot assignment that immediately follows the thread's
+creation."
   (let ((deadline (+ (get-internal-real-time)
-                     (* timeout internal-time-units-per-second))))
-    (loop
-      (handler-case
-          (let ((sock (usocket:socket-connect host port)))
-            (usocket:socket-close sock)
-            (return t))
-        (error ()
-          (when (> (get-internal-real-time) deadline)
-            (return nil))
-          (sleep interval))))))
+                     (* timeout internal-time-units-per-second)))
+        (listener-name (format nil "hunchentoot-listener-~A:~A" host port)))
+    (flet ((port-ready-p ()
+             (handler-case
+                 (let ((sock (usocket:socket-connect host port)))
+                   (usocket:socket-close sock)
+                   t)
+               (error () nil)))
+           (listener-thread-p ()
+             (find listener-name (bordeaux-threads:all-threads)
+                   :key #'bordeaux-threads:thread-name :test #'equal))
+           (expired-p ()
+             (> (get-internal-real-time) deadline)))
+      (loop until (and (port-ready-p) (listener-thread-p))
+            do (when (expired-p)
+                 (return-from wait-for-port-ready nil))
+               (sleep interval))
+      (sleep interval)
+      t)))
 
 (defun terminate-application (&optional sigint-poll)
   "Stop the web server started by `initialize-application', if it exists. When

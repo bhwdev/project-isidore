@@ -20,7 +20,8 @@
    #:load-llm-config #:llm-enabled-p #:warm-up-llm
    ;; request and reply
    #:intent-schema #:system-prompt #:llm-request-body #:parse-llm-response
-   #:vehicle-in-text-p #:constrain-intent #:llm-normalize
+   #:vehicle-in-text-p #:time-in-text-p #:day-in-text-p #:destination-in-text
+   #:word-in-text-p #:constrain-intent #:llm-normalize
    ;; rendering and validation
    #:sanitize-field #:initial-in-text-p
    #:render-book-request #:render-view-range
@@ -299,6 +300,66 @@ the closing brace (finish_reason other than \"stop\"), or is not an object."
   '((:dgh "dgh") (:lgh "lgh") (:chevy "chevy" "chevrolet") (:personal "personal"))
   "Words the message must contain for the model's vehicle to stand.")
 
+(defparameter *number-words*
+  '(("one" . 1) ("two" . 2) ("three" . 3) ("four" . 4) ("five" . 5) ("six" . 6)
+    ("seven" . 7) ("eight" . 8) ("nine" . 9) ("ten" . 10) ("eleven" . 11) ("twelve" . 12))
+  "Hours written as words, as a message may give them (\"seven PM\").")
+
+(defun word-in-text-p (word text)
+  "True when WORD occurs in TEXT as a whole word, ignoring case and any
+punctuation inside the word, so \"marys\" is found in \"Mary's\" and \"st\" in
+\"St.\"."
+  (let ((letters (remove-if-not #'alphanumericp word)))
+    (and (plusp (length letters))
+         (cl-ppcre:scan
+          (format nil "(?i)(?<![a-z0-9])~{~a~^[^a-z0-9 ]*~}(?![a-z0-9])"
+                  (map 'list #'string letters))
+          text)
+         t)))
+
+(defun time-in-text-p (time text)
+  "True when TEXT gives some ground for TIME (\"8:30 am\"): its hour written
+as digits (\"8:30\", \"8am\", \"8-10\") or as a word (\"eight\"), or noon or
+midnight for twelve.  Loose on purpose -- a day of the month counts -- it
+exists to stop a time the message never mentions at all."
+  (let* ((hour (and (stringp time) (parse-integer time :junk-allowed t)))
+         (word (car (rassoc hour *number-words*))))
+    (and hour
+         (or (cl-ppcre:scan (format nil "(?<![0-9])~d(?![0-9])" hour) text)
+             (and word (word-in-text-p word text))
+             (and (= hour 12)
+                  (or (word-in-text-p "noon" text) (word-in-text-p "midnight" text))))
+         t)))
+
+(defparameter *day-evidence-regex*
+  (concatenate
+   'string
+   "(?i)(?<![a-z])(?:today|tonight|tomorrow|tmrw|tmr|tmw|2moro|tomorow"
+   "|mon|monday|tue|tues|tuesday|wed|weds|wednesday|thu|thur|thurs|thursday"
+   "|fri|friday|sat|saturday|sun|sunday"
+   "|jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july"
+   "|aug|august|sep|sept|september|oct|october|nov|november|dec|december"
+   "|(?:this|next|last)\\s+week)(?![a-z])"
+   "|\\d{1,2}/\\d{1,2}|\\d{4}-\\d{2}-\\d{2}|(?<![0-9])\\d{1,2}(?:st|nd|rd|th)(?![a-z])")
+  "Anything a message can name a day with: a relative day (and its usual
+shorthand), a weekday, a month, a numeric date or an ordinal.")
+
+(defun day-in-text-p (text)
+  "True when TEXT names a day in any of the ways *DAY-EVIDENCE-REGEX* lists,
+so a day the model made up (there is nothing in \"ZZ and QQ to the pool\"
+to read one from) is dropped."
+  (and (cl-ppcre:scan *day-evidence-regex* text) t))
+
+(defun destination-in-text (destination text)
+  "DESTINATION reduced to the words TEXT contains, in order, or NIL when none
+is left.  The model sometimes completes a name from its examples (\"Saint
+Marys church\" for a message that says \"Saint Marys\"); only what the
+message says may reach the sheet."
+  (when (stringp destination)
+    (let ((kept (remove-if-not (lambda (word) (word-in-text-p word text))
+                               (cl-ppcre:split "\\s+" destination))))
+      (and kept (format nil "~{~a~^ ~}" kept)))))
+
 (defun vehicle-in-text-p (vehicle text)
   "True when TEXT names VEHICLE (a keyword from *VEHICLE-WORDS*) as a word."
   (some (lambda (word)
@@ -306,23 +367,43 @@ the closing brace (finish_reason other than \"stop\"), or is not an object."
         (cdr (assoc vehicle *vehicle-words*))))
 
 (defun constrain-intent (intent text)
-  "INTENT with what the model cannot have read in TEXT corrected.  A vehicle
-the message does not name is dropped, so the ordinary DGH > LGH > Chevy
-priority applies (a small model reads \"the van\" as the DGH).  A \"view\"
-that nonetheless names a destination, passengers or times is a booking
-phrased as a question (\"is the LGH free tomorrow 2-4 for BW to see the
-dentist?\"), so its intent becomes :BOOK; VALIDATE-BOOK-INTENT then holds it
-to the same rules as any other.  Passengers are left alone: one not in TEXT
-makes VALIDATE-BOOK-INTENT reject the whole request."
-  (let ((intent (copy-list intent)))
-    (when (and (getf intent :vehicle)
-               (not (vehicle-in-text-p (getf intent :vehicle) text)))
-      (setf (getf intent :vehicle) nil))
-    (when (and (eq (getf intent :intent) :view)
-               (or (getf intent :destination) (getf intent :passengers)
-                   (getf intent :dep-time) (getf intent :ret-time)))
-      (setf (getf intent :intent) :book))
-    intent))
+  "INTENT with everything the model cannot have read in TEXT taken out, so
+that only what the message says can reach the sheet:
+
+  - a vehicle the message does not name is dropped (a small model reads
+    \"the van\" as the DGH), and the ordinary DGH > LGH > Chevy priority applies;
+  - a departure or return time whose hour the message never mentions is
+    dropped (the model copied \"8:30 am\" from its examples for \"zz and qq
+    wanna hit the test lab tmrw\"), so BOOK asks for the times instead of
+    inventing a trip;
+  - the day is dropped unless the message names one somehow
+    (DAY-IN-TEXT-P), so the request comes back as incomplete;
+  - the destination keeps only the words the message contains
+    (DESTINATION-IN-TEXT).
+
+A \"view\" that, after this, still names a destination, passengers or a time
+is a booking phrased as a question (\"is the LGH free tomorrow 2-4 for BW to
+see the dentist?\"), so its intent becomes :BOOK; VALIDATE-BOOK-INTENT then
+holds it to the same rules as any other.  Passengers are left alone: one not
+in TEXT makes VALIDATE-BOOK-INTENT reject the whole request."
+  (when intent
+    (let ((intent (copy-list intent)))
+      (when (and (getf intent :vehicle)
+                 (not (vehicle-in-text-p (getf intent :vehicle) text)))
+        (setf (getf intent :vehicle) nil))
+      (dolist (slot '(:dep-time :ret-time))
+        (when (and (getf intent slot)
+                   (not (time-in-text-p (getf intent slot) text)))
+          (setf (getf intent slot) nil)))
+      (when (and (getf intent :day) (not (day-in-text-p text)))
+        (setf (getf intent :day) nil))
+      (setf (getf intent :destination)
+            (destination-in-text (getf intent :destination) text))
+      (when (and (eq (getf intent :intent) :view)
+                 (or (getf intent :destination) (getf intent :passengers)
+                     (getf intent :dep-time) (getf intent :ret-time)))
+        (setf (getf intent :intent) :book))
+      intent)))
 
 (defun llm-normalize (text &key known-destinations today)
   "Ask the model what TEXT means.  Returns the intent plist (see

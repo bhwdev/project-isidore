@@ -325,16 +325,69 @@ rendered sentence, in the notation of BOOKING-NLP-TESTS::CHECK-REQUEST.")
     (is eq :dgh (getf (llm:constrain-intent intent "book the dgh for the pool tomorrow for MM")
                       :vehicle))
     ;; the rest of the reply is untouched, and so is the original
-    (is equal '("MM") (getf (llm:constrain-intent intent "the van for MM") :passengers))
+    (is equal '("MM") (getf (llm:constrain-intent intent "the van for MM tomorrow, pool")
+                            :passengers))
     (is eq :dgh (getf intent :vehicle)))
+  ;; times: the hour must be in the message, as digits, a word, or noon/midnight
+  (true (llm:time-in-text-p "8:30 am" "out half past 8, back 11ish"))
+  (true (llm:time-in-text-p "11:00 am" "out half past 8, back 11ish"))
+  (true (llm:time-in-text-p "7:00 pm" "at seven PM to nine PM"))
+  (true (llm:time-in-text-p "9:00 pm" "at seven PM to nine PM"))
+  (true (llm:time-in-text-p "12:00 pm" "9am-noon"))
+  (true (llm:time-in-text-p "12:00 am" "back by midnight"))
+  (true (llm:time-in-text-p "2:00 pm" "tomorrow 2-4 for BW"))
+  (false (llm:time-in-text-p "8:30 am" "zz and qq wanna hit the test lab tmrw"))
+  (false (llm:time-in-text-p "8:00 am" "leaving at 18:00"))
+  (false (llm:time-in-text-p nil "8"))
+  (let ((invented (llm:constrain-intent
+                   '(:intent :book :passengers ("ZZ" "QQ") :destination "test lab" :day "tomorrow"
+                     :dep-time "8:30 am" :ret-time "11:00 am" :vehicle :dgh)
+                   "zz and qq wanna hit the test lab tmrw")))
+    (false (getf invented :dep-time))
+    (false (getf invented :ret-time))
+    (false (getf invented :vehicle))
+    (is equal "test lab" (getf invented :destination))
+    (is equal "tomorrow" (getf invented :day)))
+  (let ((kept (llm:constrain-intent
+               '(:intent :book :passengers ("BW") :destination "dentist" :day "tomorrow"
+                 :dep-time "8:30 am" :ret-time "11:00 am")
+               "me and BW need wheels to the dentist tmrw, out half past 8, back 11ish")))
+    (is equal "8:30 am" (getf kept :dep-time))
+    (is equal "11:00 am" (getf kept :ret-time)))
+  ;; the day must be named somehow: relative word, weekday, month, date, ordinal
+  (dolist (text '("tmrw" "tomorrow morning" "next Tuesday" "thurs 7-9" "Sept 12" "on the 22nd"
+                  "4/22" "2026-09-12" "next week" "sat"))
+    (true (llm:day-in-text-p text) "day evidence in ~s" text))
+  (dolist (text '("zz and qq to the pool" "book the van for MM" "at 8 to 10" "mondayish"))
+    (false (llm:day-in-text-p text) "no day evidence in ~s" text))
+  (false (getf (llm:constrain-intent '(:intent :book :passengers ("ZZ") :destination "pool"
+                                       :day "tomorrow")
+                                     "zz to the pool")
+               :day))
+  ;; the destination keeps only the words the message has
+  (is equal "Saint Marys" (llm:destination-in-text "Saint Marys church"
+                                                    "take the van to Saint Marys on Friday"))
+  (is equal "saint marys church" (llm:destination-in-text "saint marys church"
+                                                          "MM to Saint Mary's Church friday"))
+  (is equal "SHMS" (llm:destination-in-text "SHMS" "add GG to Thursday's SHMS trip"))
+  (is equal "test lab" (llm:destination-in-text "test lab" "zz and qq wanna hit the test lab tmrw"))
+  (false (llm:destination-in-text "airport" "swimming for CG"))
+  (false (llm:destination-in-text nil "x"))
+  (false (getf (llm:constrain-intent '(:intent :book :destination "airport" :day "tomorrow")
+                                     "cg tomorrow")
+               :destination))
   ;; a "view" that names passengers, a destination or times is a booking
   ;; phrased as a question
   (is eq :book (getf (llm:constrain-intent
                       '(:intent :view :passengers ("BW") :destination "dentist" :range "tomorrow")
                       "is the LGH free tomorrow for BW to see the dentist?")
                      :intent))
-  (is eq :book (getf (llm:constrain-intent '(:intent :view :dep-time "8:00 am") "x") :intent))
-  (is eq :book (getf (llm:constrain-intent '(:intent :view :ret-time "8:00 am") "x") :intent))
+  (is eq :book (getf (llm:constrain-intent '(:intent :view :dep-time "8:00 am") "at 8") :intent))
+  (is eq :book (getf (llm:constrain-intent '(:intent :view :ret-time "8:00 am") "by 8") :intent))
+  ;; but not on the strength of an invented destination or time
+  (is eq :view (getf (llm:constrain-intent '(:intent :view :destination "dentist" :range "tomorrow")
+                                           "who has the van tomorrow?")
+                     :intent))
   ;; a real question stays one, even with a day or vehicle in the reply
   (is eq :view (getf (llm:constrain-intent '(:intent :view :range "this week" :day "Saturday")
                                            "what's on this week?")

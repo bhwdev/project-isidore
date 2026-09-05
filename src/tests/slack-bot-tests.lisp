@@ -629,6 +629,76 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
       (true (search "Booking failed [SIMPLE-ERROR]" (first posted)))
       (true (search "boom" (first posted))))))
 
+(define-test parse-slash-text
+  :parent slack-bot-suite
+  (multiple-value-bind (cmd args) (sb::parse-slash-text "/view")
+    (is string= "/view" cmd)
+    (is string= "" args))
+  (multiple-value-bind (cmd args) (sb::parse-slash-text "/view  this week and next week ")
+    (is string= "/view" cmd)
+    (is string= "this week and next week" args))
+  ;; an argument line may itself span lines
+  (multiple-value-bind (cmd args) (sb::parse-slash-text (format nil "/book a van~%for MM"))
+    (is string= "/book" cmd)
+    (is string= (format nil "a van~%for MM") args))
+  ;; plain requests, and a slash that is not a command word, stay bookings
+  (false (sb::parse-slash-text "book a van for MM"))
+  (false (sb::parse-slash-text "9/4 trip to town"))
+  (false (sb::parse-slash-text "/ view")))
+
+(define-test message-event-slash-commands
+  :parent slack-bot-suite
+  ;; A client that does not expand slash commands sends "/view" as message
+  ;; text; it must show the schedule, not book a trip to "view".
+  (let ((posted '())
+        (booked '()))
+    (with-mocked-functions ((sb::post-slack-message
+                             (lambda (channel text) (push (cons channel text) posted)))
+                            (vb:book-natural
+                             (lambda (text &key week) (declare (ignore week))
+                               (push text booked)
+                               (format t "booked ~a" text)))
+                            (vb:view-schedule
+                             (lambda (&optional range)
+                               (format t "TABLE for ~a" range) "ignored")))
+      (bt:join-thread (sb::handle-message-event
+                       (message-event "text" "/view" "channel" "C1" "user" "U1")))
+      (is = 0 (length booked))
+      (is string= "C1" (car (first posted)))
+      (true (search "TABLE for today" (cdr (first posted))))
+      ;; the rest of the line is the date range, mention prefix and all
+      (bt:join-thread (sb::handle-message-event
+                       (message-event "text" "<@U9> /view tomorrow" "channel" "C1" "user" "U1")))
+      (true (search "TABLE for tomorrow" (cdr (first posted))))
+      (is = 0 (length booked))
+      ;; /book still books, with the command word stripped
+      (bt:join-thread (sb::handle-message-event
+                       (message-event "text" "/book for the pool" "channel" "C1" "user" "U1")))
+      (is equal '("for the pool") booked)
+      ;; a mistyped command is named rather than booked
+      (false (sb::handle-message-event
+              (message-event "text" "/vew tomorrow" "channel" "C1" "user" "U1")))
+      (is equal '("for the pool") booked)
+      (true (search "Unknown command: /vew" (cdr (first posted)))))))
+
+(define-test message-event-subscribe-uses-event-user
+  :parent slack-bot-suite
+  ;; /subscribe as message text identifies the user from the event, since
+  ;; there is no slash-command payload to carry user_id.
+  (let ((posted '())
+        (subscribed '()))
+    (with-mocked-functions ((sb::post-slack-message
+                             (lambda (channel text) (push (cons channel text) posted)))
+                            (db:add-slack-subscription
+                             (lambda (user-id initial)
+                               (push (cons user-id initial) subscribed) t)))
+      (bt:join-thread (sb::handle-message-event
+                       (message-event "text" "/subscribe BW" "channel" "D1" "user" "U7")))
+      (is equal '(("U7" . "BW")) subscribed)
+      ;; the reply goes back to the conversation the message came from
+      (is string= "D1" (car (first posted)))
+      (true (search "Subscribed" (cdr (first posted)))))))
+
 (define-test scheduler-tick-window
   :parent slack-bot-suite
   (let* ((trip (vb:make-trip :day "Monday" :vehicle :dgh :destination "SHMS"

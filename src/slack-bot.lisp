@@ -36,7 +36,10 @@
 Provides a Lack middleware that serves two endpoints:
 
   POST /slack/events   — Events API (DMs / @mentions) dispatched to
-                         book-natural, original behaviour.
+                         book-natural, original behaviour.  A message whose
+                         text begins with a slash command runs that command
+                         instead, for clients that deliver \"/view\" as plain
+                         text rather than expanding it.
   POST /slack/commands — Slash commands /book, /view, /subscribe,
                          /unsubscribe, /help.
 
@@ -219,13 +222,50 @@ propagate to the caller."
     (booking-incomplete (c)
       (princ-to-string c))))
 
+(defun post-command-reply (reply-to reply)
+  "Post a command handler's REPLY to REPLY-TO.
+A handler returns one string, or a list of strings that are posted as
+separate messages (a long table in code fences)."
+  (when (and reply reply-to (plusp (length reply)))
+    (dolist (part (if (listp reply) reply (list reply)))
+      (when (plusp (length part))
+        (post-slack-message reply-to part)))))
+
+(defun parse-slash-text (text)
+  "Split TEXT into a leading slash command word and its argument text.
+Returns two values, the command (\"/view\") and the rest of the line, or NIL
+when TEXT does not begin with one.  A slash command typed in Slack itself
+arrives at /slack/commands, but the same line reaches the Events API as
+plain message text whenever the client does not expand it — a bridged
+room, or a workspace where the command is not installed — and \"/view\"
+must not then be read as a booking for a destination named \"view\"."
+  (multiple-value-bind (match groups)
+      (cl-ppcre:scan-to-strings "(?s)^(/[A-Za-z][A-Za-z0-9_-]*)\\s*(.*)$" text)
+    (when match
+      (values (aref groups 0)
+              (string-trim '(#\Space #\Tab #\Newline) (aref groups 1))))))
+
+(defun message-command-params (event command args)
+  "Build the params hash-table a command handler expects from a message EVENT
+that carried COMMAND as plain text, with ARGS as the argument line."
+  (plist-hash-table (list "command" command
+                          "text" args
+                          "user_id" (gethash "user" event)
+                          "channel_id" (gethash "channel" event))
+                    :test #'equal))
+
 (defun handle-message-event (event)
-  "Process a Slack message event. Runs book-natural and posts the result back.
+  "Process a Slack message event and post the result back.
 Ignores bot messages to prevent loops. Recognizes `help`/`/help`/`?` as a
-request for usage docs. A BOOKING-INCOMPLETE condition is posted as-is (it
-asks the user to re-send the request with the missing pieces); any other
-failure is reported with the condition class as an error code and a pointer
-to `/help`. Returns the worker thread, or NIL when the event was ignored."
+request for usage docs. Text that begins with a slash command (`/view`,
+`/book ...`) runs that command's handler rather than the booking parser —
+Slack expands its own slash commands into a /slack/commands POST, but a
+client that does not (a bridged room, an uninstalled command) delivers the
+line here as ordinary text. Anything else is a booking request: a
+BOOKING-INCOMPLETE condition is posted as-is (it asks the user to re-send
+the request with the missing pieces); any other failure is reported with
+the condition class as an error code and a pointer to `/help`. Returns the
+worker thread, or NIL when the event was answered synchronously or ignored."
   (let ((text (gethash "text" event))
         (channel (gethash "channel" event))
         (bot-id (gethash "bot_id" event))
@@ -239,9 +279,23 @@ to `/help`. Returns the worker thread, or NIL when the event was ignored."
                     :test #'string-equal)
         (post-slack-message channel +help-text+)
         (return-from handle-message-event nil))
-      (with-slack-error-reply (channel :context "Booking"
-                                       :thread-name "slack-booking")
-        (post-slack-message channel (run-booking clean-text))))))
+      (multiple-value-bind (command args) (parse-slash-text clean-text)
+        (if command
+            (let ((handler (cdr (assoc command *slash-commands* :test #'string-equal))))
+              (unless handler
+                (post-slack-message
+                 channel
+                 (format nil "Unknown command: ~A. Type `/help` for usage." command))
+                (return-from handle-message-event nil))
+              (with-slack-error-reply (channel
+                                       :context (format nil "Command ~A" command)
+                                       :thread-name (format nil "slack-cmd-~A" command))
+                (post-command-reply channel
+                                    (funcall handler
+                                             (message-command-params event command args)))))
+            (with-slack-error-reply (channel :context "Booking"
+                                             :thread-name "slack-booking")
+              (post-slack-message channel (run-booking clean-text))))))))
 
 ;;; Lack Middleware
 
@@ -464,13 +518,7 @@ posted back asynchronously via chat.postMessage."
          (with-slack-error-reply (reply-to
                                   :context (format nil "Command ~A" cmd)
                                   :thread-name (format nil "slack-cmd-~A" cmd))
-           (let ((reply (funcall handler params)))
-             ;; a handler returns one string, or a list of strings that are
-             ;; posted as separate messages (a long table in code fences)
-             (when (and reply reply-to (plusp (length reply)))
-               (dolist (part (if (listp reply) reply (list reply)))
-                 (when (plusp (length part))
-                   (post-slack-message reply-to part))))))
+           (post-command-reply reply-to (funcall handler params)))
          '(200 () ("")))))))
 
 ;;; Reminder Scheduler

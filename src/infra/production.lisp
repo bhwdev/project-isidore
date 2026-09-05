@@ -32,11 +32,13 @@ the local machine in ~/.ssh/config."
   (cmd:single "firewall-cmd --reload")
   (systemd:restarted "firewalld")
   (apt:installed "sbcl" "sbcl-source" "git")
-  ;; Discard any local edits in the server checkout so that GIT:PULLED below
-  ;; can fast-forward (its "git pull" is must-succeed).  Guarded so that a
-  ;; first deploy, which has no checkout yet, does not fail here.  NOTE the
-  ;; command runs in root's home, not the checkout, hence the explicit -C.
-  (cmd:single "test -d /usr/local/src/project-isidore/.git && git -C /usr/local/src/project-isidore reset --hard HEAD || true")
+  ;; Put the server checkout exactly at origin/master so that GIT:PULLED below
+  ;; is a no-op fast-forward (its "git pull" is must-succeed and refuses a
+  ;; diverged checkout, which is what a rewritten master upstream leaves
+  ;; behind).  Guarded so that a first deploy, which has no checkout yet, does
+  ;; not fail here.  NOTE the command runs in root's home, not the checkout,
+  ;; hence the explicit -C.
+  (cmd:single "test -d /usr/local/src/project-isidore/.git && git -C /usr/local/src/project-isidore fetch origin && git -C /usr/local/src/project-isidore reset --hard origin/master || true")
   (git:pulled "https://gitlab.com/bhw/project-isidore.git"
               (pathname "/usr/local/src/project-isidore/"))
   ;; ocicl lives in root's ~/.local/bin, which a non-interactive ssh shell

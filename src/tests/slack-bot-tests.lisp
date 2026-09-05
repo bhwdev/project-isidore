@@ -549,7 +549,29 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
     (let ((all (apply #'concatenate 'string parts)))
       (dolist (r rows)
         (is = 1 (loop for start = (search r all) then (search r all :start2 (1+ start))
-                      while start count t))))))
+                      while start count t)))))
+  ;; a split prefers the blank line between groups (the days of a schedule),
+  ;; so no part opens in the middle of a day or with a blank line
+  (let* ((header (format nil "  Vehicle  Destination~%  -------  -----------"))
+         (groups (loop for d from 1 to 8
+                       collect (format nil "Day ~d~%~{~a~%~}" d
+                                       (loop for r from 1 to 5
+                                             collect (format nil "  ROW ~d-~d ~a" d r
+                                                             (make-string 30 :initial-element #\z))))))
+         (text (format nil "~a~%~{~a~^~%~}" header groups))
+         (parts (sb::code-block-chunks text :limit 700 :header-lines 2)))
+    (true (> (length parts) 1))
+    (dolist (p parts)
+      (let ((lines (uiop:split-string p :separator '(#\Newline))))
+        (is string= "```" (first lines))
+        (is string= "  Vehicle  Destination" (second lines))
+        (true (uiop:string-prefix-p "Day " (fourth lines)))))
+    (let ((all (apply #'concatenate 'string parts)))
+      (loop for d from 1 to 8
+            for needle = (format nil "Day ~d~%" d)
+            do (is = 1 (loop for start = (search needle all)
+                               then (search needle all :start2 (1+ start))
+                             while start count t))))))
 
 (define-test message-events
   :parent slack-bot-suite

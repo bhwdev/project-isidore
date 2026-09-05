@@ -724,50 +724,63 @@ cannot read PHRASE."
   (or (non-blank-p (trip-destination trip))
       (non-blank-p (trip-departure trip))))
 
-(defparameter *max-destination-width* 24
-  "Widest the Destination column of FORMAT-SCHEDULE-TABLE grows.  The column
-sizes itself to its longest cell up to this many characters; longer
-destinations are shortened with \"...\" (see TRUNCATE-CELL) so one long note
-on the sheet, such as \"SHMS & Appt approved (Not returning from SHMS)\", does
-not widen every row past what Slack shows without wrapping inside a code block.")
+(defparameter *column-width-caps*
+  '(("Destination" . 24) ("Dep" . 12) ("Ret" . 12))
+  "Widest each named column of FORMAT-SCHEDULE-TABLE grows.  A column sizes
+itself to its longest cell up to its cap; longer cells are shortened with
+\"...\" (see TRUNCATE-CELL) so one long note on the sheet, such as \"SHMS &
+Appt approved (Not returning from SHMS)\" or \"after reception (around 2:30
+pm)\", does not widen every row past what Slack shows without wrapping inside
+a code block.  Times such as \"12:00 pm\" fit the Dep and Ret caps.")
 
 (defun format-schedule-table (trips)
-  "Render TRIPS as a plaintext fixed-width table. Returns the full string.
-   Columns size themselves to their content, except Destination, which stops
-   growing at *MAX-DESTINATION-WIDTH* and shortens longer cells with \"...\"."
-  (let* ((rows (mapcar
+  "Render TRIPS as a plaintext fixed-width table grouped by day. Returns the
+   full string.  The column titles (Vehicle, Destination, Dep, Ret, Dep Pax,
+   Ret Pax) and their rule come first; then each day is a flush-left heading
+   such as \"Tue Sep 8\" over its indented rows, with a blank line between
+   days, so the eye finds a day without reading a date on every row.  TRIPS
+   must already be ordered by day.  Columns size themselves to their content
+   up to *COLUMN-WIDTH-CAPS*, and lines carry no trailing spaces."
+  (let* ((headers '("Vehicle" "Destination" "Dep" "Ret" "Dep Pax" "Ret Pax"))
+         (rows (mapcar
                 (lambda (tr)
-                  (list (format-short-date (trip-day tr))
-                        (string-upcase (symbol-name (trip-vehicle tr)))
+                  (list (string-upcase (symbol-name (trip-vehicle tr)))
                         (or (trip-destination tr) "")
                         (or (trip-departure tr) "")
                         (or (trip-return-time tr) "")
                         (format nil "~{~a~^, ~}" (trip-dep-passengers tr))
                         (format nil "~{~a~^, ~}" (trip-ret-passengers tr))))
                 trips))
-         (headers '("Date" "Vehicle" "Destination" "Dep" "Ret" "Dep Pax" "Ret Pax"))
-         (destination-column (position "Destination" headers :test #'string=))
          (widths
-           (loop for i from 0 below (length headers)
-                 for content-width = (max (length (nth i headers))
+           (loop for header in headers
+                 for i from 0
+                 for content-width = (max (length header)
                                           (reduce #'max rows
                                                   :key (lambda (r) (length (nth i r)))
                                                   :initial-value 0))
-                 collect (if (eql i destination-column)
-                             (min content-width *max-destination-width*)
-                             content-width)))
+                 for cap = (cdr (assoc header *column-width-caps* :test #'string=))
+                 collect (if cap (min content-width cap) content-width)))
          (out (make-string-output-stream)))
-    (labels ((emit-row (cells)
-               (loop for cell in cells
-                     for w in widths
-                     for i from 0
-                     do (format out "~vA" w (truncate-cell cell w))
-                        (when (< i (1- (length widths)))
-                          (format out "  ")))
-               (format out "~%")))
-      (emit-row headers)
-      (emit-row (mapcar (lambda (w) (make-string w :initial-element #\-)) widths))
-      (dolist (r rows) (emit-row r)))
+    (labels ((emit-cells (cells)
+               (let ((line (with-output-to-string (s)
+                             (write-string "  " s)
+                             (loop for cell in cells
+                                   for w in widths
+                                   for i from 0
+                                   do (format s "~vA" w (truncate-cell cell w))
+                                      (when (< i (1- (length widths)))
+                                        (write-string "  " s))))))
+                 (format out "~a~%" (string-right-trim " " line)))))
+      (emit-cells headers)
+      (emit-cells (mapcar (lambda (w) (make-string w :initial-element #\-)) widths))
+      (let ((previous-day nil))
+        (loop for tr in trips
+              for cells in rows
+              do (unless (equal (trip-day tr) previous-day)
+                   (when previous-day (terpri out))
+                   (format out "~a~%" (format-short-date (trip-day tr)))
+                   (setf previous-day (trip-day tr)))
+                 (emit-cells cells))))
     (get-output-stream-string out)))
 
 (defun view-schedule (&optional (range-phrase "today"))

@@ -828,8 +828,10 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
                                      :dep-passengers '("MM" "DM")
                                      :ret-passengers '("MM" "DM" "BW"))))
              (out (vb::format-schedule-table trips)))
-        (true (search "Date" out))
-        (true (search "Vehicle" out))
+        ;; titles and rule are indented like the rows; the day is a flush-left
+        ;; heading over them
+        (true (uiop:string-prefix-p "  Vehicle  " out))
+        (true (search (format nil "~%Mon Apr 20~%  DGH") out))
         (true (search "Destination" out))
         (true (search "Dep Pax" out))
         (true (search "Ret Pax" out))
@@ -842,32 +844,47 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
         ;; separator row present
         (true (search "---" out))))
 
-  (define-test format-schedule-table-caps-destination
-      ;; The Destination column sizes itself to its longest cell, but only up
-      ;; to *MAX-DESTINATION-WIDTH*: a longer destination is shortened with
-      ;; "..." and every row keeps the same rendered width.
-      (let* ((long-dest (make-string 60 :initial-element #\X))
+  (define-test format-schedule-table-caps-columns
+      ;; Destination, Dep and Ret size themselves to their longest cell only up
+      ;; to *COLUMN-WIDTH-CAPS*: longer cells are shortened with "..." and the
+      ;; values stay under their titles.
+      (let* ((dest-cap (cdr (assoc "Destination" vb::*column-width-caps* :test #'string=)))
+             (ret-cap (cdr (assoc "Ret" vb::*column-width-caps* :test #'string=)))
+             (long-dest (make-string 60 :initial-element #\X))
+             (long-ret "after reception (around 2:30 pm)")
              (trips (list (make-trip :day "Monday April 20" :vehicle :dgh
                                      :destination long-dest :departure "8 am"
-                                     :return-time "10 am"
+                                     :return-time long-ret
                                      :dep-passengers '("MM"))
                           (make-trip :day "Tuesday April 21" :vehicle :lgh
                                      :destination "SHMS" :departure "9 am"
                                      :return-time "11 am"
                                      :dep-passengers '("BW"))))
              (out (vb::format-schedule-table trips))
-             (lines (remove "" (cl-ppcre:split "\\n" out) :test #'string=)))
+             (lines (cl-ppcre:split "\\n" out))
+             (header (first lines)))
         (false (search long-dest out))
+        (false (search long-ret out))
         (true (search (concatenate 'string
-                                   (make-string (- vb::*max-destination-width* 3)
-                                                :initial-element #\X)
-                                   "...")
+                                   (make-string (- dest-cap 3) :initial-element #\X) "...")
                       out))
-        (let ((w (length (first lines))))
-          (dolist (line (rest lines))
-            (is = w (length line)))))
+        (true (search (concatenate 'string (subseq long-ret 0 (- ret-cap 3)) "...") out))
+        ;; lines: titles, rule, "Mon Apr 20", row, "", "Tue Apr 21", row
+        (let ((dep-col (search "Dep " header))
+              (ret-col (search "Ret " header))
+              (pax-col (search "Dep Pax" header))
+              (row1 (nth 3 lines))
+              (row2 (nth 6 lines)))
+          (is = dep-col (search "8 am" row1))
+          (is = ret-col (search "after rec" row1))
+          (is = pax-col (search "MM" row1))
+          (is = dep-col (search "9 am" row2))
+          (is = ret-col (search "11 am" row2))
+          (is = pax-col (search "BW" row2))))
     ;; a destination exactly at the cap renders in full
-    (let* ((at-cap (make-string vb::*max-destination-width* :initial-element #\Y))
+    (let* ((at-cap (make-string (cdr (assoc "Destination" vb::*column-width-caps*
+                                            :test #'string=))
+                                :initial-element #\Y))
            (out (vb::format-schedule-table
                  (list (make-trip :day "Monday April 20" :vehicle :dgh
                                   :destination at-cap :departure "8 am"
@@ -907,7 +924,7 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
                                        (true (search "8:35 am" out))
                                        (true (search "DGH" out))
                                        (true (search "MM, DM" out))
-                                       (true (search "Date" out)))))))
+                                       (true (search "Vehicle" out)))))))
 
   (define-test view-schedule-no-sheet
       ;; Date out of any configured week → informative message, no fetch.
@@ -948,6 +965,32 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
                                        (true morning-pos)
                                        (true afternoon-pos)
                                        (true (< morning-pos afternoon-pos))))))))
+
+(define-test format-schedule-table-groups-by-day
+  :parent view-schedule-tests
+  (let* ((trips (list (make-trip :day "Monday April 20" :vehicle :dgh :destination "SHMS"
+                                 :departure "8 am" :return-time "10 am" :dep-passengers '("MM"))
+                      (make-trip :day "Monday April 20" :vehicle :lgh :destination "Bank"
+                                 :departure "1 pm" :return-time "2 pm" :dep-passengers '("DM"))
+                      (make-trip :day "Tuesday April 21" :vehicle :chevy :destination "Pool"
+                                 :departure "9 am" :return-time "11 am" :dep-passengers '("CG"))))
+         (out (vb::format-schedule-table trips))
+         (lines (cl-ppcre:split "\\n" out)))
+    ;; titles and rule first, indented like the rows
+    (true (uiop:string-prefix-p "  Vehicle  Destination  " (first lines)))
+    (true (uiop:string-prefix-p "  -------  -----------  " (second lines)))
+    ;; one flush-left heading per day over its indented rows, a blank line
+    ;; between days, and the date nowhere else
+    (is equal '("Mon Apr 20" "  DGH" "  LGH" "" "Tue Apr 21" "  CHEVY")
+        (mapcar (lambda (line)
+                  (if (uiop:string-prefix-p "  " line)
+                      (subseq line 0 (position #\Space line :start 2))
+                      line))
+                (nthcdr 2 lines)))
+    (is = 1 (count "Apr 20" lines :test #'search))
+    ;; no trailing spaces on any line
+    (dolist (line lines)
+      (is string= line (string-right-trim " " line)))))
 
 (define-test phrase-date-range-tests
   :parent view-schedule-tests

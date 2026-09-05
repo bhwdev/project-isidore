@@ -323,30 +323,36 @@ Verifies the signature, dispatches on event type, returns an appropriate respons
   "Wrap TEXT in Slack code fences so a fixed-width table keeps its columns in
 the proportional-font chat view.  Slack splits or truncates messages past
 4000 characters, which would cut a code block in two, so TEXT longer than
-LIMIT characters is split on line boundaries into several fenced strings,
-each repeating the first HEADER-LINES lines (column titles and rule) so every
-part reads on its own.  Returns a list of strings."
+LIMIT characters is split into several fenced strings, each repeating the
+first HEADER-LINES lines (column titles and rule) so every part reads on its
+own.  A split lands on the last blank line of the part when there is one (the
+gap between two days of a schedule), otherwise between lines.  Returns a list
+of strings."
   (let* ((lines (cl-ppcre:split "\\n" (string-right-trim '(#\Newline #\Space) text)))
          (header (subseq lines 0 (min header-lines (length lines))))
          (body (nthcdr (length header) lines))
          (chunks '())
-         (current '())
+         (current '())                  ; body lines of the open part, newest first
          (size 0))
-    (flet ((fence (lines)
-             (format nil "```~%~{~a~%~}```" lines))
-           (start-chunk ()
-             (setf current (reverse header)
-                   size (reduce #'+ header
-                                :key (lambda (l) (1+ (length l)))
-                                :initial-value 0))))
-      (start-chunk)
+    (flet ((fence (body-lines)
+             (format nil "```~%~{~a~%~}```" (append header body-lines)))
+           (line-size (line) (1+ (length line))))
+      (setf size (reduce #'+ header :key #'line-size :initial-value 0))
       (dolist (line body)
-        (when (and (> (+ size (length line) 1) limit)
-                   (> (length current) (length header)))
-          (push (fence (reverse current)) chunks)
-          (start-chunk))
-        (push line current)
-        (incf size (1+ (length line))))
+        (when (and current (> (+ size (line-size line)) limit))
+          (let* ((ordered (reverse current))
+                 (blank (position "" ordered :test #'string= :from-end t))
+                 (split-at-blank (and blank (plusp blank)))
+                 (kept (if split-at-blank (subseq ordered 0 blank) ordered))
+                 (carried (if split-at-blank (subseq ordered (1+ blank)) '())))
+            (push (fence kept) chunks)
+            (setf current (reverse carried)
+                  size (reduce #'+ (append header carried)
+                               :key #'line-size :initial-value 0))))
+        ;; a part never opens with the blank line that closed the previous one
+        (unless (and (null current) (string= line ""))
+          (push line current)
+          (incf size (line-size line))))
       (push (fence (reverse current)) chunks))
     (nreverse chunks)))
 

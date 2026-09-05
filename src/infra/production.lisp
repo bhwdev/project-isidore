@@ -10,6 +10,7 @@
 (in-consfig "project-isidore/infra")
 (named-readtables:in-readtable :consfigurator)
 
+
 (defhost oci-a1-flex (:deploy :ssh)
   "Declarative Configuration for Production Server. To deploy to production run
 locally in the listener,
@@ -22,7 +23,11 @@ C libraries, locally apt install packages listed in
 `consfigurator.property.package:+consfigurator-system-dependencies+'.
 
 One piece of information is unique to this host: remote root SSH login access on
-the local machine in ~/.ssh/config."
+the local machine in ~/.ssh/config.
+
+The host is an OCI VM.Standard.A1.Flex (Ampere Altra / Neoverse-N1), resized
+from 2 OCPU / 12 GB to 4 OCPU / 24 GB on 2026-09-05 so that llama-server (below)
+has cores to spare beside the web application and the Matrix homeserver."
   (os:debian-stable "trixie" :aarch64) ; Has SBCL version 2.5.2.debian.
   (timezone:configured "America/Toronto")
   (apt:installed "firewalld")
@@ -59,25 +64,89 @@ the local machine in ~/.ssh/config."
                            ;; http://www.sbcl.org/manual/#Toplevel-Options
                            "--script '/usr/local/src/project-isidore/make.lisp'"))
   (cmd:single "install -m 755 /usr/local/src/project-isidore/bin/ProjectIsidore /usr/local/bin/ProjectIsidore")
+  ;; llama.cpp for the van-booking bot's model fallback (src/booking-llm.lisp).
+  ;; The upstream release tarball runs as-is on trixie and picks its armv8.2
+  ;; (dotprod) CPU kernels at runtime, so nothing is built here.  Both
+  ;; downloads are pinned by sha256, verified on every deploy and skipped when
+  ;; already in place.  The server binds to the loopback interface only, so
+  ;; the firewall needs nothing.
+  (apt:installed "curl" "ca-certificates")
+  (file:directory-exists "/opt/llama.cpp/")
+  (file:directory-exists "/var/local/project-isidore/models/")
+  (cmd:single (concatenate 'string
+                           "T=/usr/local/src/llama-b10819-bin-ubuntu-arm64.tar.gz; "
+                           "S=6f6f7e1e9b371d4840860a79ccbf4ad6f7da9da76349ce73079e3289b01033ec; "
+                           "test \"$(cat /opt/llama.cpp/VERSION 2>/dev/null)\" = b10819 || ( "
+                           "curl -fL --retry 3 -o \"$T\" https://github.com/ggml-org/llama.cpp/releases/download/b10819/llama-b10819-bin-ubuntu-arm64.tar.gz && "
+                           "echo \"$S  $T\" | sha256sum -c --status && "
+                           "rm -rf /opt/llama.cpp/bin && mkdir -p /opt/llama.cpp/bin && "
+                           "tar xzf \"$T\" -C /opt/llama.cpp/bin --strip-components=1 && "
+                           "echo b10819 > /opt/llama.cpp/VERSION )"))
+  (cmd:single (concatenate 'string
+                           "M=/var/local/project-isidore/models/Qwen3.5-0.8B-Q8_0.gguf; "
+                           "S=0ad885ffd4bb022fc4f0d33a3308fa108ef8613159d3b3a67e23abca056b7a6c; "
+                           "( test -f \"$M\" && echo \"$S  $M\" | sha256sum -c --status ) || ( "
+                           "curl -fL --retry 3 -o \"$M.part\" https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q8_0.gguf && "
+                           "echo \"$S  $M.part\" | sha256sum -c --status && "
+                           "mv \"$M.part\" \"$M\" && chmod 644 \"$M\" )"))
+  ;; Three of the four cores, niced below the web application; the memory cap
+  ;; confines any blow-up to this unit (the host has no swap).  Thinking is
+  ;; off because llama.cpp does not enforce the JSON grammar while a model
+  ;; thinks; --cache-reuse keeps the fixed system prompt in the KV cache.
+  (file:has-content
+   "/etc/systemd/system/llama-server.service"
+   "
+[Unit]
+Description=llama.cpp server: intent normalizer for the van-booking bot (loopback only).
+After=network.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+ExecStart=/opt/llama.cpp/bin/llama-server --host 127.0.0.1 --port 8081 -m /var/local/project-isidore/models/Qwen3.5-0.8B-Q8_0.gguf -t 3 -c 2048 --parallel 1 --cache-reuse 256 --jinja --reasoning-budget 0 --chat-template-kwargs '{\"enable_thinking\":false}' --no-webui
+Restart=always
+RestartSec=5
+Nice=10
+CPUWeight=50
+MemoryHigh=3G
+MemoryMax=4G
+OOMScoreAdjust=500
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadOnlyPaths=/var/local/project-isidore/models
+
+[Install]
+WantedBy=multi-user.target")
+  (systemd:daemon-reloaded)
+  (systemd:enabled "llama-server.service")
+  (systemd:restarted "llama-server.service")
   ;; https://systemd-by-example.com/
+  ;; VAN_LLM_URL turns the model fallback on; an operator can turn it off
+  ;; without a deploy by putting an empty VAN_LLM_URL= in secrets.env, since
+  ;; EnvironmentFile= overrides Environment=.
   (file:has-content
    "/etc/systemd/system/project-isidore.service"
    "
 [Unit]
 Description=Project Isidore web application.
-After=network.target
+After=network.target llama-server.service
+Wants=llama-server.service
 
 [Service]
 Type=simple
 User=root
 Group=root
 WorkingDirectory=/usr/local/src/project-isidore/
+Environment=VAN_LLM_URL=http://127.0.0.1:8081/v1/chat/completions
 EnvironmentFile=/usr/local/etc/project-isidore/secrets.env
 ExecStart=/usr/local/bin/ProjectIsidore
 Restart=always
 
 [Install]
 WantedBy=multi-user.target")
+  (systemd:daemon-reloaded)
   (systemd:enabled "project-isidore.service")
   (systemd:restarted "project-isidore.service")
   ;; Reverse Proxy: Caddy will communicate with the Hunchentoot server(s)

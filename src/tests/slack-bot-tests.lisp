@@ -6,7 +6,8 @@
   (:local-nicknames (#:sb #:project-isidore/slack-bot)
                     (#:db #:project-isidore/database)
                     (#:vb #:project-isidore/van-booking)
-                    (#:bn #:project-isidore/booking-nlp))
+                    (#:bn #:project-isidore/booking-nlp)
+                    (#:llm #:project-isidore/booking-llm))
   (:import-from #:project-isidore/tests/test-utils #:with-mocked-functions)
   (:import-from #:alexandria #:plist-hash-table)
   (:import-from #:bordeaux-threads)
@@ -634,6 +635,158 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
       (bt:join-thread (sb::handle-message-event (message-event "text" "for the pool" "channel" "C1")))
       (true (search "Booking failed [SIMPLE-ERROR]" (first posted)))
       (true (search "boom" (first posted))))))
+
+(define-test llm-fallback
+  :parent slack-bot-suite
+  ;; The rule parser goes first; the model is asked only when it cannot find
+  ;; the destination, day or passengers, and its reading is posted before the
+  ;; ordinary handler runs on it.
+  (let ((posted '())
+        (asked '()))
+    (with-mocked-functions ((sb::post-slack-message
+                             (lambda (channel text) (declare (ignore channel)) (push text posted)))
+                            (sb::llm-known-destinations (lambda () '("SHMS")))
+                            (llm:llm-enabled-p (lambda () t))
+                            (llm:llm-normalize
+                             (lambda (text &key known-destinations today)
+                               (declare (ignore known-destinations today))
+                               (push text asked)
+                               '(:intent :book :passengers ("BW" "MM") :destination "dentist"
+                                 :day "tomorrow" :dep-time "8:30 am" :ret-time "11:00 am")))
+                            (vb:book-natural
+                             (lambda (text &key week) (declare (ignore week))
+                               (if (search "leaving at" text)
+                                   (format t "booked ~a" text)
+                                   (error 'bn:booking-incomplete
+                                          :missing '(:destination :passengers) :text text)))))
+      (bt:join-thread (sb::handle-message-event
+                       (message-event "text" "bw and mm need the dentist tmrw 8:30-11"
+                                      "channel" "C1")))
+      (is equal '("bw and mm need the dentist tmrw 8:30-11") asked)
+      (is = 2 (length posted))
+      ;; POSTED is pushed, so the echo is second and the result first
+      (true (search "Interpreted as: `/book BW and MM to the dentist tomorrow leaving at 8:30 am and back at 11:00 am`"
+                    (second posted)))
+      (is string= "booked BW and MM to the dentist tomorrow leaving at 8:30 am and back at 11:00 am"
+          (first posted))))
+  ;; a question about the schedule becomes /view, through CMD-VIEW
+  (let ((posted '())
+        (ranges '()))
+    (with-mocked-functions ((sb::post-slack-message
+                             (lambda (channel text) (declare (ignore channel)) (push text posted)))
+                            (sb::llm-known-destinations (lambda () nil))
+                            (llm:llm-enabled-p (lambda () t))
+                            (llm:llm-normalize
+                             (lambda (&rest args) (declare (ignore args))
+                               '(:intent :view :range "this week")))
+                            (vb:book-natural
+                             (lambda (text &key week) (declare (ignore week))
+                               (error 'bn:booking-incomplete
+                                      :missing '(:destination :day :passengers) :text text)))
+                            (vb:view-schedule
+                             (lambda (&optional range)
+                               (push range ranges)
+                               (format t "TABLE for ~a" range)
+                               "ignored")))
+      (bt:join-thread (sb::handle-message-event
+                       (message-event "text" "what's on the van this week?" "channel" "C1")))
+      (is equal '("this week") ranges)
+      (is = 2 (length posted))
+      (true (search "Interpreted as: `/view this week`" (second posted)))
+      (is string= "TABLE for this week" (first posted))))
+  ;; no model configured: the report is posted exactly as before, and the
+  ;; model is never asked
+  (let ((posted '())
+        (asked 0))
+    (with-mocked-functions ((sb::post-slack-message
+                             (lambda (channel text) (declare (ignore channel)) (push text posted)))
+                            (llm:llm-enabled-p (lambda () nil))
+                            (llm:llm-normalize
+                             (lambda (&rest args) (declare (ignore args)) (incf asked) nil))
+                            (vb:book-natural
+                             (lambda (text &key week) (declare (ignore week))
+                               (error 'bn:booking-incomplete :missing '(:passengers)
+                                                             :understood '(:destination "pool")
+                                                             :text text))))
+      (bt:join-thread (sb::handle-message-event (message-event "text" "for the pool" "channel" "C1")))
+      (is = 0 asked)
+      (is = 1 (length posted))
+      (true (search "Please re-send" (first posted)))
+      (true (search "destination: pool" (first posted)))))
+  ;; the model answers, but names someone who is not in the message: the
+  ;; reading is rejected and the report is posted
+  (let ((posted '()))
+    (with-mocked-functions ((sb::post-slack-message
+                             (lambda (channel text) (declare (ignore channel)) (push text posted)))
+                            (sb::llm-known-destinations (lambda () nil))
+                            (llm:llm-enabled-p (lambda () t))
+                            (llm:llm-normalize
+                             (lambda (&rest args) (declare (ignore args))
+                               '(:intent :book :passengers ("ZZ") :destination "pool" :day "tomorrow")))
+                            (vb:book-natural
+                             (lambda (text &key week) (declare (ignore week))
+                               (error 'bn:booking-incomplete :missing '(:passengers)
+                                                             :understood '(:destination "pool")
+                                                             :text text))))
+      (bt:join-thread (sb::handle-message-event
+                       (message-event "text" "for the pool tomorrow" "channel" "C1")))
+      (is = 1 (length posted))
+      (true (search "Please re-send" (first posted)))))
+  ;; a miss on the times alone (BOOK found no matching trip) is not the
+  ;; model's business
+  (let ((posted '())
+        (asked 0))
+    (with-mocked-functions ((sb::post-slack-message
+                             (lambda (channel text) (declare (ignore channel)) (push text posted)))
+                            (llm:llm-enabled-p (lambda () t))
+                            (llm:llm-normalize
+                             (lambda (&rest args) (declare (ignore args)) (incf asked) nil))
+                            (vb:book-natural
+                             (lambda (text &key week) (declare (ignore week))
+                               (error 'bn:booking-incomplete :missing '(:dep-time :ret-time)
+                                                             :preamble "No existing trip to pool."
+                                                             :text text))))
+      (bt:join-thread (sb::handle-message-event
+                       (message-event "text" "add MM to the pool trip tomorrow" "channel" "C1")))
+      (is = 0 asked)
+      (is = 1 (length posted))
+      (true (search "No existing trip to pool" (first posted))))))
+
+(define-test cmd-book-llm-fallback
+  :parent slack-bot-suite
+  ;; an explicit /book never turns into a view
+  (with-mocked-functions ((sb::llm-known-destinations (lambda () nil))
+                          (llm:llm-enabled-p (lambda () t))
+                          (llm:llm-normalize
+                           (lambda (&rest args) (declare (ignore args))
+                             '(:intent :view :range "this week")))
+                          (vb:book-natural
+                           (lambda (text &key week) (declare (ignore week))
+                             (error 'bn:booking-incomplete
+                                    :missing '(:destination :day :passengers) :text text))))
+    (let ((reply (sb::cmd-book (make-params "text" "what's on this week"))))
+      (true (stringp reply))
+      (true (search "Please re-send" reply))))
+  ;; a booking the model read is echoed, then run; here the rewritten
+  ;; sentence still lacks the times, so the ordinary report follows
+  (with-mocked-functions ((sb::llm-known-destinations (lambda () nil))
+                          (llm:llm-enabled-p (lambda () t))
+                          (llm:llm-normalize
+                           (lambda (&rest args) (declare (ignore args))
+                             '(:intent :book :passengers ("BW") :destination "pool" :day "tomorrow")))
+                          (vb:book-natural
+                           (lambda (text &key week) (declare (ignore week))
+                             (if (string= text "BW to the pool tomorrow")
+                                 (error 'bn:booking-incomplete :missing '(:dep-time :ret-time)
+                                                               :preamble "No existing trip to pool."
+                                                               :text text)
+                                 (error 'bn:booking-incomplete :missing '(:passengers)
+                                                               :text text)))))
+    (let ((reply (sb::cmd-book (make-params "text" "bw to the pool tmrw"))))
+      (true (listp reply))
+      (is = 2 (length reply))
+      (true (search "Interpreted as: `/book BW to the pool tomorrow`" (first reply)))
+      (true (search "No existing trip to pool" (second reply))))))
 
 (define-test parse-slash-text
   :parent slack-bot-suite

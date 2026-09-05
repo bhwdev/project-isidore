@@ -35,6 +35,7 @@
    #:book-natural
    #:remind-driver
    #:view-schedule
+   #:date-range-phrase-p
    #:trips-for-driver-today
    #:trip-departure-universal-time)
   (:documentation
@@ -599,18 +600,71 @@ Combines today's date with TRIP-DEPARTURE's HH:MM (12h format)."
                                (floor mins 60)
                                day month year)))))
 
+(defparameter *month-regex*
+  (format nil "(?:~{~a~^|~})[a-z]*\\.?"
+          (mapcar (lambda (name) (string-downcase (subseq name 0 3))) *month-names*))
+  "Regex fragment matching an English month name or abbreviation: \"Sep\",
+\"Sept\", \"Sept.\" and \"September\" all match.  Use it case-insensitively.")
+
+(defparameter *day-regex* "\\d{1,2}(?:st|nd|rd|th)?"
+  "Regex fragment matching a day of the month: \"5\", \"19\", \"22nd\".")
+
+(defun normalize-dashes (s)
+  "Replace Unicode en and em dashes in S with plain hyphens, so a range whose
+hyphen a phone keyboard autocorrected into a dash still reads as a range."
+  (substitute #\- (code-char 8212) (substitute #\- (code-char 8211) s)))
+
+(defun phrase-month-word (phrase)
+  "Return the first month name or abbreviation written in PHRASE, or NIL."
+  (cl-ppcre:scan-to-strings (format nil "(?i)\\b~a" *month-regex*) phrase))
+
+(defun carry-month (start end)
+  "Return END qualified by START's month when END names nothing but a day, so
+the far end of \"Sept 19 - 22\" reads as \"Sept 22\" instead of a bare \"22\"
+chronicity would resolve against the wrong month.  END is returned unchanged
+otherwise."
+  (let ((month (and (cl-ppcre:scan (format nil "^\\s*~a\\s*$" *day-regex*) end)
+                    (phrase-month-word start))))
+    (if month
+        (format nil "~a ~a" month (string-trim " " end))
+        end)))
+
+(defun split-compact-range (phrase)
+  "Split a date range hyphenated without spaces -- \"Sept 19-22\", \"19-22
+Sept\", \"Mar 30-Apr 5\" -- into (values START END), the shape the sheet's own
+tab names use.  A month named on one side is carried to the side that omits it,
+so both halves come back as a full date.  Returns NIL unless PHRASE is exactly
+such a range and names a month: a bare \"8-10\" reads as a pair of times far
+more often than as a pair of dates, so it is left alone."
+  (cl-ppcre:register-groups-bind (lead-month d1 mid-month d2 trail-month)
+      ((format nil "(?i)^\\s*(~a)?\\s*(~a)\\s*-\\s*(~a)?\\s*(~a)\\s*(~a)?\\s*$"
+               *month-regex* *day-regex* *month-regex* *day-regex* *month-regex*)
+       phrase)
+    (let ((start-month (or lead-month trail-month mid-month)))
+      (when start-month
+        (values (format nil "~a ~a" start-month d1)
+                (format nil "~a ~a" (or mid-month start-month) d2))))))
+
 (defun split-range-phrase (phrase)
   "Split PHRASE on ' to ', ' through ', ' thru ', ' until ', ' till ', ' and ',
-   ' & ' or ' - ' into (values start end).
+   ' & ' or ' - ' into (values start end); failing that, on the bare hyphen of a
+   compact date range (\"Sept 19-22\", \"Mar 30-Apr 5\") the way the sheet's own
+   tab names are written.
+   A month named on only one side carries over to the other, so \"Sept 19-22\"
+   and \"Sept 19 - 22\" both end on September 22.
    Returns (values phrase phrase) when no separator is found (a single day or
    period such as \"today\" or \"next week\")."
-  (let* ((trimmed (string-trim " " phrase))
+  (let* ((trimmed (normalize-dashes (string-trim " " phrase)))
          (pattern "(?i)\\s+(?:to|through|thru|until|till|and|&|-)\\s+")
          (parts (cl-ppcre:split pattern trimmed :limit 2)))
     (if (= (length parts) 2)
-        (values (string-trim " " (first parts))
-                (string-trim " " (second parts)))
-        (values trimmed trimmed))))
+        (let ((start (string-trim " " (first parts)))
+              (end (string-trim " " (second parts))))
+          (values start (carry-month start end)))
+        (multiple-value-bind (start end) (split-compact-range trimmed)
+          (if start
+              (values start end)
+              (values trimmed trimmed))))))
 
 (defun week-phrase-range (phrase)
   "Return (values START END), chronicity datetimes, when PHRASE names a week
@@ -675,8 +729,8 @@ cannot read PHRASE."
   (multiple-value-bind (monday sunday) (week-phrase-range phrase)
     (if monday
         (values monday sunday)
-        (let* ((month "(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?")
-               (day "\\d{1,2}(?:st|nd|rd|th)?")
+        (let* ((month *month-regex*)
+               (day *day-regex*)
                (anchored
                  (if (and (not (cl-ppcre:scan "\\d{4}" phrase))
                           (or (cl-ppcre:scan (format nil "(?i)\\b~a\\s+~a\\b" month day) phrase)
@@ -825,8 +879,10 @@ a code block.  Times such as \"12:00 pm\" fit the Dep and Ret caps.")
    \"this week\", \"the whole week\", \"the rest of the week\", \"next week\",
    \"the weekend\") for that window, or two of them joined by 'to',
    'through', 'and', '&' or '-' (\"today to next Friday\", \"this week and next
-   week\", \"Apr 20 through Apr 26\") for the window spanning both.  Defaults to
-   \"today\".  Returns the rendered string and also prints it."
+   week\", \"Apr 20 through Apr 26\") for the window spanning both.  A range may
+   also be written the compact way the sheet's tabs are (\"Sept 19-22\",
+   \"Mar 30-Apr 5\").  Defaults to \"today\".  Returns the rendered string and
+   also prints it."
   (multiple-value-bind (start-phrase end-phrase) (split-range-phrase range-phrase)
     (multiple-value-bind (s1 e1) (phrase-date-range start-phrase)
       (multiple-value-bind (s2 e2) (phrase-date-range end-phrase)
@@ -876,6 +932,22 @@ a code block.  Times such as \"12:00 pm\" fit the Dep and Ret caps.")
                                       start-label end-label))))
                 (format t "~a" out)
                 out)))))))
+
+(defun date-range-phrase-p (phrase)
+  "True when PHRASE is a date range VIEW-SCHEDULE can read: a single day or
+period (\"today\", \"the weekend\", \"Sept 12\") or two of them joined the way
+SPLIT-RANGE-PHRASE splits them (\"Sept 19 to Sept 22\").  A phrase chronicity
+cannot read, or that signals while being read, gives NIL rather than an
+error, so a caller can screen a range that came from somewhere less
+trustworthy than the user (the booking-llm fallback) before VIEW-SCHEDULE
+would error on it."
+  (and (stringp phrase)
+       (plusp (length (string-trim " " phrase)))
+       (ignore-errors
+        (multiple-value-bind (start-phrase end-phrase) (split-range-phrase phrase)
+          (and (phrase-date-range start-phrase)
+               (phrase-date-range end-phrase)
+               t)))))
 
 (defun decode-js-string (s)
   "Decode the escapes Google uses inside the JavaScript string literal S:

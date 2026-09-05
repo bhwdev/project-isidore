@@ -4,7 +4,8 @@
 (uiop:define-package #:project-isidore/slack-bot
   (:use #:common-lisp)
   (:import-from #:alexandria
-                #:plist-hash-table)
+                #:plist-hash-table
+                #:ensure-list)
   (:import-from #:bordeaux-threads)
   (:import-from #:cl-ppcre)
   (:import-from #:com.inuoe.jzon)
@@ -13,10 +14,19 @@
   (:import-from #:ironclad)
   (:import-from #:quri)
   (:import-from #:project-isidore/booking-nlp
-                #:booking-incomplete)
+                #:booking-incomplete
+                #:booking-incomplete-missing)
+  (:import-from #:project-isidore/booking-llm
+                #:load-llm-config
+                #:warm-up-llm
+                #:llm-enabled-p
+                #:llm-normalize
+                #:render-intent)
   (:import-from #:project-isidore/van-booking
                 #:book-natural
                 #:view-schedule
+                #:fetch-all-trips
+                #:known-destinations
                 #:remind-driver
                 #:trips-for-driver-today
                 #:trip-departure-universal-time
@@ -48,12 +58,20 @@ When a required piece is missing, the BOOKING-INCOMPLETE report is posted
 back: it lists what was understood and asks the user to re-send the request
 with the missing piece.
 
+When the rule parser cannot find the destination, day or passengers, and a
+local model server is configured (VAN_LLM_URL, see
+project-isidore/booking-llm), the message is first shown to the model, which
+reads it into a `/book` sentence or a `/view` range.  The bot posts that
+interpretation and then runs the ordinary handler on it, so the model never
+does more than rephrase; without a server the report is posted as before.
+
 A persistent /subscribe registry (graph-db-backed via project-isidore/database)
 plus an in-process scheduler thread DMs subscribed drivers 5 minutes before
 each of their trips.
 
-Setup: set SLACK_BOT_TOKEN and SLACK_SIGNING_SECRET environment variables.
-See the project plan for Slack app configuration details."))
+Setup: set SLACK_BOT_TOKEN and SLACK_SIGNING_SECRET environment variables,
+and optionally VAN_LLM_URL.  See the project plan for Slack app
+configuration details."))
 
 (in-package #:project-isidore/slack-bot)
 
@@ -71,7 +89,9 @@ Must be called at runtime (from the application entry point), not at
 build time — a tree-shaken executable has no load-time at startup, so
 values read inside EVAL-WHEN would be baked in from the build host."
   (setf *slack-bot-token* (uiop:getenv "SLACK_BOT_TOKEN"))
-  (setf *slack-signing-secret* (uiop:getenv "SLACK_SIGNING_SECRET")))
+  (setf *slack-signing-secret* (uiop:getenv "SLACK_SIGNING_SECRET"))
+  (load-llm-config)
+  (warm-up-llm))
 
 (defvar *slash-commands* ()
   "Dispatch alist: slash command name -> handler symbol.
@@ -141,10 +161,10 @@ The order and the wording don't matter. For example:
 *To join a trip already on the sheet*, name the trip and who is coming; no times needed:
   • `add GG to the SHMS trip on Thursday`
 
-If something is missing, I reply with what I understood and ask you to re-send the whole request with the missing piece added.
+If something is missing, I reply with what I understood and ask you to re-send the whole request with the missing piece added. If I can't follow the wording at all, I first show how I read it as a `/book` or `/view` line, then act on that reading.
 
 *To see the schedule*, type `/view` for today, or add a day or a range:
-  `/view tomorrow`   `/view the rest of the week`   `/view the weekend`   `/view Apr 20 to Apr 26`
+  `/view tomorrow`   `/view the rest of the week`   `/view the weekend`   `/view Apr 20 to Apr 26`   `/view Sept 19-22`
 
 *Reminders*: type `/subscribe` and your initials, e.g. `/subscribe BW`, and I'll message you 5 minutes before each trip you are driving. `/unsubscribe` turns them off.
 
@@ -216,19 +236,80 @@ fail silently."
   "Strip leading Slack bot mention (<@U...>) from TEXT."
   (string-trim '(#\Space) (cl-ppcre:regex-replace "^<@[A-Z0-9]+>\\s*" text "")))
 
+(defun book-natural-reply (text)
+  "Run BOOK-NATURAL on TEXT and return what it printed as the reply, or a
+placeholder when it printed nothing.  Conditions propagate."
+  (let ((output (with-output-to-string (*standard-output*)
+                  (book-natural text))))
+    (if (plusp (length (string-trim '(#\Space #\Newline) output)))
+        output
+        "Booking processed (no output).")))
+
 (defun run-booking (text)
   "Run BOOK-NATURAL on TEXT and return the reply to post.  The captured output
 is the reply; a BOOKING-INCOMPLETE condition becomes its own report, which
 asks the user to re-send the request with the missing pieces.  Other errors
-propagate to the caller."
-  (handler-case
-      (let ((output (with-output-to-string (*standard-output*)
-                      (book-natural text))))
-        (if (plusp (length (string-trim '(#\Space #\Newline) output)))
-            output
-            "Booking processed (no output)."))
+propagate to the caller.  This is the rule parser alone; RUN-REQUEST adds
+the model fallback around it."
+  (handler-case (book-natural-reply text)
     (booking-incomplete (c)
       (princ-to-string c))))
+
+(defun first-pass-incomplete-p (condition)
+  "True when the BOOKING-INCOMPLETE CONDITION is about the destination, day
+or passengers -- what BOOK-NATURAL's first pass needs before it reads the
+sheet -- rather than only about the times, which BOOK asks for when no
+existing trip matches."
+  (and (intersection '(:destination :day :passengers)
+                     (booking-incomplete-missing condition))
+       t))
+
+(defun llm-known-destinations ()
+  "The sheet's destinations, for the model's prompt and as the parser's
+gazetteer, or NIL when the sheet cannot be read.  A function of its own so
+tests can stub it."
+  (ignore-errors (known-destinations (fetch-all-trips))))
+
+(defun llm-interpretation (text &key (allow-view t))
+  "Ask the model (PROJECT-ISIDORE/BOOKING-LLM) what TEXT means and turn its
+answer into a command: (values \"/book\" sentence) or (values \"/view\"
+range), or NIL when no model is configured, it did not answer, or its answer
+did not survive validation.  ALLOW-VIEW NIL keeps an explicit `/book` from
+turning into a view."
+  (when (llm-enabled-p)
+    (let* ((known (llm-known-destinations))
+           (intent (llm-normalize text :known-destinations known)))
+      (when intent
+        (render-intent intent text :known-destinations known :allow-view allow-view)))))
+
+(defun interpretation-line (command args)
+  "The message posted before a model-read request is run, so the user sees
+how it was understood and can correct it."
+  (format nil "Interpreted as: `~a ~a` — if that is wrong, re-send with the details spelled out (`/help` shows how)."
+          command args))
+
+(defun run-request (text &key (allow-view t))
+  "Run TEXT as a booking, with the model as a fallback reader.  The rule
+parser goes first (BOOK-NATURAL); when it cannot find the destination, day or
+passengers and a model is configured, LLM-INTERPRETATION rewrites TEXT as a
+`/book` sentence or, when ALLOW-VIEW, a `/view` range, and the reply is a
+list: the interpretation line, then what the ordinary handler said about the
+rewritten request.  Otherwise the reply is the BOOKING-INCOMPLETE report,
+exactly as RUN-BOOKING gives it.  A rewritten booking goes through
+RUN-BOOKING, so a sentence that is still incomplete gets the report and never
+a second consultation.  Other errors propagate to the caller."
+  (handler-case (book-natural-reply text)
+    (booking-incomplete (c)
+      (or (when (first-pass-incomplete-p c)
+            (multiple-value-bind (command args)
+                (llm-interpretation text :allow-view allow-view)
+              (when command
+                (cons (interpretation-line command args)
+                      (if (string= command "/view")
+                          (ensure-list (cmd-view (plist-hash-table (list "text" args)
+                                                                   :test #'equal)))
+                          (list (run-booking args)))))))
+          (princ-to-string c)))))
 
 (defun post-command-reply (reply-to reply)
   "Post a command handler's REPLY to REPLY-TO.
@@ -269,9 +350,11 @@ request for usage docs. Text that begins with a slash command (`/view`,
 `/book ...`) runs that command's handler rather than the booking parser —
 Slack expands its own slash commands into a /slack/commands POST, but a
 client that does not (a bridged room, an uninstalled command) delivers the
-line here as ordinary text. Anything else is a booking request: a
-BOOKING-INCOMPLETE condition is posted as-is (it asks the user to re-send
-the request with the missing pieces); any other failure is reported with
+line here as ordinary text. Anything else is a booking request (see
+RUN-REQUEST): a BOOKING-INCOMPLETE condition is posted as-is (it asks the
+user to re-send the request with the missing pieces), unless a model is
+configured and can read the message, in which case its reading is posted
+and then run; any other failure is reported with
 the condition class as an error code and a pointer to `/help`. Returns the
 worker thread, or NIL when the event was answered synchronously or ignored."
   (let ((text (gethash "text" event))
@@ -303,7 +386,7 @@ worker thread, or NIL when the event was answered synchronously or ignored."
                                              (message-command-params event command args)))))
             (with-slack-error-reply (channel :context "Booking"
                                              :thread-name "slack-booking")
-              (post-slack-message channel (run-booking clean-text))))))))
+              (post-command-reply channel (run-request clean-text))))))))
 
 ;;; Lack Middleware
 
@@ -433,7 +516,7 @@ re-send the request including it."
     (when (or (null text) (zerop (length (string-trim '(#\Space) text))))
       (return-from cmd-book
         "Usage: type `/book` followed by the trip in your own words, e.g. `/book take the DGH to the dentist tomorrow for BW, leaving at 8:30 and back by 11`. Type `/help` for more."))
-    (handler-case (run-booking text)
+    (handler-case (run-request text :allow-view nil)
       (error (c)
         (format nil "Booking failed [~A]: ~A~%Type `/help` to see how to phrase a request."
                 (type-of c) c)))))
@@ -447,7 +530,8 @@ Examples:
   /view the rest of the week
   /view this week and next week
   /view the weekend
-  /view Apr 20 to Apr 26"
+  /view Apr 20 to Apr 26
+  /view Sept 19-22"
   (let* ((text (gethash "text" params))
          (range (if (or (null text) (zerop (length (string-trim '(#\Space) text))))
                     "today"

@@ -743,7 +743,40 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
       ;; a period on its own is not split
       (multiple-value-bind (s e) (vb::split-range-phrase "next week")
         (is string= "next week" s)
-        (is string= "next week" e)))
+        (is string= "next week" e))
+      ;; the sheet's own compact shape: a bare hyphen splits, and the month
+      ;; named once carries to the side that omits it ("/view sept 19-22")
+      (multiple-value-bind (s e) (vb::split-range-phrase "sept 19-22")
+        (is string= "sept 19" s)
+        (is string= "sept 22" e))
+      (multiple-value-bind (s e) (vb::split-range-phrase "September 19-22")
+        (is string= "September 19" s)
+        (is string= "September 22" e))
+      (multiple-value-bind (s e) (vb::split-range-phrase "Mar 30-Apr 5")
+        (is string= "Mar 30" s)
+        (is string= "Apr 5" e))
+      (multiple-value-bind (s e) (vb::split-range-phrase "19-22 sept")
+        (is string= "sept 19" s)
+        (is string= "sept 22" e))
+      (multiple-value-bind (s e) (vb::split-range-phrase "22nd-25th September")
+        (is string= "September 22nd" s)
+        (is string= "September 25th" e))
+      ;; the month also carries across a spaced separator
+      (multiple-value-bind (s e) (vb::split-range-phrase "Apr 20 - 26")
+        (is string= "Apr 20" s)
+        (is string= "Apr 26" e))
+      (multiple-value-bind (s e) (vb::split-range-phrase "Apr 20 to 26")
+        (is string= "Apr 20" s)
+        (is string= "Apr 26" e))
+      ;; an en dash typed by a phone keyboard reads as a hyphen
+      (multiple-value-bind (s e)
+          (vb::split-range-phrase (format nil "Sept 19~a22" (code-char 8211)))
+        (is string= "Sept 19" s)
+        (is string= "Sept 22" e))
+      ;; numbers with no month are times far more often than dates: left whole
+      (multiple-value-bind (s e) (vb::split-range-phrase "8-10")
+        (is string= "8-10" s)
+        (is string= "8-10" e)))
 
   (define-test trip-date-key
       (let ((year (chronicity:year-of (chronicity:parse "today"))))
@@ -1073,6 +1106,17 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
                                                (view-schedule "the rest of the week")))
                                  (true (search "from Saturday April 25 to Sunday May 3"
                                                (view-schedule "the weekend and next week")))))
+    ;; the compact shape the sheet's tabs use, which "/view sept 19-22" once
+    ;; failed on: the month carries across the hyphen either way round
+    (call-with-mock-read-range (make-test-sheet)
+                               (lambda ()
+                                 (dolist (p '("Apr 20-26" "Apr 20 - 26" "Apr 20-Apr 26"
+                                              "20-26 Apr" "April 20-26"))
+                                   (true (search "from Monday April 20 to Sunday April 26"
+                                                 (view-schedule p))
+                                         "view-schedule ~s" p))
+                                 (true (search "from Monday March 30 to Sunday April 5"
+                                               (view-schedule "Mar 30-Apr 5")))))
     ;; a reversed range still works, and an unreadable one names the whole phrase
     (call-with-mock-read-range (make-test-sheet)
                                (lambda ()

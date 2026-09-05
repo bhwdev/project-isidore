@@ -101,6 +101,7 @@
   :depends-on ("project-isidore/tests/tests"
                "project-isidore/tests/nlp-tests"
                "project-isidore/tests/booking-nlp-tests"
+               "project-isidore/tests/booking-llm-tests"
                "project-isidore/tests/slack-bot-tests"
                "project-isidore/tests/van-booking-tests"
                )
@@ -109,6 +110,7 @@
             (uiop:symbol-call :parachute :test :project-isidore/tests/tests)
             (uiop:symbol-call :parachute :test :project-isidore/tests/nlp-tests)
             (uiop:symbol-call :parachute :test :project-isidore/tests/booking-nlp-tests)
+            (uiop:symbol-call :parachute :test :project-isidore/tests/booking-llm-tests)
             (uiop:symbol-call :parachute :test :project-isidore/tests/slack-bot-tests)
             (uiop:symbol-call :parachute :test :project-isidore/tests/van-booking-tests)
             ))

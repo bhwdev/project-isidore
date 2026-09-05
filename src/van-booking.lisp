@@ -724,8 +724,17 @@ cannot read PHRASE."
   (or (non-blank-p (trip-destination trip))
       (non-blank-p (trip-departure trip))))
 
+(defparameter *max-destination-width* 24
+  "Widest the Destination column of FORMAT-SCHEDULE-TABLE grows.  The column
+sizes itself to its longest cell up to this many characters; longer
+destinations are shortened with \"...\" (see TRUNCATE-CELL) so one long note
+on the sheet, such as \"SHMS & Appt approved (Not returning from SHMS)\", does
+not widen every row past what Slack shows without wrapping inside a code block.")
+
 (defun format-schedule-table (trips)
-  "Render TRIPS as a plaintext fixed-width table. Returns the full string."
+  "Render TRIPS as a plaintext fixed-width table. Returns the full string.
+   Columns size themselves to their content, except Destination, which stops
+   growing at *MAX-DESTINATION-WIDTH* and shortens longer cells with \"...\"."
   (let* ((rows (mapcar
                 (lambda (tr)
                   (list (format-short-date (trip-day tr))
@@ -737,12 +746,16 @@ cannot read PHRASE."
                         (format nil "~{~a~^, ~}" (trip-ret-passengers tr))))
                 trips))
          (headers '("Date" "Vehicle" "Destination" "Dep" "Ret" "Dep Pax" "Ret Pax"))
+         (destination-column (position "Destination" headers :test #'string=))
          (widths
            (loop for i from 0 below (length headers)
-                 collect (max (length (nth i headers))
-                              (reduce #'max rows
-                                      :key (lambda (r) (length (nth i r)))
-                                      :initial-value 0))))
+                 for content-width = (max (length (nth i headers))
+                                          (reduce #'max rows
+                                                  :key (lambda (r) (length (nth i r)))
+                                                  :initial-value 0))
+                 collect (if (eql i destination-column)
+                             (min content-width *max-destination-width*)
+                             content-width)))
          (out (make-string-output-stream)))
     (labels ((emit-row (cells)
                (loop for cell in cells

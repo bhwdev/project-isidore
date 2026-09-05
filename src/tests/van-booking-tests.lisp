@@ -842,9 +842,10 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
         ;; separator row present
         (true (search "---" out))))
 
-  (define-test format-schedule-table-autosizes-destination
-      ;; Long destinations must render in full (no truncation) and every row
-      ;; must be the same rendered width so columns stay aligned.
+  (define-test format-schedule-table-caps-destination
+      ;; The Destination column sizes itself to its longest cell, but only up
+      ;; to *MAX-DESTINATION-WIDTH*: a longer destination is shortened with
+      ;; "..." and every row keeps the same rendered width.
       (let* ((long-dest (make-string 60 :initial-element #\X))
              (trips (list (make-trip :day "Monday April 20" :vehicle :dgh
                                      :destination long-dest :departure "8 am"
@@ -856,11 +857,29 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
                                      :dep-passengers '("BW"))))
              (out (vb::format-schedule-table trips))
              (lines (remove "" (cl-ppcre:split "\\n" out) :test #'string=)))
-        (true (search long-dest out))
-        (false (search "..." out))
+        (false (search long-dest out))
+        (true (search (concatenate 'string
+                                   (make-string (- vb::*max-destination-width* 3)
+                                                :initial-element #\X)
+                                   "...")
+                      out))
         (let ((w (length (first lines))))
           (dolist (line (rest lines))
-            (is = w (length line))))))
+            (is = w (length line)))))
+    ;; a destination exactly at the cap renders in full
+    (let* ((at-cap (make-string vb::*max-destination-width* :initial-element #\Y))
+           (out (vb::format-schedule-table
+                 (list (make-trip :day "Monday April 20" :vehicle :dgh
+                                  :destination at-cap :departure "8 am"
+                                  :return-time "10 am" :dep-passengers '("MM"))))))
+      (true (search at-cap out))
+      (false (search "..." out)))
+    ;; short destinations keep the narrower, content-sized column
+    (let ((out (vb::format-schedule-table
+                (list (make-trip :day "Monday April 20" :vehicle :dgh
+                                 :destination "SHMS" :departure "8 am"
+                                 :return-time "10 am" :dep-passengers '("MM"))))))
+      (true (search "Destination  Dep" out))))
 
   (define-test view-schedule-default-today
       ;; With an empty sheet, view-schedule returns the "no trips" message.

@@ -77,7 +77,8 @@ values read inside EVAL-WHEN would be baked in from the build host."
   "Dispatch alist: slash command name -> handler symbol.
 Populated by DEFSLASH-COMMAND. Each handler takes the decoded params
 hash-table and returns a reply string, or a list of strings that are posted
-as separate messages. Docstrings feed /help.")
+as separate messages. The docstring documents the handler for developers;
+the user-facing help is +HELP-TEXT+, which must mention every command here.")
 
 (defmacro defslash-command (slash-name (params-var) docstring &body body)
   "Define a Slack slash-command handler and register it in *SLASH-COMMANDS*.
@@ -125,26 +126,33 @@ If CHANNEL evaluates to NIL, error reports are suppressed (only logged)."
              (report-error ,c)))))))
 
 (defparameter +help-text+
-  "*Van Booking Bot* — DM me, @mention me, or use `/book` with a plain-English request.
+  "*Van Steward Bot* — I book the house vans on the weekly schedule sheet and show you what is booked.
 
-I look for these pieces, in any order and any wording:
+*To book a trip*, tell me about it in your own words: send me a direct message, @mention me in a channel, or type `/book` followed by the request. Say:
   • *destination* — `for swimming`, `to the dentist`, `the SHMS trip`
-  • *day* — `tomorrow`, `next Tuesday`, `April 22`, `Thursday's`
-  • *passengers* — uppercase 2-3 letter initials: `for CG and BW`, `with MM, DM & CG`
-  • *times* — `at 7 pm to 9 pm`, `leaving at 8:30 and back around 11`, `7-9pm`
-    Times are only needed for a new trip; to join a trip already on the sheet, leave them out.
-  • *vehicle* (optional) — just mention it: `take the DGH`, `in the LGH`, `use Chevy`, `the personal car`
-
-Examples:
+  • *day* — `tomorrow`, `next Tuesday`, `April 22`
+  • *passengers* — initials in CAPITALS, driver first: `for CG and BW`, `with MM, DM & CG`
+  • *times* out and back — `at 7 pm to 9 pm`, `leaving at 8:30 and back around 11`
+  • *vehicle* (optional) — `take the DGH`, `in the LGH`, `use the Chevy`, `the personal car`. If you don't say, I take the first van that is free (DGH, then LGH, then the Chevy).
+The order and the wording don't matter. For example:
   • `book a van for swimming next Tuesday for CG and BW at 7 pm to 9 pm`
-  • `Can BW and MM take the DGH to the dentist tomorrow morning, leaving at 8:30 and back around 11?`
+  • `Can BW and MM take the DGH to the dentist tomorrow, leaving at 8:30 and back around 11?`
+
+*To join a trip already on the sheet*, name the trip and who is coming; no times needed:
   • `add GG to the SHMS trip on Thursday`
-  • `We need the van Friday, going to Saint Marys church with MM DM and CG, out at 9 and home by noon`
 
-If something is missing I reply with what I understood and ask you to re-send the request with the missing piece.
+If something is missing, I reply with what I understood and ask you to re-send the whole request with the missing piece added.
 
-Other commands: `/view [date range]`, `/subscribe <INITIAL>`, `/unsubscribe`, `/help`."
-  "User-facing help string for the Slack bot.")
+*To see the schedule*, type `/view` for today, or add a day or a range:
+  `/view tomorrow`   `/view the rest of the week`   `/view the weekend`   `/view Apr 20 to Apr 26`
+
+*Reminders*: type `/subscribe` and your initials, e.g. `/subscribe BW`, and I'll message you 5 minutes before each trip you are driving. `/unsubscribe` turns them off.
+
+*This message*: `/help`, or send me `help` or `?`."
+  "The help page: what the bot is and how to use every command, for people
+who are not programmers.  Posted for /help and for `help`/`?` messages.
+Slack mrkdwn: *bold*, `code`.  Keep it well under Slack's 4000-character
+message limit.")
 
 ;;; Signature Verification
 
@@ -285,7 +293,7 @@ worker thread, or NIL when the event was answered synchronously or ignored."
               (unless handler
                 (post-slack-message
                  channel
-                 (format nil "Unknown command: ~A. Type `/help` for usage." command))
+                 (format nil "Unknown command: ~A. Type `/help` to see what I can do." command))
                 (return-from handle-message-event nil))
               (with-slack-error-reply (channel
                                        :context (format nil "Command ~A" command)
@@ -424,10 +432,10 @@ re-send the request including it."
   (let ((text (gethash "text" params)))
     (when (or (null text) (zerop (length (string-trim '(#\Space) text))))
       (return-from cmd-book
-        "Usage: /book <plain-English request>, e.g. /book take the DGH to the dentist tomorrow for BW, leaving at 8:30 and back by 11"))
+        "Usage: type `/book` followed by the trip in your own words, e.g. `/book take the DGH to the dentist tomorrow for BW, leaving at 8:30 and back by 11`. Type `/help` for more."))
     (handler-case (run-booking text)
       (error (c)
-        (format nil "Booking failed [~A]: ~A~%Type `/help` for usage."
+        (format nil "Booking failed [~A]: ~A~%Type `/help` to see how to phrase a request."
                 (type-of c) c)))))
 
 (defslash-command "/view" (params)
@@ -435,7 +443,10 @@ re-send the request including it."
 Examples:
   /view
   /view tomorrow
+  /view the whole week
+  /view the rest of the week
   /view this week and next week
+  /view the weekend
   /view Apr 20 to Apr 26"
   (let* ((text (gethash "text" params))
          (range (if (or (null text) (zerop (length (string-trim '(#\Space) text))))
@@ -463,7 +474,7 @@ Persists across restarts. Use /unsubscribe to stop."
          (initial (parse-initial text)))
     (cond
       ((null user-id) "Could not identify Slack user.")
-      ((null initial) "Usage: /subscribe <INITIAL>  (e.g. /subscribe BW)")
+      ((null initial) "Usage: type `/subscribe` followed by your initials in CAPITALS, e.g. `/subscribe BW`.")
       (t
        (add-slack-subscription user-id (string-upcase initial))
        (format nil "Subscribed. You will be DM'd 5 minutes before each trip where ~A is the driver."
@@ -479,12 +490,11 @@ Persists across restarts. Use /unsubscribe to stop."
       (t "You were not subscribed."))))
 
 (defslash-command "/help" (params)
-  "/help — show usage for all slash commands."
+  "/help — post the help page (+HELP-TEXT+): what the bot does and how to use
+every command, written for non-technical users.  Handler docstrings are
+developer documentation and are not shown to users."
   (declare (ignore params))
-  (with-output-to-string (s)
-    (dolist (entry *slash-commands*)
-      (let ((doc (documentation (cdr entry) 'function)))
-        (format s "~A~%~A~2%" (car entry) (or doc "(no docs)"))))))
+  +help-text+)
 
 (defun reply-channel-for (params)
   "Where should the async reply be posted?
@@ -513,7 +523,7 @@ posted back asynchronously via chat.postMessage."
       (cond
         ((null handler)
          (list 200 '(:content-type "text/plain")
-               (list (format nil "Unknown command: ~A. Try /help." cmd))))
+               (list (format nil "Unknown command: ~A. Type /help to see what I can do." cmd))))
         (t
          (with-slack-error-reply (reply-to
                                   :context (format nil "Command ~A" cmd)

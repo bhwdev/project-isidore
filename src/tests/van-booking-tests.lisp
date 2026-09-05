@@ -1008,6 +1008,36 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
     (multiple-value-bind (s e) (vb::phrase-date-range "last week")
       (is = 20260413 (vb::date-key s))
       (is = 20260419 (vb::date-key e)))
+    ;; filler around "week" is ignored: these all mean this Monday to Sunday
+    (dolist (p '("the week" "the whole week" "whole week" "week" "all week"
+                 "all of this week" "this whole week" "the entire week"
+                 "all week long" "The Whole Week"))
+      (multiple-value-bind (s e) (vb::phrase-date-range p)
+        (is equal 20260420 (and s (vb::date-key s)) "start of ~s" p)
+        (is equal 20260426 (and e (vb::date-key e)) "end of ~s" p)))
+    (dolist (p '("the whole of next week" "all of next week" "the coming week"
+                 "the following week"))
+      (multiple-value-bind (s e) (vb::phrase-date-range p)
+        (is equal 20260427 (and s (vb::date-key s)) "start of ~s" p)
+        (is equal 20260503 (and e (vb::date-key e)) "end of ~s" p)))
+    (multiple-value-bind (s e) (vb::phrase-date-range "the previous week")
+      (is = 20260413 (vb::date-key s))
+      (is = 20260419 (vb::date-key e)))
+    ;; "the rest of the week" starts today (a Wednesday) and still ends Sunday
+    (multiple-value-bind (s e) (vb::phrase-date-range "the rest of the week")
+      (is = 20260422 (vb::date-key s))
+      (is = 20260426 (vb::date-key e)))
+    ;; a weekend is the Saturday and Sunday of the same Monday-to-Sunday week
+    (multiple-value-bind (s e) (vb::phrase-date-range "the weekend")
+      (is = 20260425 (vb::date-key s))
+      (is = 20260426 (vb::date-key e)))
+    (multiple-value-bind (s e) (vb::phrase-date-range "next weekend")
+      (is = 20260502 (vb::date-key s))
+      (is = 20260503 (vb::date-key e)))
+    ;; anything else is left to chronicity
+    (false (vb::week-phrase-range "Wednesday"))
+    (false (vb::week-phrase-range "weekly"))
+    (false (vb::week-phrase-range "the week after next"))
     ;; a single day is a one-day window
     (multiple-value-bind (s e) (vb::phrase-date-range "today")
       (is = 20260422 (vb::date-key s))
@@ -1031,6 +1061,18 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
         (let ((out (view-schedule "this week and next week")))
           (true (search "No trips scheduled from Monday April 20 to Sunday May 3" out))
           (is equal '("Apr 20-26" "Apr 27-May 3") (reverse sheets-read)))))
+    ;; the phrases that once failed in Slack ("/view the whole week",
+    ;; "/view the week") read as this week end to end
+    (call-with-mock-read-range (make-test-sheet)
+                               (lambda ()
+                                 (dolist (p '("the whole week" "the week" "all week"))
+                                   (true (search "from Monday April 20 to Sunday April 26"
+                                                 (view-schedule p))
+                                         "view-schedule ~s" p))
+                                 (true (search "from Wednesday April 22 to Sunday April 26"
+                                               (view-schedule "the rest of the week")))
+                                 (true (search "from Saturday April 25 to Sunday May 3"
+                                               (view-schedule "the weekend and next week")))))
     ;; a reversed range still works, and an unreadable one names the whole phrase
     (call-with-mock-read-range (make-test-sheet)
                                (lambda ()

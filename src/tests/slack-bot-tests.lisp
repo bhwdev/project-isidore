@@ -58,16 +58,22 @@ WITH-MOCKED-FUNCTIONS."))
   :parent slack-bot-suite
   (let ((names (mapcar #'car sb::*slash-commands*)))
     (is equal '("/book" "/view" "/subscribe" "/unsubscribe" "/help") names))
-  ;; Every handler has a docstring (source of truth for /help).
+  ;; Every handler has a docstring (developer reference; users get +help-text+).
   (dolist (entry sb::*slash-commands*)
     (true (documentation (cdr entry) 'function)
           "~a has a docstring" (car entry))))
 
 (define-test cmd-help-includes-all-commands
   :parent slack-bot-suite
+  ;; /help posts the one user-facing help page, and that page names every
+  ;; registered command, so adding a command without documenting it fails here.
   (let ((out (sb::cmd-help (make-hash-table :test #'equal))))
-    (dolist (name '("/book" "/view" "/subscribe" "/unsubscribe" "/help"))
-      (true (search name out) "help output mentions ~a" name))))
+    (is string= sb::+help-text+ out)
+    (dolist (entry sb::*slash-commands*)
+      (true (search (car entry) out) "help output mentions ~a" (car entry)))
+    ;; no developer notation leaks into what users read
+    (dolist (jargon '("<" ">" "[" "]" "docstring" "argument"))
+      (false (search jargon out) "help output contains ~s" jargon))))
 
 (define-test reply-channel-for
   :parent slack-bot-suite
@@ -592,7 +598,7 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
       (false (sb::handle-message-event (message-event "text" "help" "channel" "C1")))
       (false (sb::handle-message-event (message-event "text" "?" "channel" "C1")))
       (is = 2 (length posted))
-      (true (search "Van Booking Bot" (cdr (first posted))))
+      (true (search "Van Steward Bot" (cdr (first posted))))
       ;; a booking runs in a worker thread; the mention prefix is stripped
       (let ((thread (sb::handle-message-event
                      (message-event "text" "<@U1> for the pool" "channel" "C2"))))

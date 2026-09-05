@@ -613,25 +613,61 @@ Combines today's date with TRIP-DEPARTURE's HH:MM (12h format)."
         (values trimmed trimmed))))
 
 (defun week-phrase-range (phrase)
-  "Return (values MONDAY SUNDAY), chronicity datetimes, when PHRASE is \"this
-week\", \"next week\" or \"last week\"; NIL otherwise.  Weeks run Monday to
-Sunday like the sheet's tabs, which chronicity's own week spans do not."
-  (cl-ppcre:register-groups-bind (which)
-      ("(?i)^(this|next|last)\\s+week$" (string-trim " " phrase))
-    (let* ((today (chronicity:parse "today"))
-           ;; local-time counts Sunday as day 0
-           (since-monday (mod (+ (local-time:timestamp-day-of-week today) 6) 7))
-           (offset (cond ((string-equal which "next") 7)
-                         ((string-equal which "last") -7)
-                         (t 0)))
-           (monday (local-time:timestamp+ today (- offset since-monday) :day)))
-      (values monday (local-time:timestamp+ monday 6 :day)))))
+  "Return (values START END), chronicity datetimes, when PHRASE names a week
+or weekend relative to today; NIL otherwise.  Weeks run Monday to Sunday like
+the sheet's tabs, which chronicity's own week spans do not.
+  \"this week\", \"the week\", \"the whole week\", \"all week\", \"week\"
+                                        -> this Monday to this Sunday
+  \"next week\", \"the coming week\", \"all of next week\"
+                                        -> next Monday to next Sunday
+  \"last week\", \"the previous week\"  -> last Monday to last Sunday
+  \"the rest of the week\"              -> today to this Sunday
+  \"the weekend\", \"this weekend\", \"next weekend\"
+                                        -> that week's Saturday and Sunday
+Filler (\"the\", \"all\", \"of\", \"whole\", \"entire\", \"full\", a trailing
+\"long\") is ignored, so \"the whole of next week\" and \"all week long\" read
+as expected."
+  (let* ((words (cl-ppcre:split "\\s+" (string-downcase (string-trim " " phrase))))
+         (rest-p (member "rest" words :test #'string=))
+         (words (remove-if (lambda (w)
+                             (member w '("the" "of" "all" "whole" "entire" "full"
+                                         "long" "rest")
+                                     :test #'string=))
+                           words))
+         (noun (car (last words)))
+         (which (if (= (length words) 2) (first words) "this")))
+    (when (and (<= 1 (length words) 2)
+               (member noun '("week" "weekend") :test #'string=)
+               (member which '("this" "next" "coming" "upcoming" "following"
+                               "last" "previous" "past")
+                       :test #'string=))
+      (let* ((today (chronicity:parse "today"))
+             ;; local-time counts Sunday as day 0
+             (since-monday (mod (+ (local-time:timestamp-day-of-week today) 6) 7))
+             (offset (cond ((member which '("next" "coming" "upcoming" "following")
+                                    :test #'string=)
+                            7)
+                           ((member which '("last" "previous" "past") :test #'string=)
+                            -7)
+                           (t 0)))
+             (monday (local-time:timestamp+ today (- offset since-monday) :day))
+             (sunday (local-time:timestamp+ monday 6 :day))
+             (start (if (string= noun "weekend")
+                        (local-time:timestamp+ monday 5 :day)
+                        monday))
+             ;; "the rest of the week" starts today rather than Monday
+             (start (if (and rest-p (zerop offset) (local-time:timestamp< start today))
+                        today
+                        start)))
+        (values start sunday)))))
 
 (defun phrase-date-range (phrase)
   "Resolve a date PHRASE to (values START END), chronicity datetimes on the
 first and last day it covers.  \"today\", \"tomorrow\", \"Apr 20\" and
-\"Saturday\" cover one day; \"this week\" and \"next week\" cover the sheet's
-Monday-to-Sunday week (see WEEK-PHRASE-RANGE).  A month-day without a year
+\"Saturday\" cover one day; \"this week\", \"the whole week\", \"next week\"
+and the like cover the sheet's Monday-to-Sunday week, \"the rest of the week\"
+today to Sunday and \"the weekend\" Saturday to Sunday (see WEEK-PHRASE-RANGE,
+which takes precedence over chronicity).  A month-day without a year
 (\"Apr 20\", \"20th of April\") means this year's date, since the sheet only
 ever covers the current year, not the next occurrence chronicity's :FUTURE
 context would pick once the day has passed.  Returns NIL when chronicity
@@ -786,7 +822,8 @@ a code block.  Times such as \"12:00 pm\" fit the Dep and Ret caps.")
 (defun view-schedule (&optional (range-phrase "today"))
   "Display booked trips over a natural-language date range as a plaintext table.
    RANGE-PHRASE may be a single day or period (\"today\", \"tomorrow\", \"Apr 20\",
-   \"this week\", \"next week\") for that window, or two of them joined by 'to',
+   \"this week\", \"the whole week\", \"the rest of the week\", \"next week\",
+   \"the weekend\") for that window, or two of them joined by 'to',
    'through', 'and', '&' or '-' (\"today to next Friday\", \"this week and next
    week\", \"Apr 20 through Apr 26\") for the window spanning both.  Defaults to
    \"today\".  Returns the rendered string and also prints it."

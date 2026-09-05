@@ -316,7 +316,17 @@ new parser's terms (no articles in destinations, no default day).")
     ("back by 10 am"
      :ret-time "10:00 am" :missing (:destination :day :passengers :dep-time))
     ("hello there"
-     :missing (:destination :day :passengers :dep-time :ret-time)))
+     :missing (:destination :day :passengers :dep-time :ret-time))
+    ;; a weekday written next to the date must not win over the date
+    ("ZZ and QQ need the DGH for a test run on Saturday September 12, out at 3 pm and home by 5 pm"
+     :day-md "September 12" :passengers ("ZZ" "QQ") :vehicle :dgh
+     :dep-time "3:00 pm" :ret-time "5:00 pm" :missing nil)
+    ("book a van to the test lab on Sat Sep 12 for ZZ at 9 am to 10 am"
+     :destination "test lab" :day-md "September 12" :passengers ("ZZ")
+     :dep-time "9:00 am" :ret-time "10:00 am" :missing nil)
+    ("MM to the dentist on Saturday, September 12th leaving at 8:30 and back around 11"
+     :destination "dentist" :day-md "September 12" :passengers ("MM")
+     :dep-time "8:30 am" :ret-time "11:00 am" :missing nil))
   "Free-form sentences the regex parser could not handle.")
 
 (defparameter *booking-corpus* (append *legacy-corpus* *free-form-corpus*))
@@ -367,6 +377,17 @@ new parser's terms (no articles in destinations, no default day).")
   (is string= "tomorrow" (bn::normalize-day-phrase "tomorrow morning"))
   (is string= "next week Tuesday" (bn::normalize-day-phrase "Tuesday next week"))
   (is string= "2026-09-08" (bn::normalize-day-phrase "2026-09-08"))
+  ;; a weekday next to a month-day is dropped: chronicity would otherwise read
+  ;; "Saturday September 12" as the coming Saturday
+  (is string= (format nil "September 12 ~d" (current-year))
+      (bn::normalize-day-phrase "Saturday September 12"))
+  (is string= (format nil "September 12 ~d" (current-year))
+      (bn::normalize-day-phrase "Saturday, September 12"))
+  (is string= (format nil "Sep 12 ~d" (current-year))
+      (bn::normalize-day-phrase "Sat Sep 12"))
+  (is string= (format nil "12th of September ~d" (current-year))
+      (bn::normalize-day-phrase "next Saturday the 12th of September"))
+  (is string= "saturday" (bn::normalize-day-phrase "Sat"))
   ;; month-day phrases resolve to the current year even when that date has passed
   (let ((req (bn:parse-booking "for pool for MM on January 2 at 8 am to 9 am")))
     (is = (current-year) (chronicity:year-of (bn:booking-request-day-datetime req)))))

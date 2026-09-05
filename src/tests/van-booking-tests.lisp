@@ -732,7 +732,18 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
       ;; only the first separator splits (limit 2)
       (multiple-value-bind (s e) (vb::split-range-phrase "Apr 20 to Apr 26 to Apr 30")
         (is string= "Apr 20" s)
-        (is string= "Apr 26 to Apr 30" e)))
+        (is string= "Apr 26 to Apr 30" e))
+      ;; "and" / "&" join two periods (the /help example "this week and next week")
+      (multiple-value-bind (s e) (vb::split-range-phrase "this week and next week")
+        (is string= "this week" s)
+        (is string= "next week" e))
+      (multiple-value-bind (s e) (vb::split-range-phrase "Saturday & Sunday")
+        (is string= "Saturday" s)
+        (is string= "Sunday" e))
+      ;; a period on its own is not split
+      (multiple-value-bind (s e) (vb::split-range-phrase "next week")
+        (is string= "next week" s)
+        (is string= "next week" e)))
 
   (define-test trip-date-key
       (let ((year (chronicity:year-of (chronicity:parse "today"))))
@@ -919,6 +930,55 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
                                        (true afternoon-pos)
                                        (true (< morning-pos afternoon-pos))))))))
 
+(define-test phrase-date-range-tests
+  :parent view-schedule-tests
+  ;; Pinned to Wednesday April 22 2026 so the sample sheets "Apr 20-26" and
+  ;; "Apr 27-May 3" are the ones in play, whatever today is.
+  (let ((chronicity:*now* (chronicity:make-datetime 2026 4 22 12 0 0))
+        (vb::*weeks* *sample-weeks*))
+    ;; week phrases cover the sheet's Monday-to-Sunday week
+    (multiple-value-bind (s e) (vb::phrase-date-range "this week")
+      (is = 20260420 (vb::date-key s))
+      (is = 20260426 (vb::date-key e)))
+    (multiple-value-bind (s e) (vb::phrase-date-range "next week")
+      (is = 20260427 (vb::date-key s))
+      (is = 20260503 (vb::date-key e)))
+    (multiple-value-bind (s e) (vb::phrase-date-range "last week")
+      (is = 20260413 (vb::date-key s))
+      (is = 20260419 (vb::date-key e)))
+    ;; a single day is a one-day window
+    (multiple-value-bind (s e) (vb::phrase-date-range "today")
+      (is = 20260422 (vb::date-key s))
+      (is = 20260422 (vb::date-key e)))
+    (multiple-value-bind (s e) (vb::phrase-date-range "tomorrow")
+      (is = 20260423 (vb::date-key s))
+      (is = 20260423 (vb::date-key e)))
+    (multiple-value-bind (s e) (vb::phrase-date-range "Apr 20")
+      (is = 20260420 (vb::date-key s))
+      (is = 20260420 (vb::date-key e)))
+    (multiple-value-bind (s e) (vb::phrase-date-range "Saturday")
+      (is = 20260425 (vb::date-key s))
+      (is = 20260425 (vb::date-key e)))
+    (false (vb::phrase-date-range "gibberish nonsense"))
+    ;; the /help example: both weeks' sheets are read and the window is labelled
+    (let ((sheets-read '()))
+      (with-mocked-functions ((vb::read-range (lambda (range &key sheet-name)
+                                                (declare (ignore range))
+                                                (push sheet-name sheets-read)
+                                                (make-test-sheet))))
+        (let ((out (view-schedule "this week and next week")))
+          (true (search "No trips scheduled from Monday April 20 to Sunday May 3" out))
+          (is equal '("Apr 20-26" "Apr 27-May 3") (reverse sheets-read)))))
+    ;; a reversed range still works, and an unreadable one names the whole phrase
+    (call-with-mock-read-range (make-test-sheet)
+                               (lambda ()
+                                 (true (search "from Monday April 20 to Sunday April 26"
+                                               (view-schedule "Apr 26 to Apr 20")))))
+    (let ((c (handler-case (progn (view-schedule "this week and nonsense") nil)
+               (error (c) c))))
+      (true c)
+      (true (search "this week and nonsense" (princ-to-string c))))))
+
 (define-test parse-passenger-initials
   (is equal '("CG" "BW") (vb::parse-passenger-initials "CG and BW"))
   (is equal '("MM" "DM" "CG") (vb::parse-passenger-initials "MM, DM and CG"))
@@ -1084,6 +1144,22 @@ in call order."
                              :dep-time "8:00 am" :ret-time "10:00 am" :trips trips))))
         (true (search "No available vehicle slots" out))
         (is equal '() writes)))))
+
+(define-test day-without-a-sheet-reports-it
+  :parent book-tests
+  ;; Only "Thursday April 9" is on the sheet, so a booking for another day
+  ;; names the missing sheet instead of claiming every vehicle is taken (with
+  ;; times) or asking for times (without them).
+  (let ((trips (vb::parse-schedule (empty-sheet) :sheet-name "test-sheet")))
+    (multiple-value-bind (out writes)
+        (call-recording-writes
+         (lambda ()
+           (false (vb:book "Tuesday October 20" "Dentist" '("BW")
+                           :dep-time "8:00 am" :ret-time "10:00 am" :trips trips))
+           (false (vb:book "Tuesday October 20" "Dentist" '("BW") :trips trips))))
+      (true (search "No schedule sheet covers Tuesday October 20" out))
+      (false (search "No available vehicle slots" out))
+      (is equal '() writes))))
 
 (defun fixture-header ()
   "Sheet header text for April 9 of the current year, whatever weekday that is."

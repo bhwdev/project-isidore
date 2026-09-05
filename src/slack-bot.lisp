@@ -73,7 +73,8 @@ values read inside EVAL-WHEN would be baked in from the build host."
 (defvar *slash-commands* ()
   "Dispatch alist: slash command name -> handler symbol.
 Populated by DEFSLASH-COMMAND. Each handler takes the decoded params
-hash-table and returns a reply string. Docstrings feed /help.")
+hash-table and returns a reply string, or a list of strings that are posted
+as separate messages. Docstrings feed /help.")
 
 (defmacro defslash-command (slash-name (params-var) docstring &body body)
   "Define a Slack slash-command handler and register it in *SLASH-COMMANDS*.
@@ -318,6 +319,37 @@ Verifies the signature, dispatches on event type, returns an appropriate respons
   (let ((m (cl-ppcre:scan-to-strings "[A-Z]{2,3}" (or text ""))))
     (and m m)))
 
+(defun code-block-chunks (text &key (limit 3500) (header-lines 0))
+  "Wrap TEXT in Slack code fences so a fixed-width table keeps its columns in
+the proportional-font chat view.  Slack splits or truncates messages past
+4000 characters, which would cut a code block in two, so TEXT longer than
+LIMIT characters is split on line boundaries into several fenced strings,
+each repeating the first HEADER-LINES lines (column titles and rule) so every
+part reads on its own.  Returns a list of strings."
+  (let* ((lines (cl-ppcre:split "\\n" (string-right-trim '(#\Newline #\Space) text)))
+         (header (subseq lines 0 (min header-lines (length lines))))
+         (body (nthcdr (length header) lines))
+         (chunks '())
+         (current '())
+         (size 0))
+    (flet ((fence (lines)
+             (format nil "```~%~{~a~%~}```" lines))
+           (start-chunk ()
+             (setf current (reverse header)
+                   size (reduce #'+ header
+                                :key (lambda (l) (1+ (length l)))
+                                :initial-value 0))))
+      (start-chunk)
+      (dolist (line body)
+        (when (and (> (+ size (length line) 1) limit)
+                   (> (length current) (length header)))
+          (push (fence (reverse current)) chunks)
+          (start-chunk))
+        (push line current)
+        (incf size (1+ (length line))))
+      (push (fence (reverse current)) chunks))
+    (nreverse chunks)))
+
 (defslash-command "/book" (params)
   "/book <plain-English request> — book a trip or join one already on the sheet.
 Examples:
@@ -339,9 +371,10 @@ re-send the request including it."
                 (type-of c) c)))))
 
 (defslash-command "/view" (params)
-  "/view [<date range>] — show booked trips. With no argument, shows today.
+  "/view [<date range>] — show booked trips as a table. With no argument, shows today.
 Examples:
   /view
+  /view tomorrow
   /view this week and next week
   /view Apr 20 to Apr 26"
   (let* ((text (gethash "text" params))
@@ -349,8 +382,14 @@ Examples:
                     "today"
                     (string-trim '(#\Space) text))))
     (handler-case
-        (with-output-to-string (*standard-output*)
-          (view-schedule range))
+        (let ((out (with-output-to-string (*standard-output*)
+                     (view-schedule range))))
+          ;; A table is several lines: post it in code fences so the columns
+          ;; line up in Slack's proportional font, in more than one message if
+          ;; it is long.  One-line answers ("No trips scheduled ...") stay plain.
+          (if (find #\Newline (string-trim '(#\Newline #\Space) out))
+              (code-block-chunks out :header-lines 2)
+              out))
       (error (c)
         (format nil "View failed [~A]: ~A" (type-of c) c)))))
 
@@ -420,8 +459,12 @@ posted back asynchronously via chat.postMessage."
                                   :context (format nil "Command ~A" cmd)
                                   :thread-name (format nil "slack-cmd-~A" cmd))
            (let ((reply (funcall handler params)))
+             ;; a handler returns one string, or a list of strings that are
+             ;; posted as separate messages (a long table in code fences)
              (when (and reply reply-to (plusp (length reply)))
-               (post-slack-message reply-to reply))))
+               (dolist (part (if (listp reply) reply (list reply)))
+                 (when (plusp (length part))
+                   (post-slack-message reply-to part))))))
          '(200 () ("")))))))
 
 ;;; Reminder Scheduler

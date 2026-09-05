@@ -11,6 +11,7 @@
   (:import-from #:dexador)
   (:import-from #:chronicity
                 #:hour-of #:minute-of #:year-of #:month-of #:day-of)
+  (:import-from #:local-time)
   (:import-from #:project-isidore/booking-nlp
                 #:parse-booking
                 #:booking-request-destination #:booking-request-day
@@ -50,6 +51,7 @@
     - No match + times provided → creates new booking with vehicle priority DGH → LGH →
   Chevy
     - No match + no times → signals BOOKING-INCOMPLETE naming the absent time(s)
+    - No week sheet covers the day → informs user (before asking for times)
     - No empty slots → informs user
   - book-natural — free-form English frontend to book (see project-isidore/booking-nlp).
     Signals BOOKING-INCOMPLETE, whose report asks the user to re-send the request
@@ -387,6 +389,8 @@ unbooked block look like a Personal trip departing at \"Saturday\"."
 (defun book (day destination passengers &key dep-time ret-time vehicle week trips)
   "Book PASSENGERS for a trip on DAY to DESTINATION.
    If an existing trip matches, adds passengers to it (no times needed).
+   If no week sheet covers DAY (the sheet has no blocks for it), says so and
+   returns NIL rather than asking for times or reporting full vehicles.
    Otherwise creates a new booking, which requires DEP-TIME and RET-TIME; when
    either is missing, signals BOOKING-INCOMPLETE so the caller can ask for them.
    VEHICLE can override automatic selection (DGH > LGH > Chevy).
@@ -402,6 +406,9 @@ unbooked block look like a Personal trip departing at \"Saturday\"."
          (format t "Adding passengers to ~a trip (~a)...~%"
                  (trip-vehicle target) (trip-sheet-name target))
          (add-passengers target passengers)))
+      ((null (find-trips all-trips :day day))
+       (format t "No schedule sheet covers ~a yet, so nothing can be booked for that day. Ask the van steward to add that week's tab.~%" day)
+       nil)
       ((and dep-time ret-time)
        (create-booking all-trips day destination dep-time ret-time passengers
                        :vehicle vehicle))
@@ -593,15 +600,60 @@ Combines today's date with TRIP-DEPARTURE's HH:MM (12h format)."
                                day month year)))))
 
 (defun split-range-phrase (phrase)
-  "Split PHRASE on ' to ', ' through ', or ' - ' into (values start end).
-   Returns (values phrase phrase) when no separator is found (1-day range)."
+  "Split PHRASE on ' to ', ' through ', ' thru ', ' until ', ' till ', ' and ',
+   ' & ' or ' - ' into (values start end).
+   Returns (values phrase phrase) when no separator is found (a single day or
+   period such as \"today\" or \"next week\")."
   (let* ((trimmed (string-trim " " phrase))
-         (pattern "(?i)\\s+(?:to|through|-)\\s+")
+         (pattern "(?i)\\s+(?:to|through|thru|until|till|and|&|-)\\s+")
          (parts (cl-ppcre:split pattern trimmed :limit 2)))
     (if (= (length parts) 2)
         (values (string-trim " " (first parts))
                 (string-trim " " (second parts)))
         (values trimmed trimmed))))
+
+(defun week-phrase-range (phrase)
+  "Return (values MONDAY SUNDAY), chronicity datetimes, when PHRASE is \"this
+week\", \"next week\" or \"last week\"; NIL otherwise.  Weeks run Monday to
+Sunday like the sheet's tabs, which chronicity's own week spans do not."
+  (cl-ppcre:register-groups-bind (which)
+      ("(?i)^(this|next|last)\\s+week$" (string-trim " " phrase))
+    (let* ((today (chronicity:parse "today"))
+           ;; local-time counts Sunday as day 0
+           (since-monday (mod (+ (local-time:timestamp-day-of-week today) 6) 7))
+           (offset (cond ((string-equal which "next") 7)
+                         ((string-equal which "last") -7)
+                         (t 0)))
+           (monday (local-time:timestamp+ today (- offset since-monday) :day)))
+      (values monday (local-time:timestamp+ monday 6 :day)))))
+
+(defun phrase-date-range (phrase)
+  "Resolve a date PHRASE to (values START END), chronicity datetimes on the
+first and last day it covers.  \"today\", \"tomorrow\", \"Apr 20\" and
+\"Saturday\" cover one day; \"this week\" and \"next week\" cover the sheet's
+Monday-to-Sunday week (see WEEK-PHRASE-RANGE).  A month-day without a year
+(\"Apr 20\", \"20th of April\") means this year's date, since the sheet only
+ever covers the current year, not the next occurrence chronicity's :FUTURE
+context would pick once the day has passed.  Returns NIL when chronicity
+cannot read PHRASE."
+  (multiple-value-bind (monday sunday) (week-phrase-range phrase)
+    (if monday
+        (values monday sunday)
+        (let* ((month "(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?")
+               (day "\\d{1,2}(?:st|nd|rd|th)?")
+               (anchored
+                 (if (and (not (cl-ppcre:scan "\\d{4}" phrase))
+                          (or (cl-ppcre:scan (format nil "(?i)\\b~a\\s+~a\\b" month day) phrase)
+                              (cl-ppcre:scan (format nil "(?i)\\b~a\\s+(?:of\\s+)?~a" day month) phrase)))
+                     (format nil "~a ~d" phrase (year-of (chronicity:parse "today")))
+                     phrase))
+               (span (chronicity:parse anchored :context :future :guess nil)))
+          (when span
+            (let* ((start (chronicity:span-start span))
+                   ;; a span ends at the following midnight, so step back
+                   ;; into the last day it covers
+                   (end (local-time:timestamp- (chronicity:span-end span) 1 :sec)))
+              (values start (if (local-time:timestamp< end start) start end))))))))
 
 (defun trip-date-key (trip)
   "Return YYYYMMDD key for TRIP by parsing its day string, or NIL on failure.
@@ -707,59 +759,60 @@ Combines today's date with TRIP-DEPARTURE's HH:MM (12h format)."
 
 (defun view-schedule (&optional (range-phrase "today"))
   "Display booked trips over a natural-language date range as a plaintext table.
-   RANGE-PHRASE may be a single date (\"today\", \"tomorrow\", \"Apr 20\") for a 1-day
-   window, or a range using 'to', 'through', or '-' as the separator
-   (\"today to next Friday\", \"Apr 20 through Apr 26\"). Defaults to \"today\".
-   Returns the rendered string and also prints it."
+   RANGE-PHRASE may be a single day or period (\"today\", \"tomorrow\", \"Apr 20\",
+   \"this week\", \"next week\") for that window, or two of them joined by 'to',
+   'through', 'and', '&' or '-' (\"today to next Friday\", \"this week and next
+   week\", \"Apr 20 through Apr 26\") for the window spanning both.  Defaults to
+   \"today\".  Returns the rendered string and also prints it."
   (multiple-value-bind (start-phrase end-phrase) (split-range-phrase range-phrase)
-    (let ((start-dt (chronicity:parse start-phrase :context :future))
-          (end-dt   (chronicity:parse end-phrase   :context :future)))
-      (unless (and start-dt end-dt)
-        (error "Could not parse date range: ~a" range-phrase))
-      (let* ((sk (current-year-date-key start-dt))
-             (ek (current-year-date-key end-dt))
-             (start-key (min sk ek))
-             (end-key   (max sk ek))
-             (start-label (format-booking-day (if (<= sk ek) start-dt end-dt)))
-             (end-label   (format-booking-day (if (<= sk ek) end-dt start-dt)))
-             (sheets (find-week-sheets-in-range start-key end-key)))
-        (if (null sheets)
-            (let ((msg (format nil "No schedule sheets cover ~a~@[ through ~a~].~%"
-                               start-label
-                               (unless (= start-key end-key) end-label))))
-              (format t "~a" msg)
-              msg)
-            (let* ((all-trips
-                     (loop for sheet in sheets
-                           append (parse-schedule
-                                   (read-range nil :sheet-name sheet)
-                                   :sheet-name sheet)))
-                   (in-range
-                     (remove-if-not
-                      (lambda (tr)
-                        (let ((k (trip-date-key tr)))
-                          (and k (<= start-key k end-key)
-                               (booked-trip-p tr))))
-                      all-trips))
-                   (sorted
-                     (sort in-range
-                           (lambda (a b)
-                             (let ((ka (trip-date-key a))
-                                   (kb (trip-date-key b)))
-                               (cond ((< ka kb) t)
-                                     ((> ka kb) nil)
-                                     (t (let ((da (departure-minutes (trip-departure a)))
-                                              (db (departure-minutes (trip-departure b))))
-                                          (cond ((< da db) t)
-                                                ((> da db) nil)
-                                                (t (< (vehicle-priority (trip-vehicle a))
-                                                      (vehicle-priority (trip-vehicle b))))))))))))
-                   (out (if sorted
-                            (format-schedule-table sorted)
-                            (format nil "No trips scheduled from ~a to ~a.~%"
-                                    start-label end-label))))
-              (format t "~a" out)
-              out))))))
+    (multiple-value-bind (s1 e1) (phrase-date-range start-phrase)
+      (multiple-value-bind (s2 e2) (phrase-date-range end-phrase)
+        (unless (and s1 s2)
+          (error "Could not parse date range: ~a" range-phrase))
+        (let* ((start-dt (if (<= (current-year-date-key s1) (current-year-date-key s2)) s1 s2))
+               (end-dt (if (>= (current-year-date-key e1) (current-year-date-key e2)) e1 e2))
+               (start-key (current-year-date-key start-dt))
+               (end-key (current-year-date-key end-dt))
+               (start-label (format-booking-day start-dt))
+               (end-label (format-booking-day end-dt))
+               (sheets (find-week-sheets-in-range start-key end-key)))
+          (if (null sheets)
+              (let ((msg (format nil "No schedule sheets cover ~a~@[ through ~a~].~%"
+                                 start-label
+                                 (unless (= start-key end-key) end-label))))
+                (format t "~a" msg)
+                msg)
+              (let* ((all-trips
+                       (loop for sheet in sheets
+                             append (parse-schedule
+                                     (read-range nil :sheet-name sheet)
+                                     :sheet-name sheet)))
+                     (in-range
+                       (remove-if-not
+                        (lambda (tr)
+                          (let ((k (trip-date-key tr)))
+                            (and k (<= start-key k end-key)
+                                 (booked-trip-p tr))))
+                        all-trips))
+                     (sorted
+                       (sort in-range
+                             (lambda (a b)
+                               (let ((ka (trip-date-key a))
+                                     (kb (trip-date-key b)))
+                                 (cond ((< ka kb) t)
+                                       ((> ka kb) nil)
+                                       (t (let ((da (departure-minutes (trip-departure a)))
+                                                (db (departure-minutes (trip-departure b))))
+                                            (cond ((< da db) t)
+                                                  ((> da db) nil)
+                                                  (t (< (vehicle-priority (trip-vehicle a))
+                                                        (vehicle-priority (trip-vehicle b))))))))))))
+                     (out (if sorted
+                              (format-schedule-table sorted)
+                              (format nil "No trips scheduled from ~a to ~a.~%"
+                                      start-label end-label))))
+                (format t "~a" out)
+                out)))))))
 
 (defun decode-js-string (s)
   "Decode the escapes Google uses inside the JavaScript string literal S:

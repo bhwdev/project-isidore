@@ -186,10 +186,18 @@ are missing; its report is ready to post to Slack."))
        (:trim-leading 1
         (:lower ("at" "around" "about" "by" "until" "till" "to" "from" "after" "before"))
         (:regex "^(?:[1-9]|1[0-9]|2[0-4])$"))))
-    ;; Dates.
+    ;; Dates.  A weekday written next to the date ("Saturday September 12",
+    ;; "Sat, Sep 12th", "Saturday the 12th of September") must be one span:
+    ;; on its own the weekday would win as an entity and resolve to the
+    ;; coming Saturday instead of the date.
     (nlp:add-entity-patterns
      r :date 30
      `(((:lower ("today" "tomorrow" "tonight")) (:lower ,*day-parts* :op "?"))
+       ((:lower ("next" "this" "last") :op "?") (:regex ,weekday) (:lower "," :op "?")
+        (:lower ,*month-words*) (:lower "." :op "?") (:regex "^\\d{1,2}(?:st|nd|rd|th)?$"))
+       ((:lower ("next" "this" "last") :op "?") (:regex ,weekday) (:lower "," :op "?")
+        (:lower "the" :op "?") (:regex "^\\d{1,2}(?:st|nd|rd|th)?$")
+        (:lower "of" :op "?") (:lower ,*month-words*))
        ((:lower ("next" "this" "last") :op "?") (:lower "week") (:regex ,weekday))
        ((:lower ("next" "this" "last") :op "?") (:regex ,weekday) (:lower ,*day-parts* :op "?"))
        ((:regex ,weekday) (:lower "next") (:lower "week"))
@@ -443,12 +451,15 @@ Returns (values DEP-TIME RET-TIME DEP-PHRASE RET-PHRASE)."
 
 (defun normalize-day-phrase (text)
   "Rewrite a :DATE span's text into a form chronicity reads reliably:
-possessives, periods and day parts dropped, weekday abbreviations expanded,
-slash dates spelled out, and explicit month-day phrases anchored to the
-current year (the sheet only ever covers the current year)."
+possessives, commas, periods and day parts dropped, weekday abbreviations
+expanded, slash dates spelled out, explicit month-day phrases anchored to the
+current year (the sheet only ever covers the current year), and a weekday
+dropped when it accompanies a month-day (\"Saturday September 12\" becomes
+\"September 12\": chronicity would otherwise take the weekday alone and answer
+the coming Saturday)."
   (let* ((s (cl-ppcre:regex-replace-all "(?i)'s\\b" text ""))
          (words (cl-ppcre:split "\\s+" (string-trim " " s)))
-         (words (remove "" (mapcar (lambda (w) (string-right-trim "." w)) words)
+         (words (remove "" (mapcar (lambda (w) (string-trim ".," w)) words)
                         :test #'string=))
          (words (mapcar (lambda (w)
                           (let ((abbr (assoc (string-downcase w) *weekday-abbrevs*
@@ -458,6 +469,13 @@ current year (the sheet only ever covers the current year)."
          (words (remove-if (lambda (w) (member (string-downcase w) *day-parts*
                                                :test #'string=))
                            words))
+         (words (if (some #'month-number words)
+                    (remove-if (lambda (w)
+                                 (member (string-downcase w)
+                                         (append *weekday-names* '("next" "this" "last" "the"))
+                                         :test #'string=))
+                               words)
+                    words))
          (phrase (format nil "~{~a~^ ~}" words)))
     ;; "4/22" or "4/22/2026" -> "April 22 2026"
     (cl-ppcre:register-groups-bind (m d y)

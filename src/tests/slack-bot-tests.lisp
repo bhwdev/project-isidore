@@ -510,11 +510,46 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
     (true (search "TABLE for today" (sb::cmd-view (make-params))))
     (true (search "TABLE for Apr 20 to Apr 26"
                   (sb::cmd-view (make-params "text" " Apr 20 to Apr 26 ")))))
+  ;; a multi-line table is posted in code fences (a list of message parts)
+  ;; so its columns line up in Slack
+  (with-mocked-functions ((vb:view-schedule
+                           (lambda (&optional range) (declare (ignore range))
+                             (format t "Date  Vehicle~%----  -------~%Mon   DGH~%")
+                             "ignored")))
+    (let ((reply (sb::cmd-view (make-params "text" "today"))))
+      (true (listp reply))
+      (is = 1 (length reply))
+      (true (uiop:string-prefix-p (format nil "```~%Date  Vehicle~%") (first reply)))
+      (true (search "Mon   DGH" (first reply)))
+      (true (uiop:string-suffix-p (first reply) "```"))))
   (with-mocked-functions ((vb:view-schedule
                            (lambda (&optional range) (declare (ignore range)) (error "no sheet"))))
     (let ((reply (sb::cmd-view (make-params "text" "x"))))
       (true (search "View failed" reply))
       (true (search "no sheet" reply)))))
+
+(define-test code-block-chunks
+  :parent slack-bot-suite
+  ;; short text: one fenced part
+  (let ((parts (sb::code-block-chunks (format nil "a~%b~%"))))
+    (is = 1 (length parts))
+    (is string= (format nil "```~%a~%b~%```") (first parts)))
+  ;; long text is split on line boundaries under the limit, each part
+  ;; repeating the header lines, and no row is lost or duplicated
+  (let* ((header (format nil "Date  Vehicle~%----  -------"))
+         (rows (loop for i from 1 to 40
+                     collect (format nil "row ~2d ~a" i (make-string 60 :initial-element #\x))))
+         (text (format nil "~a~%~{~a~%~}" header rows))
+         (parts (sb::code-block-chunks text :limit 1000 :header-lines 2)))
+    (true (> (length parts) 1))
+    (dolist (p parts)
+      (true (<= (length p) (+ 1000 8)))
+      (true (uiop:string-prefix-p (format nil "```~%Date  Vehicle~%----  -------~%") p))
+      (true (uiop:string-suffix-p p "```")))
+    (let ((all (apply #'concatenate 'string parts)))
+      (dolist (r rows)
+        (is = 1 (loop for start = (search r all) then (search r all :start2 (1+ start))
+                      while start count t))))))
 
 (define-test message-events
   :parent slack-bot-suite

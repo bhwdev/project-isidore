@@ -7,6 +7,10 @@
   (:mix-reexport #:clog #:clog-web #:hunchentoot)
   (:import-from #:ironclad)
   (:import-from #:bordeaux-threads)
+  ;; cl+ssl, cffi and dexador are named for FORGET-BUILD-PROCESS-NETWORK-STATE
+  (:import-from #:cl+ssl)
+  (:import-from #:cffi)
+  (:import-from #:dexador)
   (:local-nicknames
    (#:conn      #:clog-connection)
    (#:bible     #:project-isidore/bible)
@@ -743,6 +747,30 @@ Navigate to http://localhost:~A to continue... ~%" port)
   ;; state set or clack's BT2:DESTROY-THREAD cleanup hits UNBOUND-SLOT.
   (wait-for-port-ready port)
   (return-from initialize-application t))
+
+(defun forget-build-process-network-state ()
+  "Drop the TLS and HTTP-connection state a saved core inherits from the
+process that built it.  make.lisp runs the test suite, which talks to Slack
+and Google over TLS, before SAVE-LISP-AND-DIE, so the core carries cl+ssl's
+foreign pointers (its Lisp BIO method, the SSL_CTX, the C string it hands to
+OpenSSL's error queue) and dexador's pool of open keep-alive connections.  In
+the restarted image those addresses and sockets belong to nobody: OpenSSL
+faults on them (the journal shows \"CORRUPTION WARNING ... Memory fault\" with
+the PC in libcrypto's BIO_new_ex) and a request to a pooled host fails.
+Registered below as a uiop image-restore hook, which runs when the dumped
+image starts."
+  ;; forget the SSL_CTX and method so the first TLS use re-initialises cl+ssl,
+  ;; which also makes a fresh Lisp BIO method
+  (cl+ssl:reload)
+  ;; the file name cl+ssl passes to ERR_set_debug was allocated by the build
+  (when (boundp 'cl+ssl::*file-name*)
+    (setf cl+ssl::*file-name* (cffi:foreign-string-alloc "cl+ssl/src/bio.lisp")))
+  ;; a new, empty pool: closing the inherited connections would call OpenSSL
+  ;; on the same stale pointers
+  (setf dexador.connection-cache:*connection-pool*
+        (dexador.connection-cache:make-connection-pool)))
+
+(uiop:register-image-restore-hook 'forget-build-process-network-state nil)
 
 (defun application-toplevel ()
   "Application entry point. Emulate a \"main\" function. Used in

@@ -249,7 +249,26 @@ PHRASE such as \"tomorrow\", computed at check time."
      :dep-time "9:30 am" :ret-time "11:30 am" :missing nil)
     ("for CG and BW at seven PM to nine PM going to swimming next week Tuesday"
      :destination "swimming" :day-contains "tuesday" :passengers ("CG" "BW")
-     :dep-time "7:00 pm" :ret-time "9:00 pm" :missing nil))
+     :dep-time "7:00 pm" :ret-time "9:00 pm" :missing nil)
+    ;; Three-letter initials.  DMM and FBM are real people on this sheet, and
+    ;; DMM in particular contains both DM and MM, who are two others -- the
+    ;; ruler must read the whole token and never a substring of it.
+    ("book a van for swimming next Tuesday for DMM and CG at 7 pm to 9 pm"
+     :destination "swimming" :day-contains "tuesday" :passengers ("DMM" "CG")
+     :dep-time "7:00 pm" :ret-time "9:00 pm" :missing nil)
+    ("Can DMM and FBM take the DGH to the dentist tomorrow, leaving at 8:30 and back around 11?"
+     :destination "dentist" :day-like "tomorrow" :passengers ("DMM" "FBM")
+     :vehicle :dgh :dep-time "8:30 am" :ret-time "11:00 am" :missing nil)
+    ("add FBM to the SHMS trip on Thursday"
+     :destination "SHMS" :day-contains "thursday" :passengers ("FBM")
+     :missing (:dep-time :ret-time))
+    ("could DMM have a van Monday 6 to 9 for the airport?"
+     :destination "airport" :day-contains "monday" :passengers ("DMM")
+     :dep-time "6:00 am" :ret-time "9:00 am" :missing nil)
+    ;; DM and MM still parse as themselves next to DMM.
+    ("book a van for DM, MM and DMM to the pool tomorrow 8 am to 10 am"
+     :destination "pool" :day-like "tomorrow" :passengers ("DM" "MM" "DMM")
+     :dep-time "8:00 am" :ret-time "10:00 am" :missing nil))
   "Sentences carried over from the regex-era tests, with expectations in the
 new parser's terms (no articles in destinations, no default day).")
 
@@ -575,3 +594,91 @@ new parser's terms (no articles in destinations, no default day).")
   (is string= "Thursday January 1" (bn:format-booking-day (chronicity:parse "January 1 2026")))
   (is = 12 (length bn:*month-names*))
   (is string= "September" (nth 8 bn:*month-names*)))
+
+;;; --- First-person resolution -------------------------------------------
+;;;
+;;; SLACK-BOT rewrites a message's "me"/"my"/"I" to the sender's initials
+;;; before either parser sees it, so that "book me a van" names somebody.
+;;; These tests pin the rewrite itself; the identity lookup that supplies the
+;;; initials is tested in SLACK-BOT-TESTS.
+
+(define-test self-reference-detection
+  ;; Every word and contraction *SELF-WORDS* / *SELF-CONTRACTIONS* cover.
+  (dolist (text '("book me a van" "my ride to SHMS" "can I get a van"
+                  "just myself thursday" "I'd like a van" "I'm going to SHMS"
+                  "I'll take the DGH" "I've got a dentist appointment"
+                  "BOOK ME A VAN" "Me and CG to the pool"))
+    (true (bn:self-reference-p text) "~s refers to its sender" text))
+  ;; A word that merely contains one must not count, nor must other people's
+  ;; initials -- "MM" and "DM" both live inside the sender word "DMM".
+  (dolist (text '("meet CG at home before the SHMS trip"
+                  "book a van for CG and MM to the pool"
+                  "add DMM to the SHMS trip"
+                  "the Chevy is in the shop"
+                  "" "   ")
+           )
+    (false (bn:self-reference-p text) "~s refers to nobody" text))
+  (false (bn:self-reference-p nil)))
+
+(define-test resolve-self-reference-rewrites
+  (macrolet ((rewrites (input expected)
+               `(is string= ,expected (bn:resolve-self-reference ,input "DMM"))))
+    ;; Bare words.
+    (rewrites "book me a van to the dentist tomorrow 9 to 11"
+              "book DMM a van to the dentist tomorrow 9 to 11")
+    (rewrites "my ride to SHMS thursday" "DMM ride to SHMS thursday")
+    (rewrites "just myself, thursday 9 to 11 to SHMS"
+              "just DMM, thursday 9 to 11 to SHMS")
+    (rewrites "can I get a van to the pool sat 8 to 10 am"
+              "can DMM get a van to the pool sat 8 to 10 am")
+    ;; Contractions expand to a clause rather than "DMM'd", whose tokens no
+    ;; longer look like initials.
+    (rewrites "I'd like a van for the pool sat 8-10"
+              "DMM would like a van for the pool sat 8-10")
+    (rewrites "I'm going to SHMS thursday" "DMM is going to SHMS thursday")
+    (rewrites "I'll take the DGH tomorrow" "DMM will take the DGH tomorrow")
+    (rewrites "I've got a dentist appointment" "DMM has got a dentist appointment")
+    ;; The typographic apostrophe Slack's phone clients substitute.
+    (rewrites "I’d like a van" "DMM would like a van")
+    ;; Case is ignored on the way in; the initials are written as given.
+    (rewrites "BOOK ME A VAN" "BOOK DMM A VAN")
+    ;; Alongside other passengers, in either order.
+    (rewrites "me and CG to the pool" "DMM and CG to the pool")
+    (rewrites "CG and I need a van" "CG and DMM need a van")
+    ;; Left alone: words that merely contain a self-word, and initials that
+    ;; are substrings of the sender's own.
+    (rewrites "meet CG at home before the SHMS trip"
+              "meet CG at home before the SHMS trip")
+    (rewrites "book a van for CG and MM to the pool"
+              "book a van for CG and MM to the pool"))
+  ;; Non-strings pass through rather than signalling.
+  (is eq nil (bn:resolve-self-reference nil "DMM"))
+  (is string= "book me a van" (bn:resolve-self-reference "book me a van" nil)))
+
+(define-test resolved-self-reference-parses
+  :description "The whole point of rewriting before parsing: PARSE-BOOKING must read the
+result as a complete booking for the sender.  Three-letter initials are used
+throughout because DMM and FBM are the cases this was built for."
+  (dolist (case '(("book me a van to the dentist tomorrow 9 to 11" "DMM" ("DMM") "dentist")
+                  ("I'd like a van for the pool tomorrow 8 to 10 am" "DMM" ("DMM") "pool")
+                  ("can I get a van to the pool tomorrow 8 to 10 am" "FBM" ("FBM") "pool")
+                  ("me and CG to the pool tomorrow 8 to 10 am" "FBM" ("FBM" "CG") "pool")
+                  ("CG and I need a van to the pool tomorrow 8 to 10 am"
+                   "DMM" ("CG" "DMM") "pool")))
+    (destructuring-bind (text initial expected-pax expected-dest) case
+      (let ((req (bn:parse-booking (bn:resolve-self-reference text initial))))
+        (is equal expected-pax (bn:booking-request-passengers req)
+            "~s resolves to ~a" text expected-pax)
+        (is string= expected-dest (bn:booking-request-destination req))
+        (false (bn:booking-request-missing req)
+               "~s is complete once resolved" text)))))
+
+(define-test me-is-never-a-passenger
+  :description "An unresolved ME or MY -- the sender could not be identified -- must not
+become a passenger of that name, or the sheet gains a person who does not
+exist."
+  (let ((req (bn:parse-booking "BOOK ME A VAN TO THE POOL TOMORROW 8 TO 10 AM")))
+    (false (bn:booking-request-passengers req))
+    (true (member :passengers (bn:booking-request-missing req))))
+  (let ((req (bn:parse-booking "MY RIDE TO SHMS TOMORROW 8 TO 10 AM")))
+    (false (bn:booking-request-passengers req))))

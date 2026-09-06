@@ -522,9 +522,10 @@ configured."
 (defparameter *bare-days* '("today" "tomorrow" "tonight")
   "Days written without \"on\" in the canonical sentence.")
 
-(defparameter *not-initials* '("AM" "PM" "OK" "FYI" "TBD" "ETA" "PS" "EOD" "DGH" "LGH")
-  "Uppercase words the booking ruler never reads as initials (mirrors
-BOOKING-NLP::MAKE-BOOKING-RULER).")
+(defparameter *not-initials* bn:*not-initials*
+  "Uppercase words the booking ruler never reads as initials.  Aliased to
+BOOKING-NLP's list rather than restated, because a copy that drifts would let
+the model write a passenger the rule parser would have refused.")
 
 (defun sanitize-field (value &key (max 60))
   "VALUE as one line of plain text: control characters become spaces,

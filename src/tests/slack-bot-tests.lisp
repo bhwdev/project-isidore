@@ -58,7 +58,7 @@ WITH-MOCKED-FUNCTIONS."))
 (define-test slash-commands-table
   :parent slack-bot-suite
   (let ((names (mapcar #'car sb::*slash-commands*)))
-    (is equal '("/book" "/view" "/subscribe" "/unsubscribe" "/help") names))
+    (is equal '("/book" "/view" "/iam" "/subscribe" "/unsubscribe" "/help") names))
   ;; Every handler has a docstring (developer reference; users get +help-text+).
   (dolist (entry sb::*slash-commands*)
     (true (documentation (cdr entry) 'function)
@@ -829,13 +829,27 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
         (true (stringp reply))
         (true (search "Please re-send" reply)))
       (is equal '("when can BW and MM have the van for the dentist tomorrow?") booked)
-      ;; an explicit /book never turns into a view
+      ;; An explicit /book never turns into a view.  Its "my" is resolved to
+      ;; the sender first, so the text that reaches BOOK-NATURAL names them.
       (setf ranges '() booked '())
-      (let ((reply (sb::cmd-book (make-params "text" "when is my ride home tuesday"))))
-        (true (stringp reply))
-        (true (search "Please re-send" reply)))
-      (is equal '() ranges)
-      (is equal '("when is my ride home tuesday") booked)
+      (with-mocked-functions ((sb::sender-initials
+                               (lambda (uid) (declare (ignore uid)) (values "DMM" :registered nil))))
+        (let ((reply (sb::cmd-book (make-params "user_id" "U1"
+                                               "text" "when is my ride home tuesday"))))
+          (true (stringp reply))
+          (true (search "Please re-send" reply)))
+        (is equal '() ranges)
+        (is equal '("when is DMM ride home tuesday") booked))
+      ;; The same /book from someone the bot cannot name asks for /iam and
+      ;; runs no booking at all, rather than guessing a passenger.
+      (setf booked '())
+      (with-mocked-functions ((sb::sender-initials
+                               (lambda (uid) (declare (ignore uid)) (values nil nil nil))))
+        (let ((reply (sb::cmd-book (make-params "user_id" "U1"
+                                               "text" "when is my ride home tuesday"))))
+          (true (stringp reply))
+          (true (search "/iam" reply)))
+        (is equal '() booked))
       ;; /view itself takes the question, a plain range as before, and passes
       ;; anything else through for VIEW-SCHEDULE to reject
       (setf ranges '())
@@ -988,3 +1002,241 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
     (false (equal (sb::reminder-key "U1" a) (sb::reminder-key "U1" b)))
     (false (equal (sb::reminder-key "U1" a) (sb::reminder-key "U1" c)))
     (is = (sb::today-date-key) (fourth (sb::reminder-key "U1" a)))))
+
+;;; --- Sender identity: who "me" is ---------------------------------------
+;;;
+;;; A booking names its passengers by initials, and the bot has more than one
+;;; user, so "book me a van" has to be resolved to the sender before either
+;;; parser sees it.  Initials come from a /iam registration when there is one
+;;; and from the Slack profile otherwise; a guess is announced in the reply
+;;; and never persisted.
+
+(define-test derive-initials-from-a-name
+  :parent slack-bot-suite
+  ;; The cases this was built for: three-letter initials that include a title.
+  (is string= "DMM" (sb::derive-initials "Deacon Matt Marin"))
+  (is string= "FBM" (sb::derive-initials "Fr Bob Marin"))
+  (is string= "CG"  (sb::derive-initials "Cassian Gray"))
+  ;; Punctuation between the parts is ignored, so "Ben H. W." still yields
+  ;; three letters -- wrong for someone who signs BW, which is exactly why a
+  ;; derived guess is announced rather than stored.
+  (is string= "BHW" (sb::derive-initials "Ben H. W."))
+  ;; A display name that is already initials is taken as it stands.
+  (is string= "DMM" (sb::derive-initials "dmm"))
+  (is string= "DMM" (sb::derive-initials "DMM"))
+  (is string= "CG"  (sb::derive-initials "  CG  "))
+  ;; Pronouns and status markers are not part of a name.
+  (is string= "MM"  (sb::derive-initials "Matt Marin (he/him)"))
+  ;; Anything that would not produce 2-3 letters is refused rather than
+  ;; guessed at; the caller then asks for /iam.
+  (false (sb::derive-initials "Madonna"))
+  (false (sb::derive-initials "Juan Carlos de la Cruz Smith"))
+  (false (sb::derive-initials ""))
+  (false (sb::derive-initials nil))
+  ;; Accented letters are letters.  Splitting on [A-Za-z] instead cut
+  ;; "Garcia"-with-an-accent in two and turned a two-word name into a
+  ;; well-formed but wrong three-letter guess, which is the one failure
+  ;; nothing downstream could have caught.  This workspace really does hold a
+  ;; "Marin" spelled with an accent.
+  (is string= "JG"  (sb::derive-initials "Jose Garcia"))
+  (is string= "JG"  (sb::derive-initials (format nil "Jos~c Garc~ca" #\LATIN_SMALL_LETTER_E_WITH_ACUTE
+                                                 #\LATIN_SMALL_LETTER_I_WITH_ACUTE)))
+  (is string= "MMC" (sb::derive-initials (format nil "Matt Mar~cn, CC"
+                                                 #\LATIN_SMALL_LETTER_I_WITH_ACUTE)))
+  ;; ...but an initial the sheet could not hold is no guess at all: both
+  ;; readers of an initial require plain A-Z, so a name yielding one outside
+  ;; that shape asks for /iam rather than producing a passenger nothing will
+  ;; recognise.
+  (false (sb::derive-initials (format nil "Fr. ~ctienne Dubois"
+                                      #\LATIN_CAPITAL_LETTER_E_WITH_ACUTE))))
+
+(define-test parse-initial-argument-is-strict
+  :parent slack-bot-suite
+  ;; A lone word is accepted in any case, so a phone that eats capitals still
+  ;; registers someone.
+  (is string= "DMM" (sb::parse-initial-argument "dmm"))
+  (is string= "DMM" (sb::parse-initial-argument "  DMM "))
+  (is string= "CG"  (sb::parse-initial-argument "cg"))
+  ;; A lone word of the wrong length is refused outright rather than trimmed
+  ;; to its first three letters, which would have registered DMM for DMMM.
+  (false (sb::parse-initial-argument "DMMM"))
+  (false (sb::parse-initial-argument "toolongname"))
+  (false (sb::parse-initial-argument "x"))
+  (false (sb::parse-initial-argument ""))
+  (false (sb::parse-initial-argument nil))
+  ;; A sentence still falls back to scanning for an uppercase run.
+  (is string= "BW" (sb::parse-initial-argument "my initials are BW")))
+
+(define-test sender-initials-prefers-registration
+  :parent slack-bot-suite
+  (with-temp-database
+      (with-mocked-functions ((sb::slack-user-names
+                               (lambda (uid)
+                                 (declare (ignore uid))
+                                 (values nil "Deacon Matt Marin"))))
+        ;; With nothing registered, the Slack profile is the source, and the
+        ;; name it came from is returned so the reply can show its working.
+        (multiple-value-bind (initial source name) (sb::sender-initials +test-user-id+)
+          (is string= "DMM" initial)
+          (is eq :derived source)
+          (is string= "Deacon Matt Marin" name))
+        ;; A registration wins over the guess, and reports no name.
+        (db:add-slack-identity +test-user-id+ "FBM")
+        (multiple-value-bind (initial source name) (sb::sender-initials +test-user-id+)
+          (is string= "FBM" initial)
+          (is eq :registered source)
+          (false name))))
+  ;; No user at all (a payload without user_id) resolves to nobody.
+  (false (sb::sender-initials nil)))
+
+(define-test sender-initials-when-nothing-works
+  :parent slack-bot-suite
+  (with-temp-database
+      (with-mocked-functions ((sb::slack-user-names
+                               (lambda (uid) (declare (ignore uid)) (values nil "Madonna"))))
+        (false (sb::sender-initials +test-user-id+)))
+    ;; A users.info that fails outright (no scope, network down) is not an
+    ;; error, just an unknown sender.
+    (with-mocked-functions ((sb::slack-user-names
+                             (lambda (uid) (declare (ignore uid)) (values nil nil))))
+      (false (sb::sender-initials +test-user-id+)))))
+
+(define-test resolve-sender-rewrites-and-announces
+  :parent slack-bot-suite
+  (with-temp-database
+      (with-mocked-functions ((sb::slack-user-names
+                               (lambda (uid)
+                                 (declare (ignore uid))
+                                 (values nil "Deacon Matt Marin"))))
+        ;; Registered: rewritten silently, no notice.
+        (db:add-slack-identity +test-user-id+ "DMM")
+        (multiple-value-bind (text notice)
+            (sb::resolve-sender "book me a van to the pool" +test-user-id+)
+          (is string= "book DMM a van to the pool" text)
+          (false notice))
+        ;; Derived: rewritten, but the reply must say where the name came from.
+        (db:remove-slack-identity +test-user-id+)
+        (multiple-value-bind (text notice)
+            (sb::resolve-sender "book me a van to the pool" +test-user-id+)
+          (is string= "book DMM a van to the pool" text)
+          (true notice)
+          (true (search "DMM" notice))
+          (true (search "Deacon Matt Marin" notice))
+          (true (search "/iam" notice)))
+        ;; A message that names nobody is returned untouched, and must not
+        ;; cost a lookup: SLACK-USER-NAMES is mocked to fail the test if hit.
+        (with-mocked-functions ((sb::slack-user-names
+                                 (lambda (uid)
+                                   (declare (ignore uid))
+                                   (fail "users.info called for a message with no \"me\"")
+                                   (values nil nil))))
+          (multiple-value-bind (text notice)
+              (sb::resolve-sender "book a van for CG and DMM" +test-user-id+)
+            (is string= "book a van for CG and DMM" text)
+            (false notice))))))
+
+(define-test resolve-sender-gives-up-on-an-unknown-sender
+  :parent slack-bot-suite
+  (with-temp-database
+      (with-mocked-functions ((sb::slack-user-names
+                               (lambda (uid) (declare (ignore uid)) (values nil "Madonna"))))
+        ;; NIL, not the original text: the caller must refuse rather than let
+        ;; a message with an unresolved "me" reach the sheet.
+        (false (sb::resolve-sender "book me a van to the pool" +test-user-id+)))))
+
+(define-test cmd-iam-registers-and-reports
+  :parent slack-bot-suite
+  (with-temp-database
+      (with-mocked-functions ((sb::slack-user-names
+                               (lambda (uid)
+                                 (declare (ignore uid))
+                                 (values nil "Deacon Matt Marin"))))
+        ;; Bare /iam before registering offers the guess to confirm.
+        (let ((reply (sb::cmd-iam (make-params "user_id" +test-user-id+ "text" ""))))
+          (true (search "not registered" reply))
+          (true (search "DMM" reply)))
+        ;; Registering, in lower case.
+        (let ((reply (sb::cmd-iam (make-params "user_id" +test-user-id+ "text" "fbm"))))
+          (true (search "FBM" reply)))
+        (is string= "FBM" (db:initial-of (db:find-slack-identity +test-user-id+)))
+        ;; Bare /iam afterwards reports the registration.
+        (let ((reply (sb::cmd-iam (make-params "user_id" +test-user-id+ "text" ""))))
+          (true (search "registered as" reply))
+          (true (search "FBM" reply)))
+        ;; Re-registering replaces.
+        (sb::cmd-iam (make-params "user_id" +test-user-id+ "text" "DMM"))
+        (is string= "DMM" (db:initial-of (db:find-slack-identity +test-user-id+)))
+        ;; Junk is refused with usage rather than truncated.
+        (let ((reply (sb::cmd-iam (make-params "user_id" +test-user-id+ "text" "DMMM"))))
+          (true (search "Usage" reply)))
+        (is string= "DMM" (db:initial-of (db:find-slack-identity +test-user-id+)))))
+  (true (search "Slack user" (sb::cmd-iam (make-params "text" "DMM")))))
+
+(define-test subscribing-registers-an-identity-that-outlives-it
+  :parent slack-bot-suite
+  (with-temp-database
+      ;; /subscribe says who you are as well as asking for reminders, so
+      ;; nobody has to register twice.
+      (sb::cmd-subscribe (make-params "user_id" +test-user-id+ "text" "CG"))
+    (is string= "CG" (db:initial-of (db:find-slack-identity +test-user-id+)))
+    ;; ...and /unsubscribe gives up the reminders only.  Losing the identity
+    ;; here would silently break "book me a van" for anyone who stops their
+    ;; DMs, which is why the two are separate vertices.
+    (sb::cmd-unsubscribe (make-params "user_id" +test-user-id+))
+    (false (db:find-slack-subscription +test-user-id+))
+    (is string= "CG" (db:initial-of (db:find-slack-identity +test-user-id+)))))
+
+(define-test run-request-resolves-me-end-to-end
+  :parent slack-bot-suite
+  (with-temp-database
+      (with-mocked-functions ((sb::slack-user-names
+                               (lambda (uid)
+                                 (declare (ignore uid))
+                                 (values nil "Deacon Matt Marin")))
+                              (sb::book-natural-reply (lambda (text) text))
+                              (sb::llm-interpretation
+                               (lambda (text &key allow-view)
+                                 (declare (ignore text allow-view))
+                                 nil)))
+        ;; Registered: the booking runs on the rewritten sentence, and the
+        ;; reply is the handler's alone.
+        (db:add-slack-identity +test-user-id+ "DMM")
+        (is string= "book DMM a van to the pool"
+            (sb::run-request "book me a van to the pool" :user-id +test-user-id+))
+        ;; Derived: same booking, with the notice posted above it.
+        (db:remove-slack-identity +test-user-id+)
+        (let ((reply (sb::run-request "book me a van to the pool"
+                                      :user-id +test-user-id+)))
+          (true (listp reply))
+          (true (search "DMM" (first reply)))
+          (is string= "book DMM a van to the pool" (second reply)))))
+  ;; Unknown sender: the reply asks for /iam and the booking never runs.
+  (with-temp-database
+      (with-mocked-functions ((sb::slack-user-names
+                               (lambda (uid) (declare (ignore uid)) (values nil "Madonna")))
+                              (sb::book-natural-reply
+                               (lambda (text)
+                                 (declare (ignore text))
+                                 (fail "a booking ran for an unidentified sender"))))
+        (let ((reply (sb::run-request "book me a van to the pool"
+                                      :user-id +test-user-id+)))
+          (true (search "/iam" reply))
+          (true (search "initials" reply))))))
+
+(define-test timing-question-survives-self-resolution
+  :parent slack-bot-suite
+  :description "\"when is my ride home Tuesday?\" is a /view, and stays one.  The rewrite
+has to happen after the timing-question check: SCHEDULE-QUESTION-RANGE only
+answers for a question that names no passengers, and \"when is DMM ride home
+Tuesday?\" names one."
+  (with-temp-database
+      (with-mocked-functions ((sb::slack-user-names
+                               (lambda (uid) (declare (ignore uid)) (values nil "Deacon Matt Marin")))
+                              (sb::cmd-view (lambda (params) (gethash "text" params))))
+        (db:add-slack-identity +test-user-id+ "DMM")
+        (let ((reply (sb::run-request "when is my ride home on Tuesday?"
+                                      :user-id +test-user-id+)))
+          (true (listp reply))
+          (true (search "/view" (first reply)))
+          ;; The range, not a booking for DMM.
+          (false (search "DMM" (first reply)))))))

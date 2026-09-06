@@ -16,7 +16,9 @@
   (:import-from #:project-isidore/booking-nlp
                 #:booking-incomplete
                 #:booking-incomplete-missing
-                #:schedule-question-range)
+                #:schedule-question-range
+                #:self-reference-p
+                #:resolve-self-reference)
   (:import-from #:project-isidore/booking-llm
                 #:load-llm-config
                 #:warm-up-llm
@@ -37,7 +39,11 @@
   (:import-from #:project-isidore/database
                 #:all-slack-subscriptions
                 #:add-slack-subscription
-                #:remove-slack-subscription)
+                #:remove-slack-subscription
+                #:find-slack-identity
+                #:add-slack-identity
+                #:remove-slack-identity
+                #:initial-of)
   (:export #:make-slack-middleware
            #:load-config
            #:start-reminder-scheduler
@@ -74,9 +80,18 @@ A persistent /subscribe registry (graph-db-backed via project-isidore/database)
 plus an in-process scheduler thread DMs subscribed drivers 5 minutes before
 each of their trips.
 
+A second registry records which initials each Slack account goes by, so a
+message can say \"me\", \"my\" or \"I\" instead of spelling them out: /iam sets
+it, /subscribe sets it as a side effect, and /unsubscribe leaves it alone.
+For someone who has registered neither, the initials are guessed from their
+Slack profile name (users.info), and the reply says so every time, because a
+guess is never persisted.
+
 Setup: set SLACK_BOT_TOKEN and SLACK_SIGNING_SECRET environment variables,
-and optionally VAN_LLM_URL.  See the project plan for Slack app
-configuration details."))
+and optionally VAN_LLM_URL.  The bot token needs the `users:read` scope for
+the profile guess; without it users.info answers \"missing_scope\", which is
+handled like any other failure -- everyone simply has to run /iam once.  See
+the project plan for Slack app configuration details."))
 
 (in-package #:project-isidore/slack-bot)
 
@@ -156,7 +171,7 @@ If CHANNEL evaluates to NIL, error reports are suppressed (only logged)."
 *To book a trip*, tell me about it in your own words: send me a direct message, @mention me in a channel, or type `/book` followed by the request. Say:
   • *destination* — `for swimming`, `to the dentist`, `the SHMS trip`
   • *day* — `tomorrow`, `next Tuesday`, `April 22`
-  • *passengers* — initials in CAPITALS, driver first: `for CG and BW`, `with MM, DM & CG`
+  • *passengers* — initials in CAPITALS, driver first: `for CG and BW`, `with MM, DM & CG`. Say `me` for yourself once you have run `/iam` (see below).
   • *times* out and back — `at 7 pm to 9 pm`, `leaving at 8:30 and back around 11`
   • *vehicle* (optional) — `take the DGH`, `in the LGH`, `use the Chevy`, `the personal car`. If you don't say, I take the first van that is free (DGH, then LGH, then the Chevy).
 The order and the wording don't matter. For example:
@@ -171,6 +186,8 @@ If something is missing, I reply with what I understood and ask you to re-send t
 *To see the schedule*, type `/view` for today, or add a day or a range:
   `/view tomorrow`   `/view the rest of the week`   `/view the weekend`   `/view Apr 20 to Apr 26`   `/view Sept 19-22`
 Or just ask about a trip's timing — `when is my ride home this coming Tuesday?`, `what time does the van leave tomorrow?` — and I show that day.
+
+*Who you are*: type `/iam` and your initials, e.g. `/iam DMM`, and I'll read `me`, `my` and `I` as you from then on — `book me a van to the dentist tomorrow 9 to 11`, `can I get a van for the pool Saturday 8-10`, `me and CG to swimming Tuesday 7-9pm`. Type `/iam` on its own to see who I have you down as. I remember it across restarts and through `/unsubscribe`.
 
 *Reminders*: type `/subscribe` and your initials, e.g. `/subscribe BW`, and I'll message you 5 minutes before each trip you are driving. `/unsubscribe` turns them off.
 
@@ -316,33 +333,186 @@ booking like any other."
     (when (and range (date-range-phrase-p range))
       (values "/view" range))))
 
-(defun run-request (text &key (allow-view t))
-  "Run TEXT as a request.  When ALLOW-VIEW, a question about a trip's timing
-that names no passengers (\"when is my ride home this coming Tuesday?\", see
-SCHEDULE-QUESTION-INTERPRETATION) is answered as a `/view` of that day, with
-no model involved.  Anything else is a booking, with the model as a fallback
-reader: the rule parser goes first (BOOK-NATURAL); when it cannot find the
-destination, day or passengers and a model is configured, LLM-INTERPRETATION
-rewrites TEXT as a `/book` sentence or, when ALLOW-VIEW, a `/view` range.
-Either way a request that was read rather than run verbatim gets a list as
-its reply: the interpretation line, then what the ordinary handler said
-about the reading (RUN-INTERPRETATION).  Otherwise the reply is the
-BOOKING-INCOMPLETE report, exactly as RUN-BOOKING gives it.  A rewritten
-booking goes through RUN-BOOKING, so a sentence that is still incomplete
-gets the report and never a second consultation.  Other errors propagate to
-the caller."
+(defun slack-user-names (user-id)
+  "Return the names Slack holds for USER-ID as (values display-name real-name),
+or NIL NIL when the lookup fails.  Needs the `users:read` scope; without it
+users.info answers ok=false with \"missing_scope\", which is treated like any
+other failure -- the caller falls back to asking for `/iam`.  Every failure
+is logged and swallowed, because not knowing a name must never take the bot
+down mid-booking."
+  (handler-case
+      (let* ((resp (dex:get (format nil "https://slack.com/api/users.info?user=~A"
+                                    (quri:url-encode user-id))
+                            :headers `(("Authorization"
+                                        . ,(format nil "Bearer ~A" *slack-bot-token*)))))
+             (parsed (com.inuoe.jzon:parse resp)))
+        (if (eq (gethash "ok" parsed) t)
+            (let* ((user (gethash "user" parsed))
+                   (profile (and user (gethash "profile" user))))
+              (values (and profile (gethash "display_name" profile))
+                      (or (and profile (gethash "real_name" profile))
+                          (and user (gethash "real_name" user)))))
+            (progn
+              (format *error-output* "slack-bot: users.info for ~A rejected: ~A~%"
+                      user-id (gethash "error" parsed))
+              (values nil nil))))
+    (error (c)
+      (format *error-output* "slack-bot: users.info for ~A failed: ~A~%" user-id c)
+      (values nil nil))))
+
+(defun name-words (text)
+  "The runs of letters in TEXT, in order.
+Letters are ALPHA-CHAR-P's, not [A-Za-z]: this workspace holds a Marin
+spelled \"Marín\", and an ASCII-only split cuts that into \"Mar\" and \"n\",
+turning a two-word name into a well-formed three-letter guess.  A guess that
+is wrong but plausible is the one outcome worth going out of the way to
+avoid, because nothing downstream can tell it from a right one."
+  (loop with word = '()
+        with words = '()
+        for ch across text
+        do (if (alpha-char-p ch)
+               (push ch word)
+               (when word
+                 (push (coerce (nreverse word) 'string) words)
+                 (setf word '())))
+        finally (when word
+                  (push (coerce (nreverse word) 'string) words))
+                (return (nreverse words))))
+
+(defun derive-initials (name)
+  "Guess the initials NAME goes by, or NIL when the guess would not be one.
+A name that is already initials is taken as it stands (\"dmm\" -> \"DMM\"),
+which covers the people who set their Slack display name to them; anything
+else contributes the first letter of each of its words, so \"Dcn. Matt
+Marin\" gives \"DMM\".  Titles are kept rather than stripped, because here
+they are part of the initials people actually use on the sheet.  Only a 2-3
+letter result is returned -- +INITIALS-PATTERN+'s shape -- so a one-word name
+or a long one yields NIL and the caller asks for `/iam` instead of guessing.
+
+The guess is right for most of this workspace and wrong for some of it: the
+display name \"Fr. Bernard\" gives FB for someone who signs FBM.  So it is
+never persisted on its own, and the reply names the profile it came from
+every time, until the sender settles it with `/iam`."
+  (when (stringp name)
+    (let* ((trimmed (string-trim '(#\Space #\Tab) name))
+           ;; "Matt Marin (he/him)" and "Bob [PTO]" carry parentheticals that
+           ;; are not part of anyone's name.
+           (bare (cl-ppcre:regex-replace-all "[(\\[{][^)\\]}]*[)\\]}]" trimmed " "))
+           (words (name-words bare))
+           (guess
+             (cond
+               ;; Already initials: one word of 2-3 letters and nothing else.
+               ((and (= 1 (length words))
+                     (<= 2 (length (first words)) 3))
+                (string-upcase (first words)))
+               ((<= 2 (length words) 3)
+                (string-upcase (map 'string (lambda (w) (char w 0)) words)))
+               (t nil))))
+      ;; The sheet writes plain A-Z, and both readers of an initial check that
+      ;; shape, so a guess outside it ("Fr. Étienne Dubois" -> "FÉD") would be
+      ;; substituted into the message and then not recognised as a passenger.
+      ;; Better to have no guess and ask for `/iam`.
+      (when (and guess (cl-ppcre:scan "^[A-Z]{2,3}$" guess))
+        guess))))
+
+(defun sender-initials (user-id)
+  "Work out whose initials USER-ID writes under.
+Returns (values INITIAL SOURCE NAME): SOURCE is :REGISTERED for initials the
+sender gave with `/iam` or `/subscribe`, :DERIVED for ones guessed from their
+Slack profile (NAME then says which name the guess came from, so the reply
+can show its working), and NIL with no initials when neither is available.
+Registration always wins, so one `/iam` corrects a wrong guess for good."
+  (if (null user-id)
+      (values nil nil nil)
+      (let ((registered (ignore-errors (find-slack-identity user-id))))
+        (if registered
+            (values (initial-of registered) :registered nil)
+            (multiple-value-bind (display real) (slack-user-names user-id)
+              (loop for name in (list display real)
+                    for guess = (derive-initials name)
+                    when guess
+                      do (return (values guess :derived (string-trim '(#\Space) name)))
+                    finally (return (values nil nil nil))))))))
+
+(defparameter +unknown-sender-reply+
+  "I don't know your initials yet, so I can't tell who \"me\" is.
+
+Tell me once with `/iam` and your initials in CAPITALS — e.g. `/iam DMM` — then re-send your request. After that I'll read \"me\", \"my\" and \"I\" as you in every message."
+  "What to say to someone who wrote \"me\" but cannot be identified.")
+
+(defun derived-initials-notice (initial name)
+  "The line prepended to a reply whose \"me\" was resolved from a Slack
+profile name rather than from a registration.  It is repeated on every such
+booking on purpose: a guess about who someone is never gets persisted, so
+this stays visible until the sender confirms it with `/iam`, which is also
+how a wrong guess is corrected."
+  (format nil "I read \"me\" as *~A*~@[, from your Slack name \"~A\"~]. If that's not right, run `/iam` with your initials — e.g. `/iam DMM` — and I'll remember it."
+          initial name))
+
+(defun resolve-sender (text user-id)
+  "Rewrite TEXT so its first-person references name the person who sent it.
+Returns (values RESOLVED-TEXT NOTICE); NOTICE is a line the caller must post
+above the reply, or NIL.  Returns NIL when TEXT refers to its sender and the
+sender cannot be identified, meaning the caller should answer
++UNKNOWN-SENDER-REPLY+ and book nothing.
+
+TEXT that refers to nobody comes back unchanged, with no notice and no
+lookup at all, so a message that spells its passengers out costs neither a
+database read nor a Slack API call."
+  (if (not (self-reference-p text))
+      (values text nil)
+      (multiple-value-bind (initial source name) (sender-initials user-id)
+        (cond
+          ((null initial) nil)
+          ((eq source :derived)
+           (values (resolve-self-reference text initial)
+                   (derived-initials-notice initial name)))
+          (t (values (resolve-self-reference text initial) nil))))))
+
+(defun run-request (text &key (allow-view t) user-id)
+  "Run TEXT as a request from USER-ID.  When ALLOW-VIEW, a question about a
+trip's timing that names no passengers (\"when is my ride home this coming
+Tuesday?\", see SCHEDULE-QUESTION-INTERPRETATION) is answered as a `/view` of
+that day, with no model involved.
+
+Anything else is a booking.  First-person references in it are rewritten to
+the sender's initials (RESOLVE-SENDER) so \"book me a van\" names somebody;
+that happens after the timing-question check, which must keep seeing the
+original \"my\" -- SCHEDULE-QUESTION-RANGE answers only for a question that
+names no passengers, and a rewritten \"when is DMM ride home Tuesday?\" names
+one.  A sender who writes \"me\" but cannot be identified is asked for `/iam`
+and nothing is booked.  When the initials were guessed from a Slack profile
+rather than registered, the reply carries a notice saying so.
+
+The booking itself runs with the model as a fallback reader: the rule parser
+goes first (BOOK-NATURAL); when it cannot find the destination, day or
+passengers and a model is configured, LLM-INTERPRETATION rewrites the text as
+a `/book` sentence or, when ALLOW-VIEW, a `/view` range.  Either way a request
+that was read rather than run verbatim gets a list as its reply: the
+interpretation line, then what the ordinary handler said about the reading
+(RUN-INTERPRETATION).  Otherwise the reply is the BOOKING-INCOMPLETE report,
+exactly as RUN-BOOKING gives it.  A rewritten booking goes through
+RUN-BOOKING, so a sentence that is still incomplete gets the report and never
+a second consultation.  Other errors propagate to the caller."
   (multiple-value-bind (command args)
       (and allow-view (schedule-question-interpretation text))
     (if command
         (run-interpretation command args)
-        (handler-case (book-natural-reply text)
-          (booking-incomplete (c)
-            (or (when (first-pass-incomplete-p c)
-                  (multiple-value-bind (command args)
-                      (llm-interpretation text :allow-view allow-view)
-                    (when command
-                      (run-interpretation command args))))
-                (princ-to-string c)))))))
+        (multiple-value-bind (resolved notice) (resolve-sender text user-id)
+          (if (null resolved)
+              +unknown-sender-reply+
+              (let ((reply
+                      (handler-case (book-natural-reply resolved)
+                        (booking-incomplete (c)
+                          (or (when (first-pass-incomplete-p c)
+                                (multiple-value-bind (command args)
+                                    (llm-interpretation resolved :allow-view allow-view)
+                                  (when command
+                                    (run-interpretation command args))))
+                              (princ-to-string c))))))
+                (if notice
+                    (cons notice (ensure-list reply))
+                    reply)))))))
 
 (defun post-command-reply (reply-to reply)
   "Post a command handler's REPLY to REPLY-TO.
@@ -421,7 +591,9 @@ worker thread, or NIL when the event was answered synchronously or ignored."
                                              (message-command-params event command args)))))
             (with-slack-error-reply (channel :context "Booking"
                                              :thread-name "slack-booking")
-              (post-command-reply channel (run-request clean-text))))))))
+              (post-command-reply
+               channel
+               (run-request clean-text :user-id (gethash "user" event)))))))))
 
 ;;; Lack Middleware
 
@@ -499,6 +671,22 @@ Verifies the signature, dispatches on event type, returns an appropriate respons
   (let ((m (cl-ppcre:scan-to-strings "[A-Z]{2,3}" (or text ""))))
     (and m m)))
 
+(defun parse-initial-argument (text)
+  "Read TEXT as the initials argument of `/iam` or `/subscribe`, or NIL.
+Stricter and more forgiving than PARSE-INITIAL at once.  A lone word is
+accepted whatever its case, so `/iam dmm` works from a phone that
+autocorrects capitals away, and rejected outright when it is not 2-3 letters,
+so `/subscribe DMMM` asks again instead of quietly registering the DMM its
+first three letters spell.  Anything longer than one word falls back to
+PARSE-INITIAL's scan for an uppercase run, which is what lets a sentence
+\(\"my initials are BW\") still work.  The result is upcased for the sheet."
+  (let ((trimmed (string-trim '(#\Space #\Tab #\Newline) (or text ""))))
+    (cond
+      ((cl-ppcre:scan "^[A-Za-z]{2,3}$" trimmed) (string-upcase trimmed))
+      ((cl-ppcre:scan "^[A-Za-z]+$" trimmed) nil)
+      (t (let ((scanned (parse-initial trimmed)))
+           (and scanned (string-upcase scanned)))))))
+
 (defun code-block-chunks (text &key (limit 3500) (header-lines 0))
   "Wrap TEXT in Slack code fences so a fixed-width table keeps its columns in
 the proportional-font chat view.  Slack splits or truncates messages past
@@ -551,7 +739,8 @@ re-send the request including it."
     (when (or (null text) (zerop (length (string-trim '(#\Space) text))))
       (return-from cmd-book
         "Usage: type `/book` followed by the trip in your own words, e.g. `/book take the DGH to the dentist tomorrow for BW, leaving at 8:30 and back by 11`. Type `/help` for more."))
-    (handler-case (run-request text :allow-view nil)
+    (handler-case (run-request text :allow-view nil
+                                    :user-id (gethash "user_id" params))
       (error (c)
         (format nil "Booking failed [~A]: ~A~%Type `/help` to see how to phrase a request."
                 (type-of c) c)))))
@@ -588,6 +777,37 @@ A question about a trip's timing shows the day it asks about."
       (error (c)
         (format nil "View failed [~A]: ~A" (type-of c) c)))))
 
+(defslash-command "/iam" (params)
+  "/iam <INITIALS> — tell the bot which initials you go by, so that \"me\",
+\"my\" and \"I\" in a booking request name you. Example:
+  /iam DMM
+Persists across restarts, and is kept when you /unsubscribe. Sending it
+again replaces the old initials. With no argument it reports what is
+currently registered, so it doubles as `/whoami`."
+  (let* ((text (gethash "text" params))
+         (user-id (gethash "user_id" params))
+         (initial (parse-initial-argument text)))
+    (cond
+      ((null user-id) "Could not identify Slack user.")
+      ;; Bare `/iam` asks rather than sets: report the registration, or the
+      ;; guess that would be used, so someone can check before booking.
+      ((and (null initial)
+            (or (null text) (zerop (length (string-trim '(#\Space #\Tab) text)))))
+       (multiple-value-bind (current source name) (sender-initials user-id)
+         (cond
+           ((eq source :registered)
+            (format nil "You are registered as *~A*. Send `/iam` and different initials to change that." current))
+           ((eq source :derived)
+            (format nil "You are not registered yet. I would read \"me\" as *~A*~@[, from your Slack name \"~A\"~]. Send `/iam ~A` to confirm it, or `/iam` with the right initials."
+                    current name current))
+           (t "You are not registered, and I can't guess your initials from your Slack profile. Send `/iam` followed by your initials in CAPITALS, e.g. `/iam DMM`."))))
+      ((null initial)
+       "Usage: type `/iam` followed by your initials in CAPITALS, e.g. `/iam DMM`. Two or three letters, exactly as they appear on the schedule sheet.")
+      (t
+       (add-slack-identity user-id initial)
+       (format nil "Got it — you are *~A*. I'll read \"me\", \"my\" and \"I\" as ~:*~A in your booking requests."
+               initial)))))
+
 (defslash-command "/subscribe" (params)
   "/subscribe <INITIAL> — receive a direct message 5 minutes before each trip
 today where you are the driver (first passenger listed). Example:
@@ -595,13 +815,17 @@ today where you are the driver (first passenger listed). Example:
 Persists across restarts. Use /unsubscribe to stop."
   (let* ((text (gethash "text" params))
          (user-id (gethash "user_id" params))
-         (initial (parse-initial text)))
+         (initial (parse-initial-argument text)))
     (cond
       ((null user-id) "Could not identify Slack user.")
       ((null initial) "Usage: type `/subscribe` followed by your initials in CAPITALS, e.g. `/subscribe BW`.")
       (t
        (add-slack-subscription user-id (string-upcase initial))
-       (format nil "Subscribed. You will be DM'd 5 minutes before each trip where ~A is the driver."
+       ;; Subscribing also says who you are, so nobody has to register twice
+       ;; to get both reminders and "book me a van".  /unsubscribe drops only
+       ;; the subscription; the identity outlives it.
+       (add-slack-identity user-id (string-upcase initial))
+       (format nil "Subscribed. You will be DM'd 5 minutes before each trip where ~A is the driver. I'll also read \"me\" as ~:*~A in your messages."
                (string-upcase initial))))))
 
 (defslash-command "/unsubscribe" (params)
@@ -610,7 +834,7 @@ Persists across restarts. Use /unsubscribe to stop."
     (cond
       ((null user-id) "Could not identify Slack user.")
       ((remove-slack-subscription user-id)
-       "Unsubscribed. No further reminders will be sent.")
+       "Unsubscribed. No further reminders will be sent. I still know your initials, so \"book me a van\" keeps working — `/iam` changes them.")
       (t "You were not subscribed."))))
 
 (defslash-command "/help" (params)

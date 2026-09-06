@@ -11,6 +11,8 @@
   (:export
    ;; parsing
    #:parse-booking #:schedule-question-range
+   #:self-reference-p #:resolve-self-reference
+   #:*self-words* #:*self-contractions*
    #:booking-request #:booking-request-p #:make-booking-request
    #:booking-request-text #:booking-request-doc
    #:booking-request-destination
@@ -20,7 +22,7 @@
    #:booking-request-dep-time #:booking-request-ret-time
    #:booking-request-vehicle
    #:booking-request-missing #:booking-request-understood
-   #:*booking-slots* #:*booking-ruler* #:*cue-matcher*
+   #:*booking-slots* #:*booking-ruler* #:*cue-matcher* #:*not-initials*
    ;; condition
    #:booking-incomplete #:booking-incomplete-missing #:booking-incomplete-understood
    #:booking-incomplete-text #:booking-incomplete-preamble
@@ -138,6 +140,40 @@ are missing; its report is ready to post to Slack."))
 (defparameter *excluded-run-pos* '(:prp :prp$ :md :wdt :wp :wp$ :ex :uh :cc)
   "POS tags whose tokens end a destination candidate run.")
 
+(defparameter *not-initials*
+  (sort
+   (remove-duplicates
+    (append
+     '("AM" "PM" "OK" "FYI" "TBD" "ETA" "PS" "EOD"
+       ;; The vehicles, written in the same shape as a person.
+       "DGH" "LGH"
+       ;; ME and MY have a meaning of their own: SLACK-BOT resolves them to
+       ;; the sender's initials before parsing (RESOLVE-SELF-REFERENCE).  One
+       ;; that reaches the parser belongs to a sender who could not be
+       ;; identified, and must not become a passenger of that name.
+       "ME" "MY")
+     ;; Every short word this file already knows is not a name.  The ruler
+     ;; tells initials from ordinary words by their capitals, which says
+     ;; nothing in a message typed entirely in capitals: without these,
+     ;; "BOOK ME A VAN TO THE POOL" is read as a trip for TO and THE, and
+     ;; "SEP 12" adds a passenger named SEP.  Taking them from the lists the
+     ;; destination and date scanners already use keeps one set of words to
+     ;; maintain rather than several that drift apart.
+     (mapcar #'string-upcase
+             (remove-if-not
+              (lambda (w) (and (<= 2 (length w) 3) (every #'alpha-char-p w)))
+              (append *run-breakers* *strip-leading* *strip-trailing*
+                      *range-connectors* *day-parts* *month-words*
+                      *weekday-names* *number-words* *meridiem-words*
+                      (mapcar #'car *weekday-abbrevs*)))))
+    :test #'string=)
+   #'string<)
+  "Uppercase words MAKE-BOOKING-RULER never reads as passenger initials.
+BOOKING-LLM validates the model's answer against this same list, so both
+readers agree on what an initial is.  Anyone whose real initials collide with
+an entry here has to be added to a trip by someone else naming them, the same
+trade-off DGH and LGH have always carried.")
+
 ;;; ---------------------------------------------------------------------------
 ;;; Entity ruler and cue matcher
 ;;; ---------------------------------------------------------------------------
@@ -210,11 +246,12 @@ are missing; its report is ready to post to Slack."))
        ((:regex "^\\d{1,2}(?:st|nd|rd|th)?$") (:lower "of" :op "?") (:lower ,*month-words*))
        ((:regex "^\\d{4}-\\d{2}-\\d{2}$"))
        ((:regex "^\\d{1,2}/\\d{1,2}(?:/\\d{2,4})?$"))))
-    ;; Passengers: 2-3 uppercase letters.
+    ;; Passengers: 2-3 uppercase letters that are not a word the sentence
+    ;; needs for something else (see *NOT-INITIALS*).
     (nlp:add-entity-patterns
      r :passenger 40
-     '(((:shape ("XX" "XXX") :is-upper t
-         :not-in ("AM" "PM" "OK" "FYI" "TBD" "ETA" "PS" "EOD" "DGH" "LGH")))))
+     `(((:shape ("XX" "XXX") :is-upper t
+         :not-in ,*not-initials*))))
     r))
 
 (defun word-specs (words &optional tail)
@@ -668,6 +705,79 @@ appears in TEXT it is used verbatim so the booking joins the existing trip."
   "How a message asks about the time of a trip instead of asking for one:
 \"when is my ride home\", \"what time does the van leave\", \"when's the DGH
 back\", \"how late is the van out\".")
+
+(defparameter *self-contractions*
+  '(("i'm"   . "~a is")
+    ("i’m"   . "~a is")
+    ("i'd"   . "~a would")
+    ("i’d"   . "~a would")
+    ("i'll"  . "~a will")
+    ("i’ll"  . "~a will")
+    ("i've"  . "~a has")
+    ("i’ve"  . "~a has"))
+  "Contractions of \"I\" and the clause each becomes once the sender's
+initials are known, as a FORMAT control taking those initials.  Written out
+rather than left to the bare-\"I\" rule so the rewrite stays a sentence:
+\"I'd like a van\" becomes \"DMM would like a van\", not \"DMM'd like a van\",
+whose tokenizer output no longer looks like initials.  Both the ASCII
+apostrophe and the typographic one Slack's phone clients insert are listed.")
+
+(defparameter *self-words* '("me" "my" "myself" "i")
+  "First-person singular words that name the sender.  \"my\" is included for
+\"my ride to SHMS\": the parser reads the rewrite \"DMM ride to SHMS\" as a
+passenger and a destination, which is what the message meant.  Plurals
+\(\"us\", \"we\") are deliberately absent -- they name a group whose other
+members the message does not give, so resolving them to the sender alone
+would silently under-book the trip.")
+
+(defparameter *self-reference-scanner*
+  (cl-ppcre:create-scanner
+   (format nil "(?i)(?<![a-z'’])(?:~{~a~^|~})(?![a-z'’])"
+           (append (mapcar (lambda (c) (cl-ppcre:quote-meta-chars (car c)))
+                           *self-contractions*)
+                   *self-words*)))
+  "Matches any *SELF-CONTRACTIONS* key or *SELF-WORDS* word standing alone.
+The contractions are listed first so \"i'm\" wins over the bare \"i\" that
+also starts it.  The lookarounds keep \"me\" out of \"meet\" and \"home\",
+\"my\" out of \"myself\" (the following \"s\" fails the lookahead, so the
+longer word matches on its own), and bare \"i\" out of \"i'd\".")
+
+(defun self-reference-p (text)
+  "True when TEXT refers to its sender in the first person singular.
+SLACK-BOT calls this before resolving an identity, so a message that spells
+its passengers out costs no database read and no Slack API call."
+  (and (stringp text)
+       (cl-ppcre:scan *self-reference-scanner* text)
+       t))
+
+(defun resolve-self-reference (text initial)
+  "Return TEXT with every first-person singular reference to the sender
+replaced by INITIAL, so the ordinary parsers can read it knowing nothing
+about who is speaking:
+
+  \"book me a van to the dentist tomorrow 9 to 11\"
+  -> \"book DMM a van to the dentist tomorrow 9 to 11\"
+  \"I'd like a van for the pool sat 8-10\"
+  -> \"DMM would like a van for the pool sat 8-10\"
+
+The rewrite is textual, and happens before parsing rather than injecting a
+passenger afterwards, for two reasons: one code path serves both the rule
+parser and the model, and the rewritten sentence is what the reply's
+`Interpreted as:` line shows, so a wrong identity is visible in Slack rather
+than only on the sheet.  Grammar is not preserved -- \"my ride\" becomes
+\"DMM ride\" -- because PARSE-BOOKING reads initials positionally and does
+not inflect."
+  (if (or (not (stringp text)) (not (stringp initial)))
+      text
+      (cl-ppcre:regex-replace-all
+       *self-reference-scanner* text
+       (lambda (match)
+         (let ((expansion (cdr (assoc (string-downcase match) *self-contractions*
+                                      :test #'string=))))
+           (if expansion
+               (format nil expansion initial)
+               initial)))
+       :simple-calls t)))
 
 (defun schedule-question-range (text)
   "The `/view` range TEXT asks about, when TEXT is a question about a trip's

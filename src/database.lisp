@@ -41,6 +41,12 @@
    #:add-slack-subscription
    #:remove-slack-subscription
 
+   #:slack-identity
+   #:find-slack-identity
+   #:all-slack-identities
+   #:add-slack-identity
+   #:remove-slack-identity
+
    #:with-db-transaction
    #:open-or-make-graph
    #:bible-graph-path
@@ -48,7 +54,8 @@
    #:ensure-crud-views
    #:make-bible
    #:make-bible-metadata
-   #:make-slack-subscription)
+   #:make-slack-subscription
+   #:make-slack-identity)
   (:documentation
    "Project Isidore database setup and teardown.
 Manages two graph-db (Vivace Graph V3) stores:
@@ -163,7 +170,46 @@ has been a source of worker crashes during long imports."
   (graph-db:def-vertex slack-subscription ()
     ((user-id :accessor user-id-of :type string)
      (initial :accessor initial-of :type string))
+    :isidore-crud)
+
+  ;; Who a Slack account is, so "book me a van" can name them.  Deliberately
+  ;; a separate vertex from SLACK-SUBSCRIPTION: that one is the opt-in to
+  ;; reminder DMs, and /unsubscribe must not cost someone their identity.
+  (graph-db:def-vertex slack-identity ()
+    ((user-id :accessor user-id-of :type string)
+     (initial :accessor initial-of :type string))
     :isidore-crud))
+
+;;; graph-db cannot add a vertex type to a graph that already exists on disk,
+;;; and this is the repair.  SAVE-SCHEMA nulls the schema's CLASS-LOCKS table
+;;; before CL-STORE:STORE and restores it only in memory (graph-db schema.lisp
+;;; SAVE-SCHEMA), so schema.dat always records NIL; OPEN-GRAPH rebuilds
+;;; SCHEMA-LOCK afterwards but not CLASS-LOCKS (graph-db graph.lisp
+;;; OPEN-GRAPH).  A restored schema therefore carries CLASS-LOCKS = NIL, and
+;;; the first DEF-VERTEX of a type that is not already in schema.dat reaches
+;;; INSTANTIATE-NODE-TYPE's new-type branch, which does
+;;; (setf (gethash name (schema-class-locks ...)) (make-rw-lock)) and dies with
+;;; "The value NIL is not of type HASH-TABLE".  Existing types take the other
+;;; branch, which is why every load before SLACK-IDENTITY was added worked.
+;;;
+;;; UPDATE-SCHEMA is called from inside OPEN-GRAPH, so the table has to be back
+;;; in place before that call rather than after OPEN-OR-MAKE-GRAPH returns.
+;;; WITH-WRITE-LOCKED-CLASS and WITH-READ-LOCKED-CLASS are the only readers of
+;;; this table and graph-db never calls either, so an empty table is as good as
+;;; the original; the per-class locks are seeded anyway to match INIT-SCHEMA.
+
+(defmethod graph-db::update-schema :before ((graph graph-db::graph))
+  "Give a schema restored from disk back the CLASS-LOCKS hash-table that
+SAVE-SCHEMA dropped, so a newly defined vertex type can be added to a graph
+that already exists.  A no-op for a freshly made graph, whose INIT-SCHEMA
+already built the table."
+  (let ((schema (graph-db:schema graph)))
+    (when (and schema (not (hash-table-p (graph-db:schema-class-locks schema))))
+      (setf (graph-db:schema-class-locks schema)
+            (make-hash-table :test 'eql :synchronized t))
+      (dolist (parent '(graph-db::edge graph-db::vertex))
+        (setf (gethash parent (graph-db:schema-class-locks schema))
+              (graph-db:make-rw-lock))))))
 
 ;;; Now open the graphs — UPDATE-SCHEMA attaches the registered metadata.
 
@@ -207,13 +253,23 @@ against re-running when OPEN-GRAPH has already restored the view."
                (graph-db:yield uid nil)))))))))
 
 (defun ensure-crud-views (&optional (graph *database*))
-  "Install the SUBSCRIPTION-BY-USER-CI view on GRAPH if it does not already
-exist. Idempotent across reopens."
+  "Install the SUBSCRIPTION-BY-USER-CI and IDENTITY-BY-USER-CI views on GRAPH
+if they do not already exist. Idempotent across reopens."
   (unless (view-installed-p graph 'slack-subscription
                             'subscription-by-user-ci)
     (let ((graph-db:*graph* graph))
       (graph-db:def-view subscription-by-user-ci :lessp
         (slack-subscription :isidore-crud)
+        (:map
+         (lambda (s)
+           (let ((uid (graph-db:node-slot-value s :user-id)))
+             (when uid
+               (graph-db:yield (string-downcase uid) nil))))))))
+  (unless (view-installed-p graph 'slack-identity
+                            'identity-by-user-ci)
+    (let ((graph-db:*graph* graph))
+      (graph-db:def-view identity-by-user-ci :lessp
+        (slack-identity :isidore-crud)
         (:map
          (lambda (s)
            (let ((uid (graph-db:node-slot-value s :user-id)))
@@ -379,6 +435,58 @@ WITH-DB-TRANSACTION fails with VERTEX-TABLE (NIL) once a row exists."
   "Delete any slack subscription for USER-ID. Returns T if one was removed."
   (with-db-transaction (:context "remove-slack-subscription")
     (let ((obj (find-slack-subscription user-id)))
+      (when obj
+        (graph-db:mark-deleted obj)
+        t))))
+
+;;; Slack identity: the initials a Slack account goes by, so a message can say
+;;; "me" instead of spelling them out.  Kept apart from SLACK-SUBSCRIPTION on
+;;; purpose — that is the opt-in to reminder DMs, and /unsubscribe must not
+;;; cost someone the ability to write "book me a van".
+
+(defun find-slack-identity (user-id)
+  "Return the persistent SLACK-IDENTITY vertex for USER-ID, or NIL.
+Lookup is case-insensitive on USER-ID.  FIND-SLACK-SUBSCRIPTION documents
+why GRAPH-DB:*GRAPH* is bound and why the vertex is hydrated eagerly; the
+same reasoning applies here."
+  (let* ((graph-db:*graph* *database*)
+         (rows (graph-db:invoke-graph-view 'slack-identity
+                                           'identity-by-user-ci
+                                           :key (string-downcase user-id)
+                                           :graph *database*))
+         (id (cdr (assoc :id (first rows)))))
+    (when id
+      (let ((v (graph-db:lookup-vertex id :graph *database*)))
+        (graph-db::maybe-init-node-data v :graph *database*)
+        v))))
+
+(defun all-slack-identities ()
+  "Return an alist of (user-id . initial) for every registered identity."
+  (let ((acc '())
+        (graph-db:*graph* *database*))
+    (graph-db:map-vertices
+     (lambda (v)
+       (graph-db::maybe-init-node-data v :graph *database*)
+       (push (cons (user-id-of v) (initial-of v)) acc))
+     *database*
+     :vertex-type 'slack-identity)
+    (nreverse acc)))
+
+(defun add-slack-identity (user-id initial)
+  "Upsert the initials USER-ID goes by. Returns the persistent vertex."
+  (with-db-transaction (:context "add-slack-identity")
+    (let ((existing (find-slack-identity user-id)))
+      (if existing
+          (let ((c (graph-db:copy existing)))
+            (setf (initial-of c) initial)
+            (graph-db:save c)
+            c)
+          (make-slack-identity :user-id user-id :initial initial)))))
+
+(defun remove-slack-identity (user-id)
+  "Delete any registered identity for USER-ID. Returns T if one was removed."
+  (with-db-transaction (:context "remove-slack-identity")
+    (let ((obj (find-slack-identity user-id)))
       (when obj
         (graph-db:mark-deleted obj)
         t))))

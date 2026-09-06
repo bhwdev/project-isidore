@@ -56,6 +56,17 @@ a re-send report today.")
     ("Could someone put CG down for the airport on Monday? leave at 6, back by 9"
      :destination "airport" :day-contains "monday" :passengers ("CG")
      :dep-time "6:00 am" :ret-time "9:00 am" :missing nil)
+    ;; Three-letter initials, and a message from someone whose "me" SLACK-BOT
+    ;; has already rewritten to them before the model is asked.
+    ("dmm and cg want the van to the pool thurs 7-9pm"
+     :destination "pool" :day-contains "thursday" :passengers ("DMM" "CG")
+     :dep-time "7:00 pm" :ret-time "9:00 pm" :missing nil)
+    ("book FBM a van to the dentist tmrw, out half past 8, back 11ish"
+     :destination "dentist" :day-like "tomorrow" :passengers ("FBM")
+     :dep-time "8:30 am" :ret-time "11:00 am" :missing nil)
+    ("can DMM get a ride to the airport monday? leave at 6, back by 9"
+     :destination "airport" :day-contains "monday" :passengers ("DMM")
+     :dep-time "6:00 am" :ret-time "9:00 am" :missing nil)
     ("DM wants the Chevy Saturday morning for groceries, 10 till 11"
      :destination "groceries" :day-contains "saturday" :passengers ("DM") :vehicle :chevy
      :dep-time "10:00 am" :ret-time "11:00 am" :missing nil)

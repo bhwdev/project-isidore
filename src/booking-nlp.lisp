@@ -10,7 +10,7 @@
                 #:year-of #:month-of #:day-of)
   (:export
    ;; parsing
-   #:parse-booking
+   #:parse-booking #:schedule-question-range
    #:booking-request #:booking-request-p #:make-booking-request
    #:booking-request-text #:booking-request-doc
    #:booking-request-destination
@@ -26,7 +26,7 @@
    #:booking-incomplete-text #:booking-incomplete-preamble
    #:missing-piece-hint #:slot-label
    ;; formatting helpers shared with van-booking
-   #:format-time-12h #:format-booking-day #:*month-names*)
+   #:format-time-12h #:format-booking-day #:normalize-day-phrase #:*month-names*)
   (:documentation
    "Natural-language understanding for van booking requests.
 
@@ -199,7 +199,12 @@ are missing; its report is ready to post to Slack."))
         (:lower "the" :op "?") (:regex "^\\d{1,2}(?:st|nd|rd|th)?$")
         (:lower "of" :op "?") (:lower ,*month-words*))
        ((:lower ("next" "this" "last") :op "?") (:lower "week") (:regex ,weekday))
-       ((:lower ("next" "this" "last") :op "?") (:regex ,weekday) (:lower ,*day-parts* :op "?"))
+       ;; "this coming Tuesday", "the upcoming Tuesday": one span, so that
+       ;; "coming" is neither left over as a destination nor lost
+       ((:lower ("next" "this" "last") :op "?") (:lower ("coming" "upcoming") :op "?")
+        (:regex ,weekday) (:lower ,*day-parts* :op "?"))
+       ((:lower "the") (:lower ("coming" "upcoming")) (:regex ,weekday)
+        (:lower ,*day-parts* :op "?"))
        ((:regex ,weekday) (:lower "next") (:lower "week"))
        ((:lower ,*month-words*) (:lower "." :op "?") (:regex "^\\d{1,2}(?:st|nd|rd|th)?$"))
        ((:regex "^\\d{1,2}(?:st|nd|rd|th)?$") (:lower "of" :op "?") (:lower ,*month-words*))
@@ -451,12 +456,16 @@ Returns (values DEP-TIME RET-TIME DEP-PHRASE RET-PHRASE)."
 
 (defun normalize-day-phrase (text)
   "Rewrite a :DATE span's text into a form chronicity reads reliably:
-possessives, commas, periods and day parts dropped, weekday abbreviations
-expanded, slash dates spelled out, explicit month-day phrases anchored to the
-current year (the sheet only ever covers the current year), and a weekday
-dropped when it accompanies a month-day (\"Saturday September 12\" becomes
-\"September 12\": chronicity would otherwise take the weekday alone and answer
-the coming Saturday)."
+possessives, commas, periods, day parts and \"coming\"/\"upcoming\" dropped
+(with a \"the\" then left standing before a bare weekday: \"the coming
+Tuesday\" becomes \"Tuesday\"), weekday abbreviations expanded, slash dates
+spelled out, a day-first month-day turned round (\"22nd of April\" becomes
+\"April 22nd\", the only order chronicity reads), explicit month-day phrases
+anchored to the current year (the sheet only ever covers the current year),
+and a weekday dropped when it accompanies a month-day (\"Saturday September
+12\" becomes \"September 12\": chronicity would otherwise take the weekday
+alone and answer the coming Saturday).  VAN-BOOKING's PHRASE-DATE-RANGE puts `/view` ranges through this
+too, so a day means the same thing in a booking and in a view."
   (let* ((s (cl-ppcre:regex-replace-all "(?i)'s\\b" text ""))
          (words (cl-ppcre:split "\\s+" (string-trim " " s)))
          (words (remove "" (mapcar (lambda (w) (string-trim ".," w)) words)
@@ -466,9 +475,13 @@ the coming Saturday)."
                                              :test #'string=)))
                             (if abbr (cdr abbr) w)))
                         words))
-         (words (remove-if (lambda (w) (member (string-downcase w) *day-parts*
+         (words (remove-if (lambda (w) (member (string-downcase w)
+                                               (append *day-parts* '("coming" "upcoming"))
                                                :test #'string=))
                            words))
+         (words (if (and (rest words) (string-equal (first words) "the"))
+                    (rest words)
+                    words))
          (words (if (some #'month-number words)
                     (remove-if (lambda (w)
                                  (member (string-downcase w)
@@ -486,6 +499,11 @@ the coming Saturday)."
                                (cond ((null y) (current-year))
                                      ((= (length y) 2) (+ 2000 (parse-integer y)))
                                      (t y)))))))
+    ;; "22nd of April" -> "April 22nd": chronicity reads only the month-first order
+    (cl-ppcre:register-groups-bind (d m)
+        ("(?i)^(\\d{1,2}(?:st|nd|rd|th)?) of (\\S+)$" phrase)
+      (when (month-number m)
+        (setf phrase (format nil "~a ~a" m d))))
     ;; "Tuesday next week" -> "next week Tuesday"
     (cl-ppcre:register-groups-bind (wd) ("(?i)^(\\w+) next week$" phrase)
       (setf phrase (format nil "next week ~a" wd)))
@@ -644,3 +662,29 @@ appears in TEXT it is used verbatim so the booking joins the existing trip."
              :dep-phrase dep-phrase :ret-phrase ret-phrase
              :dep-time dep-time :ret-time ret-time
              :vehicle vehicle :missing missing :understood understood)))))))
+
+(defparameter *timing-question-regex*
+  "(?i)(?<![a-z])(?:when(?:'s|s)?|what\\s+time(?:'s|s)?|how\\s+(?:late|early|long))(?![a-z])"
+  "How a message asks about the time of a trip instead of asking for one:
+\"when is my ride home\", \"what time does the van leave\", \"when's the DGH
+back\", \"how late is the van out\".")
+
+(defun schedule-question-range (text)
+  "The `/view` range TEXT asks about, when TEXT is a question about a trip's
+timing rather than a request for one (*TIMING-QUESTION-REGEX*); NIL otherwise.
+
+  \"when is my ride home this coming Tuesday?\"  -> \"this coming Tuesday\"
+  \"what time does the van leave tomorrow?\"    -> \"tomorrow\"
+  \"when's the DGH back?\"                       -> \"today\"
+
+The day comes back in the message's own words -- the text of the :DATE span
+PARSE-BOOKING reads -- or as \"today\" when none is named, the default `/view`
+has.  A question that names passengers (\"when can BW and MM have the van for
+the dentist tomorrow?\") is a booking phrased as a question and gets NIL, as
+does one whose day chronicity cannot read."
+  (when (cl-ppcre:scan *timing-question-regex* text)
+    (let ((req (parse-booking text)))
+      (unless (booking-request-passengers req)
+        (if (ents-with-label (booking-request-doc req) :date)
+            (booking-request-day-phrase req)
+            "today")))))

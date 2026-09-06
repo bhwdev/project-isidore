@@ -1084,7 +1084,23 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
     (multiple-value-bind (s e) (vb::phrase-date-range "Saturday")
       (is = 20260425 (vb::date-key s))
       (is = 20260425 (vb::date-key e)))
+    ;; a day reads as it does in a booking (BOOKING-NLP:NORMALIZE-DAY-PHRASE):
+    ;; "coming" and "upcoming" are filler, a weekday beside a month-day is
+    ;; dropped rather than believed, a slash date means this year
+    (dolist (p '("this coming Tuesday" "the coming Tuesday" "upcoming Tuesday"
+                 "this upcoming Tues" "Tuesday April 28" "Tue, Apr 28th"))
+      (multiple-value-bind (s e) (vb::phrase-date-range p)
+        (is equal 20260428 (and s (vb::date-key s)) "start of ~s" p)
+        (is equal 20260428 (and e (vb::date-key e)) "end of ~s" p))
+      (true (vb:date-range-phrase-p p) "readable ~s" p))
+    (multiple-value-bind (s e) (vb::phrase-date-range "4/24")
+      (is = 20260424 (vb::date-key s))
+      (is = 20260424 (vb::date-key e)))
+    (multiple-value-bind (s e) (vb::phrase-date-range "the day after tomorrow")
+      (is = 20260424 (vb::date-key s))
+      (is = 20260424 (vb::date-key e)))
     (false (vb::phrase-date-range "gibberish nonsense"))
+    (false (vb:date-range-phrase-p "gibberish nonsense"))
     ;; the /help example: both weeks' sheets are read and the window is labelled
     (let ((sheets-read '()))
       (with-mocked-functions ((vb::read-range (lambda (range &key sheet-name)

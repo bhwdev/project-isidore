@@ -78,6 +78,10 @@ the rule parser and asserting the corpus expectations against it."))
     (false (find #\` prompt))
     ;; the examples are there, as message / JSON pairs
     (true (search "Message: what's on the van this week?" prompt))
+    ;; a question about a trip's timing is shown as a view of that day
+    (true (search "Message: when is my ride home this coming Tuesday?" prompt))
+    (true (search "\"range\":\"Tuesday\"" prompt))
+    (true (search "when a van or ride leaves or gets home" prompt))
     (true (search "\"range\":\"this week\"" prompt))
     (true (search "\"passengers\":[\"BW\",\"MM\"]" prompt)))
   ;; without sheet destinations the prompt ends with the date
@@ -396,7 +400,45 @@ rendered sentence, in the notation of BOOKING-NLP-TESTS::CHECK-REQUEST.")
                                            "who has the DGH tomorrow?")
                      :intent))
   (is eq :other (getf (llm:constrain-intent '(:intent :other) "thanks") :intent))
-  (false (llm:constrain-intent nil "x")))
+  (false (llm:constrain-intent nil "x"))
+  ;; a view's range must be in the message too, in some form
+  (true (llm:range-in-text-p "this week" "what's on this week?"))
+  (true (llm:range-in-text-p "the weekend" "is anything booked for the weekend?"))
+  (true (llm:range-in-text-p "the rest of the week" "show me the schedule for the rest of the week"))
+  (true (llm:range-in-text-p "Sept 19 to Sept 22" "schedule for Sept 19 to 22?"))
+  (true (llm:range-in-text-p "tomorrow" "what's on tmrw?"))
+  (true (llm:range-in-text-p "Tuesday" "anything tues?"))
+  (true (llm:range-in-text-p "today" "when's the DGH back?"))
+  (false (llm:range-in-text-p "this week" "when is my van home this tuesday"))
+  (false (llm:range-in-text-p "tomorrow" "how late is the van out on thursday?"))
+  (false (llm:range-in-text-p "Saturday" "when's the DGH back?"))
+  (false (llm:range-in-text-p nil "x"))
+  ;; a range the model did not read gives way to the day it did: "this week"
+  ;; for "this tuesday", "tomorrow" for "thursday", nothing at all
+  (is equal "Tuesday" (getf (llm:constrain-intent '(:intent :view :day "Tuesday" :range "this week")
+                                                  "when is my van home this tuesday")
+                            :range))
+  (is equal "Thursday" (getf (llm:constrain-intent '(:intent :view :day "Thursday" :range "tomorrow")
+                                                   "how late is the van out on thursday?")
+                             :range))
+  (is equal "Tuesday" (getf (llm:constrain-intent '(:intent :view :day "Tuesday" :range nil)
+                                                  "when is my ride home this coming tuesday")
+                            :range))
+  ;; a range that is in the message stays, whatever the day says
+  (is equal "this week" (getf (llm:constrain-intent '(:intent :view :day "Saturday" :range "this week")
+                                                    "what's on this week?")
+                              :range))
+  (is equal "today" (getf (llm:constrain-intent '(:intent :view :day "Saturday" :range "today")
+                                                "show me todays")
+                          :range))
+  ;; with no day to fall back on, or one the schedule cannot read by itself,
+  ;; the range is left as it is
+  (is equal "Saturday" (getf (llm:constrain-intent '(:intent :view :day nil :range "Saturday")
+                                                   "when's the DGH back?")
+                             :range))
+  (is equal "Sept 22" (getf (llm:constrain-intent '(:intent :view :day "22nd" :range "Sept 22")
+                                                  "anything on the 22nd?")
+                            :range)))
 
 (define-test render-intent
   :parent booking-llm-suite
@@ -408,6 +450,12 @@ rendered sentence, in the notation of BOOKING-NLP-TESTS::CHECK-REQUEST.")
       (llm:render-intent '(:intent :view :range "Sept 19 to Sept 22") "schedule Sept 19-22?")
     (is string= "/view" command)
     (is string= "Sept 19 to Sept 22" args))
+  ;; a day in the message's own words, as the schedule reads it
+  (multiple-value-bind (command args)
+      (llm:render-intent '(:intent :view :range "this coming Tuesday")
+                         "when is my ride home this coming Tuesday?")
+    (is string= "/view" command)
+    (is string= "this coming Tuesday" args))
   ;; an explicit /book never turns into a view
   (false (llm:render-intent '(:intent :view :range "this week") "x" :allow-view nil))
   ;; a range the schedule cannot read is dropped, as is a missing one

@@ -326,7 +326,15 @@ new parser's terms (no articles in destinations, no default day).")
      :dep-time "9:00 am" :ret-time "10:00 am" :missing nil)
     ("MM to the dentist on Saturday, September 12th leaving at 8:30 and back around 11"
      :destination "dentist" :day-md "September 12" :passengers ("MM")
-     :dep-time "8:30 am" :ret-time "11:00 am" :missing nil))
+     :dep-time "8:30 am" :ret-time "11:00 am" :missing nil)
+    ;; "this coming Tuesday" is one day phrase: "coming" is not a destination
+    ("MM to the dentist this coming Tuesday leaving at 8:30 and back around 11"
+     :destination "dentist" :day-contains "tuesday" :passengers ("MM")
+     :dep-time "8:30 am" :ret-time "11:00 am" :missing nil)
+    ;; a day-first month-day
+    ("MM to the pool on the 22nd of April, 9 am to noon"
+     :destination "pool" :day-md "April 22" :passengers ("MM")
+     :dep-time "9:00 am" :ret-time "12:00 pm" :missing nil))
   "Free-form sentences the regex parser could not handle.")
 
 (defparameter *booking-corpus* (append *legacy-corpus* *free-form-corpus*))
@@ -373,7 +381,11 @@ new parser's terms (no articles in destinations, no default day).")
   (is string= "April 22 2026" (bn::normalize-day-phrase "4/22/2026"))
   (is string= (format nil "April 11th ~d" (current-year)) (bn::normalize-day-phrase "April 11th"))
   (is string= (format nil "Apr 11 ~d" (current-year)) (bn::normalize-day-phrase "Apr. 11"))
-  (is string= (format nil "11th of April ~d" (current-year)) (bn::normalize-day-phrase "11th of April"))
+  ;; a day-first month-day is turned round: chronicity reads "April 11th",
+  ;; not "11th of April"
+  (is string= (format nil "April 11th ~d" (current-year)) (bn::normalize-day-phrase "11th of April"))
+  (is string= (format nil "April 22nd ~d" (current-year))
+      (bn::normalize-day-phrase "the 22nd of April"))
   (is string= "tomorrow" (bn::normalize-day-phrase "tomorrow morning"))
   (is string= "next week Tuesday" (bn::normalize-day-phrase "Tuesday next week"))
   (is string= "2026-09-08" (bn::normalize-day-phrase "2026-09-08"))
@@ -385,12 +397,50 @@ new parser's terms (no articles in destinations, no default day).")
       (bn::normalize-day-phrase "Saturday, September 12"))
   (is string= (format nil "Sep 12 ~d" (current-year))
       (bn::normalize-day-phrase "Sat Sep 12"))
-  (is string= (format nil "12th of September ~d" (current-year))
+  (is string= (format nil "September 12th ~d" (current-year))
       (bn::normalize-day-phrase "next Saturday the 12th of September"))
   (is string= "saturday" (bn::normalize-day-phrase "Sat"))
+  ;; "coming" and "upcoming" are filler, as is a "the" then left before the weekday
+  (is string= "this tuesday" (bn::normalize-day-phrase "this coming Tues"))
+  (is string= "Tuesday" (bn::normalize-day-phrase "the coming Tuesday"))
+  (is string= "Tuesday" (bn::normalize-day-phrase "upcoming Tuesday"))
+  (is string= "day after tomorrow" (bn::normalize-day-phrase "the day after tomorrow"))
   ;; month-day phrases resolve to the current year even when that date has passed
   (let ((req (bn:parse-booking "for pool for MM on January 2 at 8 am to 9 am")))
-    (is = (current-year) (chronicity:year-of (bn:booking-request-day-datetime req)))))
+    (is = (current-year) (chronicity:year-of (bn:booking-request-day-datetime req))))
+  ;; ... and a day-first one resolves at all
+  (let ((dt (bn:booking-request-day-datetime
+             (bn:parse-booking "MM to the pool on the 22nd of April, 9 am to noon"))))
+    (true dt)
+    (is = 4 (and dt (chronicity:month-of dt)))
+    (is = 22 (and dt (chronicity:day-of dt)))))
+
+(define-test schedule-questions
+  ;; a question about a trip's timing that names no passengers is a view of
+  ;; the day it names, in the message's own words, or of today
+  (is string= "this coming tuesday"
+      (bn:schedule-question-range "when is my ride home this coming tuesday"))
+  (is string= "this tuesday" (bn:schedule-question-range "when is my van home this tuesday"))
+  (is string= "monday" (bn:schedule-question-range "when is my van home on monday"))
+  (is string= "tomorrow" (bn:schedule-question-range "what time does the van leave tomorrow?"))
+  (is string= "thursday" (bn:schedule-question-range "How late is the van out on thursday?"))
+  (is string= "Saturday September 12"
+      (bn:schedule-question-range "what time is the SHMS trip back on Saturday September 12?"))
+  (is string= "today" (bn:schedule-question-range "when's the DGH back?"))
+  (is string= "today" (bn:schedule-question-range "What time's the van leaving"))
+  ;; passengers make it a booking phrased as a question
+  (false (bn:schedule-question-range "when can BW and MM have the van for the dentist tomorrow?"))
+  ;; no timing cue: not a question, or not one about timing
+  (false (bn:schedule-question-range "book a van for the pool tomorrow for MM"))
+  (false (bn:schedule-question-range "whenever works, book the van for the pool tomorrow"))
+  (false (bn:schedule-question-range "who has the DGH tomorrow?"))
+  (false (bn:schedule-question-range "what's on the van this week?"))
+  ;; "this coming Tuesday" is one date span, so "coming" is not left over
+  ;; as a destination, and it resolves to a Tuesday
+  (let ((req (bn:parse-booking "when is my ride home this coming tuesday")))
+    (false (bn:booking-request-destination req))
+    (is string= "this coming tuesday" (bn:booking-request-day-phrase req))
+    (true (search "Tuesday" (bn:booking-request-day req)))))
 
 (define-test time-roles
   (flet ((times (text)

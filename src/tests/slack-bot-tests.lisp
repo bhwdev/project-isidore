@@ -788,6 +788,72 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
       (true (search "Interpreted as: `/book BW to the pool tomorrow`" (first reply)))
       (true (search "No existing trip to pool" (second reply))))))
 
+(define-test timing-questions
+  :parent slack-bot-suite
+  ;; A question about a trip's timing that names no passengers is a /view of
+  ;; the day it names, decided by the rule parser alone: the model is not
+  ;; asked and nothing is booked.
+  (let ((booked '())
+        (asked 0)
+        (ranges '()))
+    (with-mocked-functions ((llm:llm-enabled-p (lambda () t))
+                            (llm:llm-normalize
+                             (lambda (&rest args) (declare (ignore args)) (incf asked) nil))
+                            (vb:book-natural
+                             (lambda (text &key week) (declare (ignore week))
+                               (push text booked)
+                               (error 'bn:booking-incomplete
+                                      :missing '(:destination :passengers) :text text)))
+                            (vb:view-schedule
+                             (lambda (&optional range)
+                               (push range ranges)
+                               (format t "TABLE for ~a" range)
+                               "ignored")))
+      (let ((reply (sb::run-request "when is my ride home this coming tuesday")))
+        (true (listp reply))
+        (is = 2 (length reply))
+        (true (search "Interpreted as: `/view this coming tuesday`" (first reply)))
+        (is string= "TABLE for this coming tuesday" (second reply)))
+      (is equal '("this coming tuesday") ranges)
+      (setf ranges '())
+      (sb::run-request "when is my van home this tuesday")
+      (is equal '("this tuesday") ranges)
+      ;; no day named: today, as with a bare /view
+      (setf ranges '())
+      (sb::run-request "what time does the van leave?")
+      (is equal '("today") ranges)
+      (is = 0 asked)
+      (is equal '() booked)
+      ;; passengers make it a booking phrased as a question: the ordinary path
+      (let ((reply (sb::run-request "when can BW and MM have the van for the dentist tomorrow?")))
+        (true (stringp reply))
+        (true (search "Please re-send" reply)))
+      (is equal '("when can BW and MM have the van for the dentist tomorrow?") booked)
+      ;; an explicit /book never turns into a view
+      (setf ranges '() booked '())
+      (let ((reply (sb::cmd-book (make-params "text" "when is my ride home tuesday"))))
+        (true (stringp reply))
+        (true (search "Please re-send" reply)))
+      (is equal '() ranges)
+      (is equal '("when is my ride home tuesday") booked)
+      ;; /view itself takes the question, a plain range as before, and passes
+      ;; anything else through for VIEW-SCHEDULE to reject
+      (setf ranges '())
+      (sb::cmd-view (make-params "text" "when is my ride home tuesday"))
+      (sb::cmd-view (make-params "text" "tomorrow"))
+      (sb::cmd-view (make-params "text" "xyzzy"))
+      (is equal '("xyzzy" "tomorrow" "tuesday") ranges)
+      ;; through a message event: the interpretation is posted, then the table
+      (let ((posted '()))
+        (with-mocked-functions ((sb::post-slack-message
+                                 (lambda (channel text) (declare (ignore channel)) (push text posted))))
+          (bt:join-thread (sb::handle-message-event
+                           (message-event "text" "when is my van home on monday" "channel" "C1")))
+          (is = 2 (length posted))
+          (true (search "Interpreted as: `/view monday`" (second posted)))
+          (is string= "TABLE for monday" (first posted))))))
+  (true (search "when is my ride home" sb::+help-text+)))
+
 (define-test parse-slash-text
   :parent slack-bot-suite
   (multiple-value-bind (cmd args) (sb::parse-slash-text "/view")

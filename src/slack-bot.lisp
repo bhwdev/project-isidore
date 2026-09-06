@@ -15,7 +15,8 @@
   (:import-from #:quri)
   (:import-from #:project-isidore/booking-nlp
                 #:booking-incomplete
-                #:booking-incomplete-missing)
+                #:booking-incomplete-missing
+                #:schedule-question-range)
   (:import-from #:project-isidore/booking-llm
                 #:load-llm-config
                 #:warm-up-llm
@@ -25,6 +26,7 @@
   (:import-from #:project-isidore/van-booking
                 #:book-natural
                 #:view-schedule
+                #:date-range-phrase-p
                 #:fetch-all-trips
                 #:known-destinations
                 #:remind-driver
@@ -56,7 +58,10 @@ Provides a Lack middleware that serves two endpoints:
 Booking requests are free-form English (see project-isidore/booking-nlp).
 When a required piece is missing, the BOOKING-INCOMPLETE report is posted
 back: it lists what was understood and asks the user to re-send the request
-with the missing piece.
+with the missing piece.  A question about a trip's timing that names no
+passengers (\"when is my ride home this coming Tuesday?\") is not a booking
+at all: it is answered as `/view` of that day, by the rule parser, before
+anything else is tried.
 
 When the rule parser cannot find the destination, day or passengers, and a
 local model server is configured (VAN_LLM_URL, see
@@ -165,6 +170,7 @@ If something is missing, I reply with what I understood and ask you to re-send t
 
 *To see the schedule*, type `/view` for today, or add a day or a range:
   `/view tomorrow`   `/view the rest of the week`   `/view the weekend`   `/view Apr 20 to Apr 26`   `/view Sept 19-22`
+Or just ask about a trip's timing — `when is my ride home this coming Tuesday?`, `what time does the van leave tomorrow?` — and I show that day.
 
 *Reminders*: type `/subscribe` and your initials, e.g. `/subscribe BW`, and I'll message you 5 minutes before each trip you are driving. `/unsubscribe` turns them off.
 
@@ -283,33 +289,60 @@ turning into a view."
         (render-intent intent text :known-destinations known :allow-view allow-view)))))
 
 (defun interpretation-line (command args)
-  "The message posted before a model-read request is run, so the user sees
+  "The message posted before a request that was read as COMMAND ARGS -- by
+SCHEDULE-QUESTION-INTERPRETATION or by the model -- is run, so the user sees
 how it was understood and can correct it."
   (format nil "Interpreted as: `~a ~a` — if that is wrong, re-send with the details spelled out (`/help` shows how)."
           command args))
 
+(defun run-interpretation (command args)
+  "The reply for a request that was read as COMMAND ARGS rather than run
+verbatim: the interpretation line, then what the ordinary handler says about
+ARGS -- CMD-VIEW for `/view`, RUN-BOOKING for `/book`, so a rewritten booking
+that is still incomplete gets the report and nothing further is tried."
+  (cons (interpretation-line command args)
+        (if (string= command "/view")
+            (ensure-list (cmd-view (plist-hash-table (list "text" args) :test #'equal)))
+            (list (run-booking args)))))
+
+(defun schedule-question-interpretation (text)
+  "(values \"/view\" range) when TEXT asks about a trip's timing rather than
+for a trip -- \"when is my ride home this coming Tuesday?\", \"what time does
+the van leave tomorrow?\" -- and names no passengers (see
+BOOKING-NLP:SCHEDULE-QUESTION-RANGE); NIL otherwise, or when the schedule
+cannot read the day it names, in which case the message is treated as a
+booking like any other."
+  (let ((range (schedule-question-range text)))
+    (when (and range (date-range-phrase-p range))
+      (values "/view" range))))
+
 (defun run-request (text &key (allow-view t))
-  "Run TEXT as a booking, with the model as a fallback reader.  The rule
-parser goes first (BOOK-NATURAL); when it cannot find the destination, day or
-passengers and a model is configured, LLM-INTERPRETATION rewrites TEXT as a
-`/book` sentence or, when ALLOW-VIEW, a `/view` range, and the reply is a
-list: the interpretation line, then what the ordinary handler said about the
-rewritten request.  Otherwise the reply is the BOOKING-INCOMPLETE report,
-exactly as RUN-BOOKING gives it.  A rewritten booking goes through
-RUN-BOOKING, so a sentence that is still incomplete gets the report and never
-a second consultation.  Other errors propagate to the caller."
-  (handler-case (book-natural-reply text)
-    (booking-incomplete (c)
-      (or (when (first-pass-incomplete-p c)
-            (multiple-value-bind (command args)
-                (llm-interpretation text :allow-view allow-view)
-              (when command
-                (cons (interpretation-line command args)
-                      (if (string= command "/view")
-                          (ensure-list (cmd-view (plist-hash-table (list "text" args)
-                                                                   :test #'equal)))
-                          (list (run-booking args)))))))
-          (princ-to-string c)))))
+  "Run TEXT as a request.  When ALLOW-VIEW, a question about a trip's timing
+that names no passengers (\"when is my ride home this coming Tuesday?\", see
+SCHEDULE-QUESTION-INTERPRETATION) is answered as a `/view` of that day, with
+no model involved.  Anything else is a booking, with the model as a fallback
+reader: the rule parser goes first (BOOK-NATURAL); when it cannot find the
+destination, day or passengers and a model is configured, LLM-INTERPRETATION
+rewrites TEXT as a `/book` sentence or, when ALLOW-VIEW, a `/view` range.
+Either way a request that was read rather than run verbatim gets a list as
+its reply: the interpretation line, then what the ordinary handler said
+about the reading (RUN-INTERPRETATION).  Otherwise the reply is the
+BOOKING-INCOMPLETE report, exactly as RUN-BOOKING gives it.  A rewritten
+booking goes through RUN-BOOKING, so a sentence that is still incomplete
+gets the report and never a second consultation.  Other errors propagate to
+the caller."
+  (multiple-value-bind (command args)
+      (and allow-view (schedule-question-interpretation text))
+    (if command
+        (run-interpretation command args)
+        (handler-case (book-natural-reply text)
+          (booking-incomplete (c)
+            (or (when (first-pass-incomplete-p c)
+                  (multiple-value-bind (command args)
+                      (llm-interpretation text :allow-view allow-view)
+                    (when command
+                      (run-interpretation command args))))
+                (princ-to-string c)))))))
 
 (defun post-command-reply (reply-to reply)
   "Post a command handler's REPLY to REPLY-TO.
@@ -350,12 +383,14 @@ request for usage docs. Text that begins with a slash command (`/view`,
 `/book ...`) runs that command's handler rather than the booking parser —
 Slack expands its own slash commands into a /slack/commands POST, but a
 client that does not (a bridged room, an uninstalled command) delivers the
-line here as ordinary text. Anything else is a booking request (see
-RUN-REQUEST): a BOOKING-INCOMPLETE condition is posted as-is (it asks the
-user to re-send the request with the missing pieces), unless a model is
-configured and can read the message, in which case its reading is posted
-and then run; any other failure is reported with
-the condition class as an error code and a pointer to `/help`. Returns the
+line here as ordinary text. Anything else goes to RUN-REQUEST: a question
+about a trip's timing that names no passengers (\"when is my ride home
+Tuesday?\") is shown as a `/view` of that day; the rest is a booking, whose
+BOOKING-INCOMPLETE condition is posted as-is (it asks the user to re-send
+the request with the missing pieces), unless a model is configured and can
+read the message, in which case its reading is posted and then run; any
+other failure is reported with the condition class as an error code and a
+pointer to `/help`. Returns the
 worker thread, or NIL when the event was answered synchronously or ignored."
   (let ((text (gethash "text" event))
         (channel (gethash "channel" event))
@@ -531,11 +566,16 @@ Examples:
   /view this week and next week
   /view the weekend
   /view Apr 20 to Apr 26
-  /view Sept 19-22"
-  (let* ((text (gethash "text" params))
-         (range (if (or (null text) (zerop (length (string-trim '(#\Space) text))))
-                    "today"
-                    (string-trim '(#\Space) text))))
+  /view Sept 19-22
+  /view when is my ride home Tuesday?
+A question about a trip's timing shows the day it asks about."
+  (let* ((text (string-trim '(#\Space) (or (gethash "text" params) "")))
+         (range (cond ((zerop (length text)) "today")
+                      ((date-range-phrase-p text) text)
+                      ;; "/view when is my ride home Tuesday?": the day the
+                      ;; question asks about (SCHEDULE-QUESTION-RANGE)
+                      ((schedule-question-range text))
+                      (t text))))
     (handler-case
         (let ((out (with-output-to-string (*standard-output*)
                      (view-schedule range))))

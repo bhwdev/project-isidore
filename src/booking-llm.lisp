@@ -21,7 +21,7 @@
    ;; request and reply
    #:intent-schema #:system-prompt #:llm-request-body #:parse-llm-response
    #:vehicle-in-text-p #:time-in-text-p #:day-in-text-p #:destination-in-text
-   #:word-in-text-p #:constrain-intent #:llm-normalize
+   #:range-in-text-p #:word-in-text-p #:constrain-intent #:llm-normalize
    ;; rendering and validation
    #:sanitize-field #:initial-in-text-p
    #:render-book-request #:render-view-range
@@ -164,26 +164,32 @@ pattern, maxLength, maxItems, additionalProperties false)."
          (intent-json :intent "view" :range "tomorrow"))
    (cons "what's happening on Saturday?"
          (intent-json :intent "view" :range "Saturday"))
+   (cons "when is my ride home this coming Tuesday?"
+         (intent-json :intent "view" :range "Tuesday"))
+   (cons "what time does the van leave tomorrow?"
+         (intent-json :intent "view" :range "tomorrow"))
    (cons "is anything booked Sept 19 to 22?"
          (intent-json :intent "view" :range "Sept 19 to Sept 22"))
    (cons "thanks!"
          (intent-json :intent "other" :unclear "Not a booking or a schedule question.")))
   "Message / JSON pairs shown to the model.  The bookings are corpus
 sentences from booking-nlp-tests, so the model's reading matches the rule
-parser's; the questions cover the view ranges the schedule understands.")
+parser's; the questions cover the view ranges the schedule understands, and
+the timing questions (\"when is my ride home ...\") that are a view of one
+day.")
 
 (defparameter *prompt-prefix*
   (format nil "~{~a~%~}"
           '("You turn one Slack message about the house vans into a JSON object with exactly these keys: intent, destination, day, passengers, dep_time, ret_time, vehicle, range, unclear. Every value must come from the message; never invent anything. Use null for anything the message does not say."
             ""
-            "- intent: \"book\" when the message wants to book or reserve a van, or add people to a trip; \"view\" when it asks what is booked, who has a van, or to see the schedule; \"other\" for anything else (thanks, chit-chat, questions about you). A message that names passengers (initials) and a destination is a booking even when it is phrased as a question."
+            "- intent: \"book\" when the message wants to book or reserve a van, or add people to a trip; \"view\" when it asks what is booked, who has a van, or to see the schedule; \"other\" for anything else (thanks, chit-chat, questions about you). A message that names passengers (initials) and a destination is a booking even when it is phrased as a question. A question about when a van or ride leaves or gets home (\"when is my ride home Tuesday?\", \"what time does the van leave tomorrow?\") is \"view\" for that day."
             "- destination: where the trip goes, in the message's own words, without a leading \"the\" or a trailing \"trip\" (\"dentist\", \"SHMS\", \"Saint Marys church\"). null unless intent is \"book\"."
             "- day: the day as the message gives it, with shorthand spelled out (\"tmrw\" -> \"tomorrow\", \"thurs\" -> \"Thursday\", \"Sept 12\" stays \"Sept 12\", \"4/22\" stays \"4/22\"); null if not given."
             "- passengers: the 2-3 letter initials in the message, uppercased, in the order written (driver first), e.g. [\"BW\",\"MM\"]. Only initials that appear in the message; [] if none."
             "- dep_time: the departure time as \"H:MM am\" or \"H:MM pm\" (\"8:30 am\"); null if not given. A bare hour is daytime: 7 to 11 are am, 12 to 6 are pm (8 -> \"8:00 am\", 2 -> \"2:00 pm\", 5 -> \"5:00 pm\"), \"half past 8\" -> \"8:30 am\", noon -> \"12:00 pm\"."
             "- ret_time: the return time in the same format (\"back by 5\" -> \"5:00 pm\"); null if not given."
             "- vehicle: \"dgh\", \"lgh\", \"chevy\" or \"personal\" only when the message itself says DGH, LGH, Chevy or personal car. \"the van\" or \"a van\" is not a vehicle choice: use null."
-            "- range: only when intent is \"view\": the period asked about, in these words: \"today\", \"tomorrow\", \"this week\", \"next week\", \"the weekend\", \"the rest of the week\", a day such as \"Saturday\" or \"Sept 12\", or \"Sept 19 to Sept 22\". \"today\" when no period is given. Keep \"today\" and \"tomorrow\" as words; never replace them with the weekday's name. null unless intent is \"view\"."
+            "- range: only when intent is \"view\": the period asked about, in these words: \"today\", \"tomorrow\", \"this week\", \"next week\", \"the weekend\", \"the rest of the week\", a day such as \"Saturday\" or \"Sept 12\", or \"Sept 19 to Sept 22\". \"today\" when no period is given. Keep \"today\" and \"tomorrow\" as words; never replace them with the weekday's name. A message that names one day (\"this Tuesday\", \"on Thursday\") means that day, not its week: \"Tuesday\", \"Thursday\". null unless intent is \"view\"."
             "- unclear: one short sentence about what could not be determined; else null."
             ""
             "Examples:"))
@@ -366,6 +372,44 @@ message says may reach the sheet."
           (cl-ppcre:scan (format nil "(?i)(?<![a-z])~a(?![a-z])" word) text))
         (cdr (assoc vehicle *vehicle-words*))))
 
+(defparameter *range-filler*
+  '("the" "this" "next" "last" "of" "to" "on" "rest" "coming" "upcoming" "whole" "all")
+  "Words of a `/view` range that need no ground in the message.")
+
+(defun range-in-text-p (range text)
+  "True when every word of RANGE that carries meaning (not one of
+*RANGE-FILLER*) has some ground in TEXT, so that a range the model took from
+its examples or its vocabulary rather than from the message -- \"this week\"
+for \"when is my van home this tuesday\", \"tomorrow\" for \"how late is the
+van out on thursday?\" -- can be told from one it read.  \"today\" needs no
+ground (it is the range's default), \"tomorrow\" is found in its usual
+shorthand, a number as a whole number, and any other word by its first three
+letters, so \"Tuesday\" is grounded by \"tues\", \"September\" by \"Sept\" and
+\"week\" by \"weekend\".  Loose on purpose, like TIME-IN-TEXT-P."
+  (flet ((grounded-p (word)
+           (let ((w (string-downcase word)))
+             (cond ((string= w "today") t)
+                   ((string= w "tomorrow")
+                    (and (cl-ppcre:scan "(?i)(?<![a-z])(?:tomorrow|tmrw|tmr|tmw|2moro|tomorow)(?![a-z])"
+                                        text)
+                         t))
+                   ((and (plusp (length w)) (digit-char-p (char w 0)))
+                    (and (cl-ppcre:scan (format nil "(?<![0-9])~a(?![0-9])"
+                                                (subseq w 0 (or (position-if-not #'digit-char-p w)
+                                                                (length w))))
+                                        text)
+                         t))
+                   ((>= (length w) 3)
+                    (and (cl-ppcre:scan (format nil "(?i)(?<![a-z])~a"
+                                                (cl-ppcre:quote-meta-chars (subseq w 0 3)))
+                                        text)
+                         t))
+                   (t (word-in-text-p w text))))))
+    (and (stringp range)
+         (every #'grounded-p
+                (remove-if (lambda (w) (member w *range-filler* :test #'string-equal))
+                           (cl-ppcre:split "\\s+" (string-trim " " range)))))))
+
 (defun constrain-intent (intent text)
   "INTENT with everything the model cannot have read in TEXT taken out, so
 that only what the message says can reach the sheet:
@@ -379,7 +423,11 @@ that only what the message says can reach the sheet:
   - the day is dropped unless the message names one somehow
     (DAY-IN-TEXT-P), so the request comes back as incomplete;
   - the destination keeps only the words the message contains
-    (DESTINATION-IN-TEXT).
+    (DESTINATION-IN-TEXT);
+  - a view's range with no ground in the message (RANGE-IN-TEXT-P: \"this
+    week\" for \"when is my van home this tuesday\") gives way to the day the
+    model read, when that day is in the message and the schedule can read it
+    (DATE-RANGE-PHRASE-P); with no such day the range stands as it is.
 
 A \"view\" that, after this, still names a destination, passengers or a time
 is a booking phrased as a question (\"is the LGH free tomorrow 2-4 for BW to
@@ -399,6 +447,13 @@ in TEXT makes VALIDATE-BOOK-INTENT reject the whole request."
         (setf (getf intent :day) nil))
       (setf (getf intent :destination)
             (destination-in-text (getf intent :destination) text))
+      (let ((day (getf intent :day)))
+        (when (and (eq (getf intent :intent) :view)
+                   day
+                   (not (range-in-text-p (getf intent :range) text))
+                   (range-in-text-p day text)
+                   (date-range-phrase-p day))
+          (setf (getf intent :range) day)))
       (when (and (eq (getf intent :intent) :view)
                  (or (getf intent :destination) (getf intent :passengers)
                      (getf intent :dep-time) (getf intent :ret-time)))

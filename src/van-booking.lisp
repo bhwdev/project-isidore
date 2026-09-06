@@ -19,7 +19,8 @@
                 #:booking-request-ret-time #:booking-request-vehicle
                 #:booking-request-missing #:booking-request-understood
                 #:booking-incomplete
-                #:format-time-12h #:format-booking-day #:*month-names*)
+                #:format-time-12h #:format-booking-day #:normalize-day-phrase
+                #:*month-names*)
   (:export
    ;; struct
    #:trip #:make-trip #:copy-trip #:trip-p
@@ -721,23 +722,20 @@ first and last day it covers.  \"today\", \"tomorrow\", \"Apr 20\" and
 \"Saturday\" cover one day; \"this week\", \"the whole week\", \"next week\"
 and the like cover the sheet's Monday-to-Sunday week, \"the rest of the week\"
 today to Sunday and \"the weekend\" Saturday to Sunday (see WEEK-PHRASE-RANGE,
-which takes precedence over chronicity).  A month-day without a year
-(\"Apr 20\", \"20th of April\") means this year's date, since the sheet only
-ever covers the current year, not the next occurrence chronicity's :FUTURE
-context would pick once the day has passed.  Returns NIL when chronicity
-cannot read PHRASE."
+which takes precedence over chronicity).  Anything else goes through the
+booking parser's NORMALIZE-DAY-PHRASE first, so a day reads here exactly as
+it does in a booking: \"this coming Tuesday\" and \"the upcoming Tuesday\"
+are that Tuesday, \"Tuesday September 8\" is September 8 (chronicity alone
+would answer the coming Tuesday), \"4/22\" is April 22, and a month-day
+without a year (\"Apr 20\", \"20th of April\") is this year's date, since the
+sheet only ever covers the current year, not the next occurrence chronicity's
+:FUTURE context would pick once the day has passed.  Returns NIL when
+chronicity cannot read PHRASE."
   (multiple-value-bind (monday sunday) (week-phrase-range phrase)
     (if monday
         (values monday sunday)
-        (let* ((month *month-regex*)
-               (day *day-regex*)
-               (anchored
-                 (if (and (not (cl-ppcre:scan "\\d{4}" phrase))
-                          (or (cl-ppcre:scan (format nil "(?i)\\b~a\\s+~a\\b" month day) phrase)
-                              (cl-ppcre:scan (format nil "(?i)\\b~a\\s+(?:of\\s+)?~a" day month) phrase)))
-                     (format nil "~a ~d" phrase (year-of (chronicity:parse "today")))
-                     phrase))
-               (span (chronicity:parse anchored :context :future :guess nil)))
+        (let ((span (chronicity:parse (normalize-day-phrase phrase)
+                                      :context :future :guess nil)))
           (when span
             (let* ((start (chronicity:span-start span))
                    ;; a span ends at the following midnight, so step back

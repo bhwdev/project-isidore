@@ -156,8 +156,17 @@ WantedBy=multi-user.target")
   (apt:installed "caddy")
   (systemd:enabled "caddy")
   (systemd:started "caddy")
-  ;; Caddy listens on port 2019 for incremental API configuration.
-  ;; We do this as Matrix Synapse is also using Caddy.
+  ;; This form OWNS /etc/caddy/Caddyfile: FILE:HAS-CONTENT rewrites the whole
+  ;; file on every deploy, so a site block added by hand on the server is gone
+  ;; at the next push (that took vdb.bhw.name down on 2026-09-06).  Every site
+  ;; this host's Caddy fronts is declared here: the Matrix homeserver
+  ;; (tuwunel, 8008/8448) and the public VolunteerDB demo, whose own deploy
+  ;; runs with [proxy] caddy = false for exactly this reason (volunteerdb
+  ;; repo, deploy/sites/bhwdemo.toml).  The vdb block adds what that app
+  ;; never emits itself: compression, the security headers, a deny-all
+  ;; robots.txt and a request-body cap; the app listens on 127.0.0.1:8100.
+  ;; Certificates come from Let's Encrypt over TLS-ALPN-01 on 443, so a new
+  ;; name needs no firewall change (80 stays closed).
   (file:has-content
    "/etc/caddy/Caddyfile"
    "
@@ -166,6 +175,23 @@ www.bhw.name {
 }
 matrix.bhw.name, matrix.bhw.name:8448 {
     reverse_proxy localhost:8008
+}
+vdb.bhw.name {
+    encode zstd gzip
+    request_body {
+        max_size 12MB
+    }
+    header {
+        Strict-Transport-Security \"max-age=31536000; includeSubDomains\"
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+        X-Frame-Options DENY
+        X-Robots-Tag noindex
+        -Server
+    }
+    respond /robots.txt \"User-agent: *
+Disallow: /\" 200
+    reverse_proxy 127.0.0.1:8100
 }")
   (systemd:restarted "caddy")
   (reboot:at-end))

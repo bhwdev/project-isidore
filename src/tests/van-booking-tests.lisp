@@ -407,6 +407,9 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
 ;;; --- Unit tests: add-passengers deduplication ---
 
 (define-test add-passengers-dedup
+    ;; The writer itself, called directly: ADD-PASSENGERS re-reads the sheet
+    ;; and refuses conflicts before delegating here, and that is covered by
+    ;; CONFLICT-TESTS.
     (define-test skips-dep-duplicates
         ;; MM and DM already in dep; CG is new → only CG written to dep
         (let ((original (symbol-function 'vb::write-range))
@@ -422,7 +425,7 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
                                         :dep-passengers '("MM" "DM") :ret-passengers '()
                                         :block-start-row 3 :dep-col 5 :ret-col 6
                                         :sheet-name "test")))
-                   (vb::add-passengers trip '("MM" "DM" "CG"))
+                   (vb::write-passengers trip '("MM" "DM" "CG"))
                    (is equal '("CG") dep-written)))
             (setf (symbol-function 'vb::write-range) original))))
 
@@ -441,7 +444,7 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
                                       :dep-passengers '() :ret-passengers '("MM")
                                       :block-start-row 3 :dep-col 5 :ret-col 6
                                       :sheet-name "test")))
-                 (vb::add-passengers trip '("MM" "CG"))
+                 (vb::write-passengers trip '("MM" "CG"))
                  (is equal '("CG") ret-written)))
           (setf (symbol-function 'vb::write-range) original))))
 
@@ -459,7 +462,7 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
                                       :dep-passengers '("MM") :ret-passengers '("MM")
                                       :block-start-row 3 :dep-col 5 :ret-col 6
                                       :sheet-name "test")))
-                 (vb::add-passengers trip '("MM"))
+                 (vb::write-passengers trip '("MM"))
                  (is = 0 write-count)))
           (setf (symbol-function 'vb::write-range) original))))
 
@@ -478,7 +481,7 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
                                       :dep-passengers '("MM") :ret-passengers '()
                                       :block-start-row 3 :dep-col 5 :ret-col 6
                                       :sheet-name "test")))
-                 (vb::add-passengers trip '("mm" "CG"))
+                 (vb::write-passengers trip '("mm" "CG"))
                  (is equal '("CG") dep-written)))
           (setf (symbol-function 'vb::write-range) original))))
 
@@ -494,7 +497,7 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
                                        :dep-passengers '() :ret-passengers '()
                                        :block-start-row 3 :dep-col 5 :ret-col 6
                                        :sheet-name "test"))
-                      (result (vb::add-passengers trip '("MM"))))
+                      (result (vb::write-passengers trip '("MM"))))
                  (is eq trip result)))
           (setf (symbol-function 'vb::write-range) original)))))
 
@@ -1191,17 +1194,34 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
   (make-test-sheet
    (make-block "Thursday April 9           Thursday April 9" '() '() '())))
 
-(defun call-recording-writes (thunk)
-  "Run THUNK with WRITE-RANGE mocked and *STANDARD-OUTPUT* captured.
-Returns (values OUTPUT WRITES); WRITES is a list of (range values sheet-name)
-in call order."
-  (let ((writes '()))
+(defun full-day-sheet ()
+  "A one-block sheet for \"Thursday April 9\" with every auto-assignable
+vehicle booked from 8 to 9."
+  (make-test-sheet
+   (make-block "Thursday April 9           Thursday April 9"
+               '(:dgh "A" :lgh "B" :chevy "C")
+               '(:dgh ("8 am" "9 am") :lgh ("8 am" "9 am") :chevy ("8 am" "9 am"))
+               '(:dgh (("MM") ("MM")) :lgh (("DM") ("DM")) :chevy (("CG") ("CG"))))))
+
+(defun call-recording-writes (thunk &key sheet)
+  "Run THUNK with WRITE-RANGE and READ-RANGE mocked and *STANDARD-OUTPUT*
+captured.  Returns (values OUTPUT WRITES READS); WRITES is a list of (range
+values sheet-name) in call order and READS the sheet names READ-RANGE was
+asked for.  SHEET is the row list every read answers with, and every test that
+writes needs one: the sheet being written is re-read immediately beforehand
+(VB::REFRESH-TRIP), so leaving it out would reach the network."
+  (let ((writes '()) (reads '()))
     (let ((out (with-output-to-string (*standard-output*)
                  (with-mocked-functions ((vb::write-range
                                           (lambda (range values &key sheet-name)
-                                            (push (list range values sheet-name) writes))))
+                                            (push (list range values sheet-name) writes)))
+                                         (vb::read-range
+                                          (lambda (range &key sheet-name)
+                                            (declare (ignore range))
+                                            (push sheet-name reads)
+                                            sheet)))
                    (funcall thunk)))))
-      (values out (nreverse writes)))))
+      (values out (nreverse writes) (nreverse reads)))))
 
 (define-test book-tests
   ;; Fixtures (see SHEET-WITH-SHMS / EMPTY-SHEET): one block for
@@ -1211,37 +1231,38 @@ in call order."
     (let ((trips (vb::parse-schedule (sheet-with-shms) :sheet-name "test-sheet")))
       (multiple-value-bind (out writes)
           (call-recording-writes
-           (lambda () (vb:book "Thursday April 9" "SHMS" '("GG") :trips trips)))
+           (lambda () (vb:book "Thursday April 9" "SHMS" '("GG") :trips trips))
+           :sheet (sheet-with-shms))
         (true (search "Found 1 existing trip" out))
         ;; MM already occupies row 7, so GG goes to row 8 in both columns
         (is equal '(("F8:F8" (("GG")) "test-sheet")
                     ("G8:G8" (("GG")) "test-sheet"))
             writes))))
 
-  (define-test trips-argument-skips-the-sheet-read
-    (let ((trips (vb::parse-schedule (sheet-with-shms) :sheet-name "test-sheet"))
-          (read-called nil))
-      (with-mocked-functions ((vb::read-range (lambda (range &key sheet-name)
-                                                (declare (ignore range sheet-name))
-                                                (setf read-called t)
-                                                nil)))
-        (call-recording-writes
-         (lambda () (vb:book "Thursday April 9" "SHMS" '("GG") :trips trips)))
-        (false read-called))))
+  (define-test trips-argument-skips-the-initial-read
+    ;; :TRIPS skips FETCH-ALL-TRIPS, which would read every week sheet.  The
+    ;; one sheet being written is still read once, immediately before the
+    ;; write, so a snapshot taken minutes ago cannot decide where the
+    ;; passengers land (VB::REFRESH-TRIP).
+    (let ((trips (vb::parse-schedule (sheet-with-shms) :sheet-name "test-sheet")))
+      (multiple-value-bind (out writes reads)
+          (call-recording-writes
+           (lambda () (vb:book "Thursday April 9" "SHMS" '("GG") :trips trips))
+           :sheet (sheet-with-shms))
+        (declare (ignore out))
+        (is equal '("test-sheet") reads)
+        (is equal '("F8:F8" "G8:G8") (mapcar #'first writes)))))
 
   (define-test week-argument-reads-one-sheet
-    (let ((reads '()))
-      (with-mocked-functions ((vb::read-range (lambda (range &key sheet-name)
-                                                (declare (ignore range))
-                                                (push sheet-name reads)
-                                                (sheet-with-shms))))
-        (multiple-value-bind (out writes)
-            (call-recording-writes
-             (lambda () (vb:book "Thursday April 9" "SHMS" '("GG") :week "Apr 6-12")))
-          (declare (ignore out))
-          (is equal '("Apr 6-12") reads)
-          (is equal '("F8:F8" "G8:G8") (mapcar #'first writes))
-          (is equal '("Apr 6-12" "Apr 6-12") (mapcar #'third writes))))))
+    (multiple-value-bind (out writes reads)
+        (call-recording-writes
+         (lambda () (vb:book "Thursday April 9" "SHMS" '("GG") :week "Apr 6-12"))
+         :sheet (sheet-with-shms))
+      (declare (ignore out))
+      ;; the named week sheet, then that same sheet again before writing
+      (is equal '("Apr 6-12" "Apr 6-12") reads)
+      (is equal '("F8:F8" "G8:G8") (mapcar #'first writes))
+      (is equal '("Apr 6-12" "Apr 6-12") (mapcar #'third writes))))
 
   (define-test creates-new-booking-with-times
     (let ((trips (vb::parse-schedule (empty-sheet) :sheet-name "test-sheet")))
@@ -1249,7 +1270,8 @@ in call order."
           (call-recording-writes
            (lambda ()
              (vb:book "Thursday April 9" "Dentist" '("BW" "CG")
-                      :dep-time "8:00 am" :ret-time "10:00 am" :trips trips)))
+                      :dep-time "8:00 am" :ret-time "10:00 am" :trips trips))
+           :sheet (empty-sheet))
         (true (search "Created DGH booking" out))
         (is equal '(("F4" (("Dentist")) "test-sheet")
                     ("F6" (("8:00 am")) "test-sheet")
@@ -1265,7 +1287,8 @@ in call order."
            (lambda ()
              (vb:book "Thursday April 9" "Dentist" '("BW")
                       :dep-time "8:00 am" :ret-time "10:00 am"
-                      :vehicle :chevy :trips trips)))
+                      :vehicle :chevy :trips trips))
+           :sheet (empty-sheet))
         (true (search "Created CHEVY booking" out))
         (is equal '("C4" "C6" "D6" "C7:C7" "D7:D7") (mapcar #'first writes)))))
 
@@ -1295,18 +1318,29 @@ in call order."
       (is eq :lgh (getf (bn:booking-incomplete-understood c) :vehicle))))
 
   (define-test no-empty-slot-reports-and-returns-nil
-    (let* ((sheet (make-test-sheet
-                   (make-block "Thursday April 9           Thursday April 9"
-                               '(:dgh "A" :lgh "B" :chevy "C")
-                               '(:dgh ("8 am" "9 am") :lgh ("8 am" "9 am") :chevy ("8 am" "9 am"))
-                               '(:dgh (("MM") ("MM")) :lgh (("DM") ("DM")) :chevy (("CG") ("CG"))))))
+    ;; Every van is booked for the day, and the request is for a window none
+    ;; of them overlaps: the day is simply out of blocks, which is a
+    ;; different answer from a van being on the road (see CONFLICT-TESTS).
+    (let* ((sheet (full-day-sheet))
+           (trips (vb::parse-schedule sheet :sheet-name "test-sheet")))
+      (multiple-value-bind (out writes)
+          (call-recording-writes
+           (lambda ()
+             (false (vb:book "Thursday April 9" "Dentist" '("BW")
+                             :dep-time "10:00 am" :ret-time "11:00 am" :trips trips))))
+        (true (search "No available vehicle slots" out))
+        (is equal '() writes))))
+
+  (define-test overlapping-a-full-day-names-the-vans-that-are-out
+    (let* ((sheet (full-day-sheet))
            (trips (vb::parse-schedule sheet :sheet-name "test-sheet")))
       (multiple-value-bind (out writes)
           (call-recording-writes
            (lambda ()
              (false (vb:book "Thursday April 9" "Dentist" '("BW")
                              :dep-time "8:00 am" :ret-time "10:00 am" :trips trips))))
-        (true (search "No available vehicle slots" out))
+        (true (search "No vehicle is free" out))
+        (false (search "No available vehicle slots" out))
         (is equal '() writes)))))
 
 (define-test day-without-a-sheet-reports-it
@@ -1324,6 +1358,160 @@ in call order."
       (true (search "No schedule sheet covers Tuesday October 20" out))
       (false (search "No available vehicle slots" out))
       (is equal '() writes))))
+
+(defun block-spacer ()
+  "The blank row that separates two blocks in a fixture sheet.  PARSE-SCHEDULE
+numbers blocks on a fixed 15-row pitch and MAKE-BLOCK builds 14 rows, so a
+sheet with more than one block needs the fifteenth row the real sheet has, or
+the second block's start row comes out one short."
+  (list (make-list 13 :initial-element "")))
+
+(defun two-block-day (&key (dests '(:dgh "SHMS"))
+                        (times '(:dgh ("8:00 am" "11:00 am")))
+                        (pax '(:dgh (("MM") ("MM")))))
+  "Two blocks for \"Thursday April 9\": the first booked as DESTS/TIMES/PAX
+say, the second blank throughout.  The second block's header leaves column A
+empty, which is how the sheet carries a day across a second block
+(EXTRACT-DAY-FROM-HEADER).  Block start rows come out 3 and 18."
+  (make-test-sheet
+   (make-block "Thursday April 9           Thursday April 9" dests times pax)
+   (block-spacer)
+   (make-block "" '() '() '())))
+
+(define-test conflict-tests
+  ;; Nothing is written over a conflict: a van already out at that time, a
+  ;; passenger already on an overlapping trip, or a slot booked by somebody
+  ;; else since the schedule was read.  TWO-BLOCK-DAY supplies the day with a
+  ;; second, blank block, which is the only way the sheet holds the same van
+  ;; twice in one day.
+
+  (define-test named-vehicle-out-at-that-time-is-refused
+    (let ((trips (vb::parse-schedule (two-block-day) :sheet-name "test-sheet")))
+      (multiple-value-bind (out writes)
+          (call-recording-writes
+           (lambda ()
+             (false (vb:book "Thursday April 9" "Dentist" '("BW")
+                             :dep-time "9:00 am" :ret-time "10:00 am"
+                             :vehicle :dgh :trips trips)))
+           :sheet (two-block-day))
+        (true (search "No vehicle is free" out))
+        (true (search "SHMS" out))
+        (is equal '() writes))))
+
+  (define-test auto-selection-passes-over-a-van-that-is-out
+    ;; The DGH's second-block slot is blank, but the DGH is on the road from
+    ;; 8 to 11, so the LGH takes the trip.
+    (let ((trips (vb::parse-schedule (two-block-day) :sheet-name "test-sheet")))
+      (multiple-value-bind (out writes)
+          (call-recording-writes
+           (lambda ()
+             (vb:book "Thursday April 9" "Dentist" '("BW")
+                      :dep-time "9:00 am" :ret-time "10:00 am" :trips trips))
+           :sheet (two-block-day))
+        (true (search "Created LGH booking" out))
+        (is equal '("I4" "I6" "J6" "I7:I7" "J7:J7") (mapcar #'first writes)))))
+
+  (define-test the-same-van-again-once-it-is-back
+    ;; Windows are half-open: the DGH is due back at 11:00 and may go out
+    ;; again at 11:00, into the day's second block (start row 18).
+    (let ((trips (vb::parse-schedule (two-block-day) :sheet-name "test-sheet")))
+      (multiple-value-bind (out writes)
+          (call-recording-writes
+           (lambda ()
+             (vb:book "Thursday April 9" "Dentist" '("BW")
+                      :dep-time "11:00 am" :ret-time "1:00 pm"
+                      :vehicle :dgh :trips trips))
+           :sheet (two-block-day))
+        (true (search "Created DGH booking" out))
+        (is equal '("F19" "F21" "G21" "F22:F22" "G22:G22") (mapcar #'first writes)))))
+
+  (define-test passenger-already-out-is-refused
+    ;; MM is on the DGH SHMS trip 8-11, so a second trip for MM at 9-10 in
+    ;; another van is refused -- and BW, who is free, is not booked either.
+    (let ((trips (vb::parse-schedule (two-block-day) :sheet-name "test-sheet")))
+      (multiple-value-bind (out writes)
+          (call-recording-writes
+           (lambda ()
+             (false (vb:book "Thursday April 9" "Dentist" '("MM" "BW")
+                             :dep-time "9:00 am" :ret-time "10:00 am"
+                             :vehicle :lgh :trips trips)))
+           :sheet (two-block-day))
+        (true (search "MM is already booked" out))
+        (true (search "nothing was booked" out))
+        (is equal '() writes))))
+
+  (define-test passenger-free-once-their-trip-is-back
+    (let ((trips (vb::parse-schedule (two-block-day) :sheet-name "test-sheet")))
+      (multiple-value-bind (out writes)
+          (call-recording-writes
+           (lambda ()
+             (vb:book "Thursday April 9" "Dentist" '("MM")
+                      :dep-time "11:00 am" :ret-time "1:00 pm"
+                      :vehicle :lgh :trips trips))
+           :sheet (two-block-day))
+        (true (search "Created LGH booking" out))
+        (is equal '("I4" "I6" "J6" "I7:I7" "J7:J7") (mapcar #'first writes)))))
+
+  (define-test a-slot-taken-since-the-snapshot-is-not-overwritten
+    ;; The snapshot says every van is free; the sheet now has the DGH booked.
+    ;; The read before the write catches it and nothing is written.
+    (let ((stale (vb::parse-schedule (empty-sheet) :sheet-name "test-sheet")))
+      (multiple-value-bind (out writes reads)
+          (call-recording-writes
+           (lambda ()
+             (false (vb:book "Thursday April 9" "Dentist" '("BW")
+                             :dep-time "9:00 am" :ret-time "10:00 am"
+                             :vehicle :dgh :trips stale)))
+           :sheet (sheet-with-shms))
+        (true (search "while this request was being handled" out))
+        (is equal '("test-sheet") reads)
+        (is equal '() writes))))
+
+  (define-test a-passenger-added-since-the-snapshot-shifts-the-write
+    ;; The snapshot has MM alone on the SHMS trip, so a write decided from it
+    ;; would put GG in row 8, over DM.  The re-read puts GG in row 9.
+    (let ((stale (vb::parse-schedule (sheet-with-shms) :sheet-name "test-sheet"))
+          (now (make-test-sheet
+                (make-block "Thursday April 9           Thursday April 9"
+                            '(:dgh "SHMS") '(:dgh ("8:35 am" "10:30 am"))
+                            '(:dgh (("MM" "DM") ("MM" "DM")))))))
+      (multiple-value-bind (out writes)
+          (call-recording-writes
+           (lambda () (vb:book "Thursday April 9" "SHMS" '("GG") :trips stale))
+           :sheet now)
+        (true (search "Added GG" out))
+        (is equal '("F9:F9" "G9:G9") (mapcar #'first writes)))))
+
+  (define-test joining-refuses-someone-already-out-elsewhere
+    ;; GG is on the LGH pool run 9-10, which overlaps the SHMS trip
+    ;; 8:35-10:30, so GG is not added to it.
+    (let* ((sheet (make-test-sheet
+                   (make-block "Thursday April 9           Thursday April 9"
+                               '(:dgh "SHMS" :lgh "Pool")
+                               '(:dgh ("8:35 am" "10:30 am") :lgh ("9:00 am" "10:00 am"))
+                               '(:dgh (("MM") ("MM")) :lgh (("GG") ("GG"))))))
+           (trips (vb::parse-schedule sheet :sheet-name "test-sheet")))
+      (multiple-value-bind (out writes)
+          (call-recording-writes
+           (lambda () (false (vb:book "Thursday April 9" "SHMS" '("GG") :trips trips)))
+           :sheet sheet)
+        (true (search "GG is already booked" out))
+        (is equal '() writes))))
+
+  (define-test an-unreadable-time-blocks-rather-than-guesses
+    ;; A booked trip whose own times cannot be read cannot be shown to be out
+    ;; of the way, so the van it holds is not handed out again that day.
+    (let* ((sheet (two-block-day :times '(:dgh ("" ""))))
+           (trips (vb::parse-schedule sheet :sheet-name "test-sheet")))
+      (multiple-value-bind (out writes)
+          (call-recording-writes
+           (lambda ()
+             (false (vb:book "Thursday April 9" "Dentist" '("BW")
+                             :dep-time "9:00 am" :ret-time "10:00 am"
+                             :vehicle :dgh :trips trips)))
+           :sheet sheet)
+        (true (search "No vehicle is free" out))
+        (is equal '() writes)))))
 
 (defun fixture-header ()
   "Sheet header text for April 9 of the current year, whatever weekday that is."
@@ -1359,7 +1547,8 @@ BOOKING-INCOMPLETE signalled, if any."
         (run-book-natural "Can BW and CG take the van to the dentist on April 9 from 8 am to 10 am?"
                           (make-test-sheet (make-block (fixture-header) '() '() '())))
       (false condition)
-      (is = 1 reads)
+      ;; the week sheet, then that same sheet again to verify before writing
+      (is = 2 reads)
       (true (search "Created DGH booking" out))
       (is equal '(("F4" (("dentist")) "Apr 6-12")
                   ("F6" (("8:00 am")) "Apr 6-12")

@@ -55,6 +55,15 @@
     - No match + no times → signals BOOKING-INCOMPLETE naming the absent time(s)
     - No week sheet covers the day → informs user (before asking for times)
     - No empty slots → informs user
+    - Conflicts → informs user and writes nothing (see below)
+  - conflict checks, run by BOOK before every write and again on a fresh read
+  of the sheet immediately before the first cell is written:
+    - the van is already out that day over an overlapping window — passed over
+  when the vehicle was chosen automatically, refused when it was named
+    - a passenger is already on an overlapping trip that day, in any vehicle
+    - the slot was booked by somebody else since the schedule was read
+  Times are half-open, so a van due back at 11:00 can go out again at 11:00,
+  and a booked trip whose own times cannot be read blocks unconditionally
   - book-natural — free-form English frontend to book (see project-isidore/booking-nlp).
     Signals BOOKING-INCOMPLETE, whose report asks the user to re-send the request
     with the missing pieces, when destination, day or passengers cannot be found.
@@ -279,10 +288,143 @@ unbooked block look like a Personal trip departing at \"Saturday\"."
           (trip-dep-passengers trip)
           (trip-sheet-name trip)))
 
-(defun add-passengers (trip passengers)
-  "Add PASSENGERS (list of initials) to TRIP in both dep and ret columns.
+;;; --- Conflict detection ---
+;;;
+;;; A slot on the sheet is one vehicle on one day, so the only way a van is
+;;; booked twice in a day is a second block for that day.  PARSE-SCHEDULE
+;;; supports that (a block header whose column A is blank carries the previous
+;;; day forward), and FIND-EMPTY-SLOT would otherwise hand out the blank slot
+;;; in the second block while the van is on the road for the first.  These
+;;; functions are what stops that, and what stops somebody being written onto
+;;; two trips that run at the same time.
+
+(defun clock-minutes (time-str)
+  "Minutes since midnight for a 12h TIME-STR like \"8:35 am\", or NIL when
+TIME-STR is blank or CHRONICITY cannot read it.  DEPARTURE-MINUTES answers 0
+in that case, which is what sorting a table wants but not what deciding an
+overlap wants: an unreadable time must not be taken for midnight."
+  (when (non-blank-p time-str)
+    (handler-case
+        (let ((dt (chronicity:parse time-str :context :future)))
+          (when dt (+ (* 60 (hour-of dt)) (minute-of dt))))
+      (error () nil))))
+
+(defun trip-window (trip)
+  "Return (values START END), minutes since midnight, for TRIP's departure and
+return times, or NIL when either end is blank, unreadable, or does not run
+forwards -- a return before its departure means the row cannot be read as a
+window, and a trip carrying on past midnight is one such row."
+  (let ((start (clock-minutes (trip-departure trip)))
+        (end (clock-minutes (trip-return-time trip))))
+    (when (and start end (< start end))
+      (values start end))))
+
+(defun windows-overlap-p (start-a end-a start-b end-b)
+  "True when [START-A, END-A) and [START-B, END-B) share a minute.  The
+intervals are half-open on purpose: a van due back at 11:00 may be taken out
+again at 11:00."
+  (and (< start-a end-b) (< start-b end-a)))
+
+(defun trip-blocks-window-p (trip start end)
+  "True when the booked TRIP stands in the way of a trip running START to END
+on the same day.  A booked trip whose own times cannot be read blocks
+unconditionally: nothing can show it is out of the way, and writing over a van
+that may already be on the road is the worse mistake."
+  (and (booked-trip-p trip)
+       (multiple-value-bind (trip-start trip-end) (trip-window trip)
+         (or (null trip-start)
+             (windows-overlap-p start end trip-start trip-end)))))
+
+(defun vehicle-conflicts (trips day vehicle start end &key exclude)
+  "The booked TRIPS that already have VEHICLE out on DAY over a window
+overlapping START to END.  EXCLUDE is the slot about to be written, which
+never conflicts with itself."
+  (remove-if-not (lambda (tr)
+                   (and (eq (trip-vehicle tr) vehicle)
+                        (not (eq tr exclude))
+                        (trip-blocks-window-p tr start end)))
+                 (find-trips trips :day day)))
+
+(defun passenger-conflicts (trips day passengers start end &key exclude)
+  "An alist of (PASSENGER . TRIP) naming each of PASSENGERS already written
+onto a booked trip on DAY that overlaps START to END, whatever vehicle that
+trip uses.  EXCLUDE is the trip being booked or joined, which is not a
+conflict with itself.  Someone on two overlapping trips is reported once,
+against the first."
+  (let ((candidates (remove-if-not (lambda (tr)
+                                     (and (not (eq tr exclude))
+                                          (trip-blocks-window-p tr start end)))
+                                   (find-trips trips :day day))))
+    (loop for p in passengers
+          for clash = (find-if (lambda (tr)
+                                 (member p (append (trip-dep-passengers tr)
+                                                   (trip-ret-passengers tr))
+                                         :test #'string-equal))
+                               candidates)
+          when clash collect (cons p clash))))
+
+(defun format-vehicle-conflicts (vehicle day conflicts)
+  "The report for CONFLICTS, the trips that already have VEHICLE out on DAY."
+  (with-output-to-string (s)
+    (format s "The ~a is already out on ~a over those times, so nothing was booked:~%"
+            vehicle day)
+    (dolist (tr conflicts) (print-trip tr s))))
+
+(defun format-passenger-conflicts (day conflicts)
+  "The report for CONFLICTS, an alist of (passenger . trip) from
+PASSENGER-CONFLICTS.  Nobody is booked when one person clashes: half a request
+written to a shared sheet is harder to make sense of than a refused one, and
+the reply names who has to be left out."
+  (with-output-to-string (s)
+    (format s "~{~a~^, ~} ~:[are~;is~] already booked on ~a over those times, so nothing was booked:~%"
+            (mapcar #'car conflicts) (null (rest conflicts)) day)
+    (dolist (tr (remove-duplicates (mapcar #'cdr conflicts) :test #'eq :from-end t))
+      (print-trip tr s))))
+
+(defun booking-obstacle (trips day vehicle passengers start end &key exclude)
+  "The reason a booking of VEHICLE on DAY for PASSENGERS running START to END
+cannot go ahead against TRIPS, as a report ready to print, or NIL when nothing
+stands in its way.  EXCLUDE is the slot being written.  A NIL START or END
+means the request carries no readable window, so no overlap can be judged and
+none is claimed."
+  (when (and start end)
+    (let ((veh (vehicle-conflicts trips day vehicle start end :exclude exclude)))
+      (if veh
+          (format-vehicle-conflicts vehicle day veh)
+          (let ((pax (passenger-conflicts trips day passengers start end
+                                          :exclude exclude)))
+            (when pax (format-passenger-conflicts day pax)))))))
+
+(defun refresh-trip (trip)
+  "Re-read TRIP's own week sheet and return (values FRESH-TRIP FRESH-TRIPS):
+that same slot as the sheet now has it -- matched by block start row and
+departure column -- and every trip on the sheet.  Returns (values TRIP NIL)
+when TRIP carries no sheet name, since there is then nothing to re-read, and
+(values NIL FRESH-TRIPS) when the block has gone.
+
+Every booking is decided against a snapshot taken before the request was
+parsed (FETCH-ALL-TRIPS, or the caller's own :TRIPS), and two Slack messages
+seconds apart both work from that one snapshot.  Everything that writes goes
+through here first, so the second request sees what the first one booked."
+  (let ((sheet (trip-sheet-name trip)))
+    (if (null sheet)
+        (values trip nil)
+        (let ((fresh (parse-schedule (read-range nil :sheet-name sheet)
+                                     :sheet-name sheet)))
+          (values (find-if (lambda (tr)
+                             (and (eql (trip-block-start-row tr)
+                                       (trip-block-start-row trip))
+                                  (eql (trip-dep-col tr) (trip-dep-col trip))))
+                           fresh)
+                  fresh)))))
+
+(defun write-passengers (trip passengers)
+  "Write PASSENGERS (list of initials) into TRIP's dep and ret columns.
    Passengers already present in a column are skipped for that column.
-   Writes to the spreadsheet using the trip's sheet-name."
+   Writes to the spreadsheet using the trip's sheet-name.
+   TRIP must be current: the rows written are counted from the passengers it
+   already carries, so a stale TRIP writes over whoever was added since.
+   ADD-PASSENGERS is the entry point that guarantees that."
   (let* ((new-dep (filter-new-passengers passengers (trip-dep-passengers trip)))
          (new-ret (filter-new-passengers passengers (trip-ret-passengers trip)))
          (passenger-start-offset 4)
@@ -312,9 +454,41 @@ unbooked block look like a Personal trip departing at \"Saturday\"."
         (format t "Skipped (already booked): ~{~a~^, ~}~%" skipped)))
     trip))
 
-(defun find-empty-slot (trips day &optional preferred-vehicle)
+(defun add-passengers (trip passengers &key (verify t))
+  "Add PASSENGERS (list of initials) to TRIP in both dep and ret columns, and
+return the trip written to, or NIL when nothing was written.
+
+Unless VERIFY is NIL, TRIP's sheet is re-read first (REFRESH-TRIP) and the
+write goes to the slot as it now stands: TRIP may have been parsed minutes
+ago, and appending after a stale passenger count writes over whoever was added
+since.  Anyone already on another trip that day whose times overlap this one
+is refused, and then nobody is added at all (see FORMAT-PASSENGER-CONFLICTS).
+VERIFY NIL writes against TRIP as given, for a caller that has just read it."
+  (multiple-value-bind (current fresh-trips)
+      (if verify (refresh-trip trip) (values trip nil))
+    (cond
+      ((null current)
+       (format t "The ~a block for ~a is no longer on the ~a sheet, so nobody was added.~%"
+               (trip-vehicle trip) (trip-day trip) (trip-sheet-name trip))
+       nil)
+      (t
+       (multiple-value-bind (start end) (trip-window current)
+         (let ((clashes (when (and start end fresh-trips)
+                          (passenger-conflicts fresh-trips (trip-day current)
+                                               passengers start end
+                                               :exclude current))))
+           (cond
+             (clashes (princ (format-passenger-conflicts (trip-day current) clashes))
+                      nil)
+             (t (write-passengers current passengers)))))))))
+
+(defun find-empty-slot (trips day &optional preferred-vehicle start end)
   "Find an empty vehicle slot for DAY. If PREFERRED-VEHICLE given, try that first.
    Otherwise try *auto-vehicles* in priority order.
+   When START and END (minutes since midnight) are both given, a vehicle
+   already out on DAY over an overlapping window is passed over even though
+   the slot in this block is blank: the sheet can carry more than one block
+   for a day, and the van cannot be in two places at once.
    Returns the empty trip struct or NIL."
   (let ((day-trips (find-trips trips :day day))
         (try-order (if preferred-vehicle
@@ -323,48 +497,103 @@ unbooked block look like a Personal trip departing at \"Saturday\"."
     (collect-first
      (choose-if #'identity
                 (map-fn t (lambda (veh)
-                            (find-if (lambda (tr)
-                                       (and (eq (trip-vehicle tr) veh)
-                                            (not (non-blank-p (trip-destination tr)))
-                                            (not (non-blank-p (trip-departure tr)))))
-                                     day-trips))
+                            (unless (and start end
+                                         (vehicle-conflicts day-trips day veh start end))
+                              (find-if (lambda (tr)
+                                         (and (eq (trip-vehicle tr) veh)
+                                              (not (non-blank-p (trip-destination tr)))
+                                              (not (non-blank-p (trip-departure tr)))))
+                                       day-trips)))
                         (scan try-order))))))
 
+(defun report-no-slot (trips day vehicle start end)
+  "Say why CREATE-BOOKING found nowhere to write on DAY.  A vehicle that is
+merely out over the requested window is a different answer from a day whose
+slots are all taken, and only the first tells the asker that another time
+would work."
+  (let ((clashes (when (and start end)
+                   (loop for veh in (if vehicle (list vehicle) *auto-vehicles*)
+                         append (vehicle-conflicts trips day veh start end)))))
+    (if clashes
+        (progn
+          (format t "No vehicle is free on ~a between those times~@[ (tried ~a only)~]. Already out:~%"
+                  day vehicle)
+          (dolist (tr clashes) (print-trip tr)))
+        (format t "No available vehicle slots for ~a~@[ (tried ~a only)~].~%" day vehicle))))
+
 (defun create-booking (trips day destination dep-time ret-time passengers
-                       &key vehicle)
+                       &key vehicle (verify t))
   "Create a new booking in an empty slot. Auto-selects vehicle by priority if not given.
-   Returns the trip or NIL if no slots available."
-  (let ((slot (find-empty-slot trips day vehicle)))
-    (unless slot
-      (format t "No available vehicle slots for ~a~@[ (tried ~a only)~].~%" day vehicle)
-      (return-from create-booking nil))
-    (let ((sn (trip-sheet-name slot)))
-      (let ((dest-row (1+ (trip-block-start-row slot)))
-            (dep-col-letter (col-letter (trip-dep-col slot))))
-        (write-range (format nil "~a~a" dep-col-letter dest-row)
-                     (list (list destination)) :sheet-name sn))
-      (let ((time-row (+ (trip-block-start-row slot) 3))
-            (dep-col-letter (col-letter (trip-dep-col slot)))
-            (ret-col-letter (col-letter (trip-ret-col slot))))
-        (write-range (format nil "~a~a" dep-col-letter time-row)
-                     (list (list dep-time)) :sheet-name sn)
-        (write-range (format nil "~a~a" ret-col-letter time-row)
-                     (list (list ret-time)) :sheet-name sn))
-      (let* ((pass-start (+ (trip-block-start-row slot) 4))
-             (dep-col-letter (col-letter (trip-dep-col slot)))
-             (ret-col-letter (col-letter (trip-ret-col slot)))
-             (dep-range (format nil "~a~a:~a~a"
-                                dep-col-letter pass-start
-                                dep-col-letter (+ pass-start (length passengers) -1)))
-             (ret-range (format nil "~a~a:~a~a"
-                                ret-col-letter pass-start
-                                ret-col-letter (+ pass-start (length passengers) -1)))
-             (values (mapcar #'list passengers)))
-        (write-range dep-range values :sheet-name sn)
-        (write-range ret-range values :sheet-name sn)))
-    (format t "Created ~a booking on ~a → ~a (~a - ~a) for ~{~a~^, ~}~%"
-            (trip-vehicle slot) day destination dep-time ret-time passengers)
-    slot))
+   Returns the trip or NIL when the booking could not be made.
+
+   A vehicle already out on DAY over a window overlapping DEP-TIME to RET-TIME
+   is passed over when the vehicle is chosen automatically and refused when it
+   was named (FIND-EMPTY-SLOT, REPORT-NO-SLOT), and a passenger already on an
+   overlapping trip that day is refused outright (PASSENGER-CONFLICTS).  Both
+   checks are skipped when the times cannot be read as a window, since then
+   there is no overlap to judge.
+
+   Unless VERIFY is NIL, the chosen slot's sheet is re-read immediately before
+   the first write (REFRESH-TRIP) and both checks run again against it, so a
+   booking decided on a stale snapshot cannot write over one made since."
+  (multiple-value-bind (start end)
+      (let ((s (clock-minutes dep-time)) (e (clock-minutes ret-time)))
+        (if (and s e (< s e)) (values s e) (values nil nil)))
+    (let ((slot (find-empty-slot trips day vehicle start end)))
+      (unless slot
+        (report-no-slot trips day vehicle start end)
+        (return-from create-booking nil))
+      (let ((obstacle (booking-obstacle trips day (trip-vehicle slot) passengers
+                                        start end :exclude slot)))
+        (when obstacle
+          (princ obstacle)
+          (return-from create-booking nil)))
+      (when verify
+        (multiple-value-bind (current fresh-trips) (refresh-trip slot)
+          (cond
+            ((null current)
+             (format t "The ~a block for ~a is no longer on the ~a sheet, so nothing was booked.~%"
+                     (trip-vehicle slot) day (trip-sheet-name slot))
+             (return-from create-booking nil))
+            ((booked-trip-p current)
+             (format t "The ~a was booked for ~a while this request was being handled, so nothing was written:~%"
+                     (trip-vehicle current) day)
+             (print-trip current)
+             (return-from create-booking nil))
+            (fresh-trips
+             (let ((obstacle (booking-obstacle fresh-trips day (trip-vehicle current)
+                                               passengers start end :exclude current)))
+               (when obstacle
+                 (princ obstacle)
+                 (return-from create-booking nil)))))
+          (setf slot current)))
+      (let ((sn (trip-sheet-name slot)))
+        (let ((dest-row (1+ (trip-block-start-row slot)))
+              (dep-col-letter (col-letter (trip-dep-col slot))))
+          (write-range (format nil "~a~a" dep-col-letter dest-row)
+                       (list (list destination)) :sheet-name sn))
+        (let ((time-row (+ (trip-block-start-row slot) 3))
+              (dep-col-letter (col-letter (trip-dep-col slot)))
+              (ret-col-letter (col-letter (trip-ret-col slot))))
+          (write-range (format nil "~a~a" dep-col-letter time-row)
+                       (list (list dep-time)) :sheet-name sn)
+          (write-range (format nil "~a~a" ret-col-letter time-row)
+                       (list (list ret-time)) :sheet-name sn))
+        (let* ((pass-start (+ (trip-block-start-row slot) 4))
+               (dep-col-letter (col-letter (trip-dep-col slot)))
+               (ret-col-letter (col-letter (trip-ret-col slot)))
+               (dep-range (format nil "~a~a:~a~a"
+                                  dep-col-letter pass-start
+                                  dep-col-letter (+ pass-start (length passengers) -1)))
+               (ret-range (format nil "~a~a:~a~a"
+                                  ret-col-letter pass-start
+                                  ret-col-letter (+ pass-start (length passengers) -1)))
+               (values (mapcar #'list passengers)))
+          (write-range dep-range values :sheet-name sn)
+          (write-range ret-range values :sheet-name sn)))
+      (format t "Created ~a booking on ~a → ~a (~a - ~a) for ~{~a~^, ~}~%"
+              (trip-vehicle slot) day destination dep-time ret-time passengers)
+      slot)))
 
 (defun fetch-all-trips (&key week)
   "Read and parse the schedule for every week sheet (see WEEK-SHEETS), or only
@@ -397,7 +626,13 @@ unbooked block look like a Personal trip departing at \"Saturday\"."
    either is missing, signals BOOKING-INCOMPLETE so the caller can ask for them.
    VEHICLE can override automatic selection (DGH > LGH > Chevy).
    WEEK is the sheet name (e.g. \"Apr 20-26\"). If omitted, searches all weeks.
-   TRIPS, when given, is a pre-fetched list from FETCH-ALL-TRIPS and skips the read."
+   TRIPS, when given, is a pre-fetched list from FETCH-ALL-TRIPS and skips the
+   initial read; the sheet being written is re-read before the write either
+   way (REFRESH-TRIP).
+   Nothing is written over a conflict: a van already out at that time, a
+   passenger already on an overlapping trip that day, or a slot booked by
+   somebody else since TRIPS was read.  The reason is printed and NIL
+   returned, as for a day with no free slots."
   (let* ((all-trips (or trips (fetch-all-trips :week week)))
          (matches (find-trips all-trips :day day :destination destination)))
     (cond
@@ -793,12 +1028,10 @@ chronicity cannot read PHRASE."
   (or (position vehicle *vehicles* :key #'first) 999))
 
 (defun departure-minutes (time-str)
-  "Convert a 12h TIME-STR like \"8:35 am\" to minutes-since-midnight. 0 on failure."
-  (or (handler-case
-          (let ((dt (chronicity:parse (or time-str "") :context :future)))
-            (when dt (+ (* 60 (hour-of dt)) (minute-of dt))))
-        (error () nil))
-      0))
+  "Convert a 12h TIME-STR like \"8:35 am\" to minutes-since-midnight. 0 on failure.
+   Sorting a day's rows wants a number for every row; CLOCK-MINUTES is the one
+   to use where an unreadable time must not pass for midnight."
+  (or (clock-minutes time-str) 0))
 
 (defun truncate-cell (s width)
   "Truncate S to WIDTH chars, appending '...' when shortened."

@@ -178,6 +178,8 @@ The order and the wording don't matter. For example:
   • `book a van for swimming next Tuesday for CG and BW at 7 pm to 9 pm`
   • `Can BW and MM take the DGH to the dentist tomorrow, leaving at 8:30 and back around 11?`
 
+I never book over a clash: if the van you asked for is already out at that time, or if somebody on your list is already on another trip that overlaps, I say which trip is in the way and book nothing.
+
 *To join a trip already on the sheet*, name the trip and who is coming; no times needed:
   • `add GG to the SHMS trip on Thursday`
 

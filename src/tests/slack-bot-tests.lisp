@@ -930,7 +930,13 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                              (lambda (channel text) (push (cons channel text) posted)))
                             (db:add-slack-subscription
                              (lambda (user-id initial)
-                               (push (cons user-id initial) subscribed) t)))
+                               (push (cons user-id initial) subscribed) t))
+                            ;; /subscribe registers the identity too; unmocked,
+                            ;; that wrote U7 -> BW into the real database on
+                            ;; every build that ran this suite.
+                            (db:add-slack-identity
+                             (lambda (user-id initial)
+                               (declare (ignore user-id initial)) t)))
       (bt:join-thread (sb::handle-message-event
                        (message-event "text" "/subscribe BW" "channel" "D1" "user" "U7")))
       (is equal '(("U7" . "BW")) subscribed)
@@ -951,6 +957,8 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                              (lambda () '(("U1" . "BW"))))
                             (vb:trips-for-driver-today
                              (lambda (initial) (declare (ignore initial)) (list trip)))
+                            (vb:trips-for-return-driver-today
+                             (lambda (initial) (declare (ignore initial)) nil))
                             (vb:trip-departure-universal-time
                              (lambda (tr) (declare (ignore tr)) (+ (get-universal-time) dep-offset)))
                             (vb:remind-driver
@@ -991,6 +999,54 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
       (let ((*error-output* (make-string-output-stream)))
         (finish (sb::scheduler-tick))
         (true (search "sheet unavailable" (get-output-stream-string *error-output*)))))))
+
+(define-test scheduler-tick-return-leg
+  :parent slack-bot-suite
+  ;; The driver of the return is reminded before the return time, apart from
+  ;; the departure: the two legs of one trip are deduplicated separately.
+  (let* ((trip (vb:make-trip :day "Thursday" :vehicle :dgh :destination "SHMS"
+                             :departure "8:35 am" :return-time "12 pm"
+                             :block-start-row 138
+                             :dep-passengers '("BW" "DM")
+                             :ret-passengers '("BW" "DM" "CG")))
+         (dep-offset 100)
+         (ret-offset 200)
+         (posted '())
+         (sb::*sent-reminders* (make-hash-table :test #'equal))
+         (sb::*sent-reminders-date* (sb::today-date-key)))
+    (with-mocked-functions ((db:all-slack-subscriptions
+                             (lambda () '(("U1" . "BW"))))
+                            (vb:trips-for-driver-today
+                             (lambda (initial) (declare (ignore initial)) (list trip)))
+                            (vb:trips-for-return-driver-today
+                             (lambda (initial) (declare (ignore initial)) (list trip)))
+                            (vb:trip-departure-universal-time
+                             (lambda (tr) (declare (ignore tr)) (+ (get-universal-time) dep-offset)))
+                            (vb:trip-return-universal-time
+                             (lambda (tr) (declare (ignore tr)) (+ (get-universal-time) ret-offset)))
+                            (vb:remind-driver
+                             (lambda (initial &optional day)
+                               (declare (ignore day))
+                               (format nil "departure for ~a" initial)))
+                            (sb::post-slack-message
+                             (lambda (channel text) (push (cons channel text) posted))))
+      (let ((*error-output* (make-broadcast-stream)))
+        ;; both legs in the window -> two DMs, the return one worded by
+        ;; REMIND-RETURN-DRIVER
+        (sb::scheduler-tick)
+        (is = 2 (length posted))
+        (true (find "departure for BW" posted :key #'cdr :test #'string=))
+        (true (find "BW is the driver for the return from SHMS at 12 pm and DM, CG are passengers."
+                    posted :key #'cdr :test #'string=))
+        ;; neither leg repeats on the next tick
+        (sb::scheduler-tick)
+        (is = 2 (length posted))
+        ;; a return still far off waits, while a new day's departure goes out
+        (clrhash sb::*sent-reminders*)
+        (setf ret-offset 3600)
+        (sb::scheduler-tick)
+        (is = 3 (length posted))
+        (is string= "departure for BW" (cdr (first posted)))))))
 
 (define-test reminder-key-shape
   :parent slack-bot-suite

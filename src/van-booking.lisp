@@ -38,7 +38,10 @@
    #:view-schedule
    #:date-range-phrase-p
    #:trips-for-driver-today
-   #:trip-departure-universal-time)
+   #:trip-departure-universal-time
+   #:remind-return-driver
+   #:trips-for-return-driver-today
+   #:trip-return-universal-time)
   (:documentation
    "
   - parse-schedule — reads the full sheet, filters CSV artifacts, extracts 72 trip
@@ -806,27 +809,55 @@ all are listed in one string separated by spaces."
                                   driver (trip-destination tr) (trip-departure tr) others)))))
                    driver-trips))))))
 
-(defun trips-for-driver-today (initial)
-  "Return the trips departing today where INITIAL is the first dep-passenger.
-Used by the slack-bot reminder scheduler. Returns NIL when no sheet covers
-today or no matching trips exist."
+(defun remind-return-driver (trip)
+  "Return the reminder for the driver of TRIP's return leg, the first of its
+ret-passengers, worded like REMIND-DRIVER's."
+  (destructuring-bind (&optional driver &rest others) (trip-ret-passengers trip)
+    (let ((lead (format nil "~a is the driver for the return from ~a at ~a"
+                        driver (trip-destination trip) (trip-return-time trip))))
+      (cond
+        ((null others)
+         (format nil "~a with no other passengers." lead))
+        ((null (rest others))
+         (format nil "~a and ~a is a passenger." lead (first others)))
+        (t
+         (format nil "~a and ~{~a~^, ~} are passengers." lead others))))))
+
+(defun todays-trips ()
+  "The trips in today's block of the week sheet that covers today, or NIL
+when no sheet covers today.  Reads the sheet afresh on every call."
   (let* ((day-dt (chronicity:parse "today"))
          (day-str (format-booking-day day-dt))
          (sheet (find-week-sheet day-dt)))
     (when sheet
-      (let* ((rows (read-range nil :sheet-name sheet))
-             (trips (parse-schedule rows :sheet-name sheet))
-             (day-trips (find-trips trips :day day-str)))
-        (remove-if-not
-         (lambda (tr)
-           (let ((pax (trip-dep-passengers tr)))
-             (and pax (string-equal initial (first pax)))))
-         day-trips)))))
+      (find-trips (parse-schedule (read-range nil :sheet-name sheet) :sheet-name sheet)
+                  :day day-str))))
 
-(defun trip-departure-universal-time (trip)
-  "Return the CL universal-time at which TRIP departs today, or NIL.
-Combines today's date with TRIP-DEPARTURE's HH:MM (12h format)."
-  (let ((mins (departure-minutes (trip-departure trip))))
+(defun trips-for-driver-today (initial)
+  "Return the trips departing today where INITIAL is the first dep-passenger.
+Used by the slack-bot reminder scheduler. Returns NIL when no sheet covers
+today or no matching trips exist."
+  (remove-if-not
+   (lambda (tr)
+     (let ((pax (trip-dep-passengers tr)))
+       (and pax (string-equal initial (first pax)))))
+   (todays-trips)))
+
+(defun trips-for-return-driver-today (initial)
+  "Return today's trips whose return leg INITIAL drives: INITIAL is the first
+ret-passenger.  The return can have a different driver from the departure,
+so it is looked up on its own.  Used by the slack-bot reminder scheduler;
+NIL when no sheet covers today or no matching trips exist."
+  (remove-if-not
+   (lambda (tr)
+     (let ((pax (trip-ret-passengers tr)))
+       (and pax (string-equal initial (first pax)))))
+   (todays-trips)))
+
+(defun today-universal-time (time-str)
+  "Return the CL universal-time at which the 12h TIME-STR (\"8:35 am\") falls
+today, or NIL when TIME-STR cannot be read."
+  (let ((mins (departure-minutes time-str)))
     (when (and mins (plusp mins))
       (multiple-value-bind (s m h day month year)
           (decode-universal-time (get-universal-time))
@@ -835,6 +866,16 @@ Combines today's date with TRIP-DEPARTURE's HH:MM (12h format)."
                                (mod mins 60)
                                (floor mins 60)
                                day month year)))))
+
+(defun trip-departure-universal-time (trip)
+  "Return the CL universal-time at which TRIP departs today, or NIL.
+Combines today's date with TRIP-DEPARTURE's HH:MM (12h format)."
+  (today-universal-time (trip-departure trip)))
+
+(defun trip-return-universal-time (trip)
+  "Return the CL universal-time at which TRIP's return leg leaves today, or
+NIL.  Combines today's date with TRIP-RETURN-TIME's HH:MM (12h format)."
+  (today-universal-time (trip-return-time trip)))
 
 (defparameter *month-regex*
   (format nil "(?:~{~a~^|~})[a-z]*\\.?"

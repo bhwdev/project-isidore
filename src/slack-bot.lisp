@@ -34,6 +34,9 @@
                 #:remind-driver
                 #:trips-for-driver-today
                 #:trip-departure-universal-time
+                #:trips-for-return-driver-today
+                #:trip-return-universal-time
+                #:remind-return-driver
                 #:trip-vehicle
                 #:trip-block-start-row)
   (:import-from #:project-isidore/database
@@ -78,7 +81,8 @@ does more than rephrase; without a server the report is posted as before.
 
 A persistent /subscribe registry (graph-db-backed via project-isidore/database)
 plus an in-process scheduler thread DMs subscribed drivers 5 minutes before
-each of their trips.
+each leg they drive: the departure when they are its first passenger, the
+return when they are the first listed for the return.
 
 A second registry records which initials each Slack account goes by, so a
 message can say \"me\", \"my\" or \"I\" instead of spelling them out: /iam sets
@@ -191,7 +195,7 @@ Or just ask about a trip's timing — `when is my ride home this coming Tuesday?
 
 *Who you are*: type `/iam` and your initials, e.g. `/iam DMM`, and I'll read `me`, `my` and `I` as you from then on — `book me a van to the dentist tomorrow 9 to 11`, `can I get a van for the pool Saturday 8-10`, `me and CG to swimming Tuesday 7-9pm`. Type `/iam` on its own to see who I have you down as. I remember it across restarts and through `/unsubscribe`.
 
-*Reminders*: type `/subscribe` and your initials, e.g. `/subscribe BW`, and I'll message you 5 minutes before each trip you are driving. `/unsubscribe` turns them off.
+*Reminders*: type `/subscribe` and your initials, e.g. `/subscribe BW`, and I'll message you 5 minutes before each trip you are driving, out or back (the first name listed drives). `/unsubscribe` turns them off.
 
 *This message*: `/help`, or send me `help` or `?`."
   "The help page: what the bot is and how to use every command, for people
@@ -812,7 +816,9 @@ currently registered, so it doubles as `/whoami`."
 
 (defslash-command "/subscribe" (params)
   "/subscribe <INITIAL> — receive a direct message 5 minutes before each trip
-today where you are the driver (first passenger listed). Example:
+leg today where you are the driver: the departure when you are the first
+passenger listed for it, the return when you are the first listed for that.
+Example:
   /subscribe BW
 Persists across restarts. Use /unsubscribe to stop."
   (let* ((text (gethash "text" params))
@@ -827,7 +833,7 @@ Persists across restarts. Use /unsubscribe to stop."
        ;; to get both reminders and "book me a van".  /unsubscribe drops only
        ;; the subscription; the identity outlives it.
        (add-slack-identity user-id (string-upcase initial))
-       (format nil "Subscribed. You will be DM'd 5 minutes before each trip where ~A is the driver. I'll also read \"me\" as ~:*~A in your messages."
+       (format nil "Subscribed. You will be DM'd 5 minutes before each departure or return that ~A drives. I'll also read \"me\" as ~:*~A in your messages."
                (string-upcase initial))))))
 
 (defslash-command "/unsubscribe" (params)
@@ -889,7 +895,8 @@ posted back asynchronously via chat.postMessage."
 (defvar *scheduler-lock* (bt:make-lock "slack-scheduler-lock"))
 
 (defvar *sent-reminders* (make-hash-table :test #'equal)
-  "Dedup set. Key: (list user-id sheet-row vehicle date-key). Value: T.")
+  "Dedup set. Key: (list user-id sheet-row vehicle date-key leg), LEG being
+:DEPARTURE or :RETURN. Value: T.")
 
 (defvar *sent-reminders-date* nil
   "YYYYMMDD of the day *sent-reminders* was last reset.")
@@ -906,33 +913,45 @@ posted back asynchronously via chat.postMessage."
       (clrhash *sent-reminders*)
       (setf *sent-reminders-date* today))))
 
-(defun reminder-key (user-id trip)
+(defun reminder-key (user-id trip &optional (leg :departure))
   (list user-id
         (trip-block-start-row trip)
         (trip-vehicle trip)
-        (today-date-key)))
+        (today-date-key)
+        leg))
 
 (defun scheduler-tick ()
-  "Single sweep: for each subscription, DM 5m-before reminders for due trips.
-Window is [now, now+360s] — with a 60s sleep that covers 5 minutes ±30s."
+  "Single sweep: for each subscription, DM a reminder 5 minutes before each
+leg of today's trips that the subscriber drives -- the departure when they
+are the first dep-passenger, the return when they are the first
+ret-passenger.  Window is [now, now+360s] — with a 60s sleep that covers
+5 minutes ±30s."
   (maybe-reset-sent-reminders)
   (let ((now (get-universal-time)))
     (dolist (sub (all-slack-subscriptions))
       (let ((user-id (car sub))
             (initial (cdr sub)))
-        (handler-case
-            (dolist (trip (trips-for-driver-today initial))
-              (let ((dep-ut (trip-departure-universal-time trip)))
-                (when (and dep-ut
-                           (<= 0 (- dep-ut now) 360)
-                           (not (gethash (reminder-key user-id trip)
-                                         *sent-reminders*)))
-                  (post-slack-message user-id (remind-driver initial))
-                  (setf (gethash (reminder-key user-id trip) *sent-reminders*) t))))
-          (error (c)
-            (format *error-output*
-                    "slack scheduler: error for ~A/~A: ~A~%"
-                    user-id initial c)))))))
+        (flet ((remind (trip leg leaves text-fn)
+                 (let ((key (reminder-key user-id trip leg)))
+                   (when (and leaves
+                              (<= 0 (- leaves now) 360)
+                              (not (gethash key *sent-reminders*)))
+                     (post-slack-message user-id (funcall text-fn))
+                     (setf (gethash key *sent-reminders*) t)
+                     (format *error-output* "slack scheduler: reminded ~A/~A of the ~(~A~) at ~A~%"
+                             user-id initial leg (trip-vehicle trip))))))
+          (handler-case
+              (progn
+                (dolist (trip (trips-for-driver-today initial))
+                  (remind trip :departure (trip-departure-universal-time trip)
+                          (lambda () (remind-driver initial))))
+                (dolist (trip (trips-for-return-driver-today initial))
+                  (remind trip :return (trip-return-universal-time trip)
+                          (lambda () (remind-return-driver trip)))))
+            (error (c)
+              (format *error-output*
+                      "slack scheduler: error for ~A/~A: ~A~%"
+                      user-id initial c))))))))
 
 (defun reminder-scheduler-loop ()
   (loop

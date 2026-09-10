@@ -657,10 +657,6 @@ creation."
 called with a non NIL value for SIGINT-POLL, it will listen for SIGINT (Catch a
 user's Control-c in the terminal) and gracefully shut down the web server and
 exit the lisp process."
-  ;; Symmetric to initialize-application starting the scheduler. Stopping it
-  ;; here lets save-lisp-and-die proceed after asdf:test-system runs the
-  ;; can-app-init-and-exit test, which exercises this lifecycle.
-  (slack-bot:stop-reminder-scheduler)
   (when sigint-poll
     (handler-case (loop (sleep 1))
       (#+sbcl sb-sys:interactive-interrupt
@@ -676,6 +672,12 @@ exit the lisp process."
             (format t "~%Server successfully stopped.~%")
             (uiop:quit)))
       (error (c) (format t "Whoops, an unknown error occured:~&~a~&" c))))
+  ;; Symmetric to initialize-application starting the scheduler, and what
+  ;; lets save-lisp-and-die proceed after the can-app-init-and-exit test.  It
+  ;; comes after the SIGINT wait, not before it: APPLICATION-TOPLEVEL calls
+  ;; this with SIGINT-POLL as its wait loop straight after startup, and
+  ;; stopping first killed the scheduler seconds after every boot.
+  (slack-bot:stop-reminder-scheduler)
   (when (or *server* (is-running-p))
     (ignore-errors
      (progn

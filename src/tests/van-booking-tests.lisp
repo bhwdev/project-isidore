@@ -1861,6 +1861,45 @@ BOOKING-INCOMPLETE signalled, if any."
          (let ((vb::*weeks* '(("Feb 30-Feb 31" nil))))
            (is equal '() (vb::trips-for-driver-today "BW")))))))
 
+  (define-test return-driver-trips-today
+    ;; The return leg has its own driver, the first ret-passenger: DM drives
+    ;; the DGH home although BW drove it out.
+    (let* ((day-str (bn:format-booking-day (chronicity:parse "today")))
+           (sheet (make-test-sheet
+                   (make-block (format nil "~a           ~a" day-str day-str)
+                               '(:dgh "SHMS")
+                               '(:dgh ("8:35 am" "12 pm"))
+                               '(:dgh (("BW" "DM") ("DM" "BW" "CG")))))))
+      (call-with-mock-read-range
+       sheet
+       (lambda ()
+         (let ((vb::*weeks* '(("Jan 1-Dec 31" nil))))
+           (let ((trips (vb::trips-for-return-driver-today "dm")))
+             (is = 1 (length trips))
+             (is string= "SHMS" (trip-destination (first trips))))
+           (is equal '() (vb::trips-for-return-driver-today "BW"))
+           (is equal '() (vb::trips-for-driver-today "DM")))))))
+
+  (define-test return-universal-time
+    (multiple-value-bind (s m h) (decode-universal-time
+                                  (vb::trip-return-universal-time (make-trip :return-time "12 pm")))
+      (is = 0 s)
+      (is = 0 m)
+      (is = 12 h))
+    (false (vb::trip-return-universal-time (make-trip :return-time "")))
+    (false (vb::trip-return-universal-time (make-trip :departure "8:35 am"))))
+
+  (define-test remind-return-driver-wording
+    (is string= "BW is the driver for the return from SHMS at 12 pm with no other passengers."
+        (vb:remind-return-driver (make-trip :destination "SHMS" :return-time "12 pm"
+                                            :ret-passengers '("BW"))))
+    (is string= "BW is the driver for the return from SHMS at 12 pm and DM is a passenger."
+        (vb:remind-return-driver (make-trip :destination "SHMS" :return-time "12 pm"
+                                            :ret-passengers '("BW" "DM"))))
+    (is string= "BW is the driver for the return from SHMS at 12 pm and DM, CG are passengers."
+        (vb:remind-return-driver (make-trip :destination "SHMS" :return-time "12 pm"
+                                            :ret-passengers '("BW" "DM" "CG")))))
+
   (define-test current-year-key
     (let ((year (nth-value 5 (decode-universal-time (get-universal-time)))))
       (is = (+ (* year 10000) 422)

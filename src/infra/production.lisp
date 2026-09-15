@@ -174,7 +174,24 @@ www.bhw.name {
      reverse_proxy localhost:8080
 }
 matrix.bhw.name, matrix.bhw.name:8448 {
-    reverse_proxy localhost:8008
+    # MatrixRTC (Element Call).  The homeserver's .well-known/matrix/client
+    # advertises https://matrix.bhw.name/livekit/jwt as its rtc_focus, and
+    # lk-jwt-service (127.0.0.1:8090) hands the client back an SFU URL of
+    # wss://matrix.bhw.name/livekit/sfu, so both prefixes must be routed and
+    # stripped here.  Losing these two blocks is what made every voice call
+    # fail with 404 M_UNRECOGNIZED on /livekit/jwt/sfu/get: the POST landed on
+    # tuwunel, which knows no such endpoint.  Media itself does not pass
+    # through Caddy -- it goes straight to livekit-server on 7881/tcp and
+    # 7882/udp, both open in firewalld's permanent config.
+    handle_path /livekit/jwt/* {
+        reverse_proxy 127.0.0.1:8090
+    }
+    handle_path /livekit/sfu/* {
+        reverse_proxy 127.0.0.1:7880
+    }
+    handle {
+        reverse_proxy localhost:8008
+    }
 }
 vdb.bhw.name {
     encode zstd gzip

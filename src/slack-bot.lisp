@@ -195,7 +195,7 @@ Or just ask about a trip's timing — `when is my ride home this coming Tuesday?
 
 *Who you are*: type `/iam` and your initials, e.g. `/iam DMM`, and I'll read `me`, `my` and `I` as you from then on — `book me a van to the dentist tomorrow 9 to 11`, `can I get a van for the pool Saturday 8-10`, `me and CG to swimming Tuesday 7-9pm`. Type `/iam` on its own to see who I have you down as. I remember it across restarts and through `/unsubscribe`.
 
-*Reminders*: type `/subscribe` and your initials, e.g. `/subscribe BW`, and I'll message you 5 minutes before each trip you are driving, out or back (the first name listed drives). `/unsubscribe` turns them off.
+*Reminders*: type `/subscribe` and your initials, e.g. `/subscribe BW`, and I'll message you 30 minutes before each trip you are driving, out or back, with the vehicle you are taking (the first name listed drives). `/unsubscribe` turns them off.
 
 *This message*: `/help`, or send me `help` or `?`."
   "The help page: what the bot is and how to use every command, for people
@@ -814,10 +814,16 @@ currently registered, so it doubles as `/whoami`."
        (format nil "Got it — you are *~A*. I'll read \"me\", \"my\" and \"I\" as ~:*~A in your booking requests."
                initial)))))
 
+(defparameter *reminder-lead-minutes* 30
+  "How many minutes before a trip leg leaves its driver is sent the reminder
+DM (SCHEDULER-TICK).  /subscribe's reply quotes it; +HELP-TEXT+ states it in
+words and has to be changed by hand.")
+
 (defslash-command "/subscribe" (params)
-  "/subscribe <INITIAL> — receive a direct message 5 minutes before each trip
-leg today where you are the driver: the departure when you are the first
-passenger listed for it, the return when you are the first listed for that.
+  "/subscribe <INITIAL> — receive a direct message *REMINDER-LEAD-MINUTES*
+before each trip leg today where you are the driver, naming the vehicle: the
+departure when you are the first passenger listed for it, the return when you
+are the first listed for that.
 Example:
   /subscribe BW
 Persists across restarts. Use /unsubscribe to stop."
@@ -833,8 +839,8 @@ Persists across restarts. Use /unsubscribe to stop."
        ;; to get both reminders and "book me a van".  /unsubscribe drops only
        ;; the subscription; the identity outlives it.
        (add-slack-identity user-id (string-upcase initial))
-       (format nil "Subscribed. You will be DM'd 5 minutes before each departure or return that ~A drives. I'll also read \"me\" as ~:*~A in your messages."
-               (string-upcase initial))))))
+       (format nil "Subscribed. You will be DM'd ~D minutes before each departure or return that ~A drives, with the vehicle to take. I'll also read \"me\" as ~:*~A in your messages."
+               *reminder-lead-minutes* (string-upcase initial))))))
 
 (defslash-command "/unsubscribe" (params)
   "/unsubscribe — stop receiving trip reminder DMs."
@@ -921,20 +927,23 @@ posted back asynchronously via chat.postMessage."
         leg))
 
 (defun scheduler-tick ()
-  "Single sweep: for each subscription, DM a reminder 5 minutes before each
-leg of today's trips that the subscriber drives -- the departure when they
-are the first dep-passenger, the return when they are the first
-ret-passenger.  Window is [now, now+360s] — with a 60s sleep that covers
-5 minutes ±30s."
+  "Single sweep: for each subscription, DM a reminder *REMINDER-LEAD-MINUTES*
+before each leg of today's trips that the subscriber drives -- the departure
+when they are the first dep-passenger, the return when they are the first
+ret-passenger.  A leg is due from the lead time plus the 60s between sweeps
+until it leaves, so the DM goes out between the lead time and a minute more
+ahead of it, and a leg booked later than that is still reminded, on the next
+sweep."
   (maybe-reset-sent-reminders)
-  (let ((now (get-universal-time)))
+  (let ((now (get-universal-time))
+        (window (* 60 (1+ *reminder-lead-minutes*))))
     (dolist (sub (all-slack-subscriptions))
       (let ((user-id (car sub))
             (initial (cdr sub)))
         (flet ((remind (trip leg leaves text-fn)
                  (let ((key (reminder-key user-id trip leg)))
                    (when (and leaves
-                              (<= 0 (- leaves now) 360)
+                              (<= 0 (- leaves now) window)
                               (not (gethash key *sent-reminders*)))
                      (post-slack-message user-id (funcall text-fn))
                      (setf (gethash key *sent-reminders*) t)

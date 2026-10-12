@@ -216,7 +216,7 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
                              '(:dgh "SHMS") '(:dgh ("8 am" "10 am")) '(:dgh (("MM") ("MM")))))
              (b2 (make-block ""  ; no day header = same day
                              '(:lgh "Shrine") '(:lgh ("5 pm" "8 pm")) '(:lgh (("MK") ("MK")))))
-             (sheet (make-test-sheet b1 b2))
+             (sheet (make-test-sheet b1 (block-spacer) b2))
              (trips (vb::parse-schedule sheet)))
         ;; 4 vehicles * 2 blocks = 8 trips
         (is = 8 (length trips))
@@ -225,6 +225,25 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
               (block2-trips (remove-if-not (lambda (tr) (= 18 (trip-block-start-row tr))) trips)))
           (is = 4 (length block1-trips))
           (is = 4 (length block2-trips)))))
+
+  (define-test block-rows-follow-the-sheet
+      ;; A block's start row is the row its header is on, not its ordinal
+      ;; times fifteen.  Two rows inserted by hand under the first block (the
+      ;; "Oct 5-11" tab had that under Sunday's first block) put the second
+      ;; block on row 20, and that is where a booking for it must be written.
+      (let* ((b1 (make-block "Sunday October 11           Sunday October 11"
+                             '(:dgh "St. Paul") '(:dgh ("11:00 am" "2:30 pm")) '(:dgh (("GL") ("GL")))))
+             (b2 (make-block "" '() '() '()))
+             (sheet (make-test-sheet b1 (block-spacer) (block-spacer) (block-spacer) b2)))
+        (is equal '(3 20)
+            (remove-duplicates (mapcar #'trip-block-start-row (vb::parse-schedule sheet))))
+        ;; phantom rows are an artifact of the CSV parser, not rows of the
+        ;; sheet, and are not counted
+        (is equal '(3 20)
+            (remove-duplicates
+             (mapcar #'trip-block-start-row
+                     (vb::parse-schedule (loop for row in sheet
+                                               collect row collect (list ""))))))))
 
   (define-test day-carries-forward
       (let* ((b1 (make-block "Tuesday April 7           Tuesday April 7"
@@ -622,6 +641,9 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
                                    (lambda ()
                                      (let ((result (remind-driver "BW" "April 22")))
                                        (true (search "BW is the driver" result))
+                                       ;; the vehicle to be driven is named
+                                       (true (search "BW is the driver of the DGH for a trip to X location departing at 12:00 pm"
+                                                     result))
                                        (true (search "X location" result))
                                        (true (search "12:00 pm" result))
                                        (true (search "CG, GG are passengers" result)))))))
@@ -670,6 +692,9 @@ Google embeds as JavaScript object literals, with the escapes it uses.")
                                      (let ((result (remind-driver "BW" "April 22")))
                                        (true (search "SHMS" result))
                                        (true (search "Shrine" result))
+                                       ;; each trip with its own vehicle
+                                       (true (search "of the DGH for a trip to SHMS" result))
+                                       (true (search "of the LGH for a trip to Shrine" result))
                                        (true (search "12:35 pm" result))
                                        (true (search "5:35 pm" result))
                                        (true (search "CG is a passenger" result)))))))
@@ -1360,10 +1385,11 @@ writes needs one: the sheet being written is re-read immediately beforehand
       (is equal '() writes))))
 
 (defun block-spacer ()
-  "The blank row that separates two blocks in a fixture sheet.  PARSE-SCHEDULE
-numbers blocks on a fixed 15-row pitch and MAKE-BLOCK builds 14 rows, so a
-sheet with more than one block needs the fifteenth row the real sheet has, or
-the second block's start row comes out one short."
+  "One blank row between two blocks of a fixture sheet.  PARSE-SCHEDULE takes
+a block's start row from where its header is, MAKE-BLOCK builds 14 rows and
+the sheet's blocks are 15 apart, so one spacer after a block puts the next
+one on the row the real sheet has it on.  Each spacer beyond that stands for
+a row somebody inserted by hand."
   (list (make-list 13 :initial-element "")))
 
 (defun two-block-day (&key (dests '(:dgh "SHMS"))
@@ -1376,6 +1402,17 @@ empty, which is how the sheet carries a day across a second block
   (make-test-sheet
    (make-block "Thursday April 9           Thursday April 9" dests times pax)
    (block-spacer)
+   (make-block "" '() '() '())))
+
+(defun shifted-two-block-day ()
+  "TWO-BLOCK-DAY with two rows inserted under the first block, so that the
+second block's header is on sheet row 20 instead of 18: the shape of the
+\"Oct 5-11\" tab when a booking for Sunday's second block was written two
+rows too high."
+  (make-test-sheet
+   (make-block "Thursday April 9           Thursday April 9"
+               '(:dgh "SHMS") '(:dgh ("8:00 am" "11:00 am")) '(:dgh (("MM") ("MM"))))
+   (block-spacer) (block-spacer) (block-spacer)
    (make-block "" '() '() '())))
 
 (define-test conflict-tests
@@ -1424,6 +1461,44 @@ empty, which is how the sheet carries a day across a second block
            :sheet (two-block-day))
         (true (search "Created DGH booking" out))
         (is equal '("F19" "F21" "G21" "F22:F22" "G22:G22") (mapcar #'first writes)))))
+
+  (define-test a-block-moved-down-is-written-where-it-is
+    ;; The incident this guards against: two rows had been inserted under
+    ;; Sunday's first block on the "Oct 5-11" tab, and a booking for the
+    ;; second block, placed by counting blocks, went two rows too high --
+    ;; the times into the destination row and the passengers over the
+    ;; "Dep./Ret." labels.  The rows written follow the block's header, here
+    ;; on row 20: destination 21, times 23, passengers from 24.
+    (let ((trips (vb::parse-schedule (shifted-two-block-day) :sheet-name "test-sheet")))
+      (multiple-value-bind (out writes)
+          (call-recording-writes
+           (lambda ()
+             (vb:book "Thursday April 9" "Detroit Airport" '("BW" "JC")
+                      :dep-time "8:00 pm" :ret-time "9:00 pm"
+                      :vehicle :dgh :trips trips))
+           :sheet (shifted-two-block-day))
+        (true (search "Created DGH booking" out))
+        (is equal '(("F21" (("Detroit Airport")) "test-sheet")
+                    ("F23" (("8:00 pm")) "test-sheet")
+                    ("G23" (("9:00 pm")) "test-sheet")
+                    ("F24:F25" (("BW") ("JC")) "test-sheet")
+                    ("G24:G25" (("BW") ("JC")) "test-sheet"))
+            writes))))
+
+  (define-test a-block-moved-since-the-snapshot-is-not-written
+    ;; The snapshot has the second block on row 18; two rows inserted since
+    ;; have put it on row 20.  The read before the write no longer finds a
+    ;; block on row 18, so nothing is written by the stale row number.
+    (let ((stale (vb::parse-schedule (two-block-day) :sheet-name "test-sheet")))
+      (multiple-value-bind (out writes)
+          (call-recording-writes
+           (lambda ()
+             (false (vb:book "Thursday April 9" "Dentist" '("BW")
+                             :dep-time "11:00 am" :ret-time "1:00 pm"
+                             :vehicle :dgh :trips stale)))
+           :sheet (shifted-two-block-day))
+        (true (search "is no longer on the test-sheet sheet" out))
+        (is equal '() writes))))
 
   (define-test passenger-already-out-is-refused
     ;; MM is on the DGH SHMS trip 8-11, so a second trip for MM at 9-10 in
@@ -1661,6 +1736,15 @@ BOOKING-INCOMPLETE signalled, if any."
         (is string= "Apr 6-12" (getf book-args :week))
         (is = 1 (length (getf book-args :trips)))))))
 
+(defun crlf-csv (&rest records)
+  "RECORDS joined with CR LF, the way Google's CSV export ends them."
+  (with-output-to-string (out)
+    (loop for (record . more) on records
+          do (write-string record out)
+             (when more
+               (write-char #\Return out)
+               (write-char #\Newline out)))))
+
 (define-test sheet-io-tests
   (define-test write-range-payload
     (let ((requests '()) (gets '()))
@@ -1711,23 +1795,48 @@ BOOKING-INCOMPLETE signalled, if any."
       (fail (vb:write-range "F4" '(("SHMS")) :sheet-name "Apr 20-26") error)))
 
   (define-test read-range-urls
-    (let ((urls '()))
+    (let ((urls '())
+          (vb::*weeks* '(("Apr 20-26" "4242"))))
       (with-mocked-functions ((dexador:get (lambda (uri &rest args)
                                              (declare (ignore args))
                                              (push uri urls)
                                              (format nil "a,b~%c,d~%"))))
-        ;; gviz endpoint for a named sheet
+        ;; CSV export of the whole tab for a named sheet, by that tab's gid
         (let ((rows (vb:read-range nil :sheet-name "Apr 20-26")))
           (is equal '(("a" "b") ("c" "d")) rows)
-          (true (search "gviz/tq" (first urls)))
-          (true (search "sheet=Apr%2020-26" (first urls)))
-          (true (search "out:csv" (first urls)))
+          (is = 1 (length urls))
+          (true (search "export?format=csv" (first urls)))
+          (true (search "gid=4242" (first urls)))
+          (false (search "range=" (first urls)))
           (true (search vb::*spreadsheet-id* (first urls))))
         ;; CSV export for a range on the default gid
         (vb:read-range "A1:B2")
         (true (search "export?format=csv" (first urls)))
         (true (search "range=A1:B2" (first urls)))
-        (true (search (format nil "gid=~a" vb::*gid*) (first urls)))))))
+        (true (search (format nil "gid=~a" vb::*gid*) (first urls))))))
+
+  (define-test read-range-keeps-sheet-rows
+    ;; Row N of what READ-RANGE returns must be row N of the sheet, because
+    ;; that is how PARSE-SCHEDULE knows where a block is.  The export keeps
+    ;; the tab's empty rows and ends each record with CR LF, which CL-CSV
+    ;; turns into extra one-cell rows unless the CRs are removed; a line
+    ;; break inside a quoted cell is a bare LF and stays in its cell.
+    (let ((vb::*weeks* '(("Apr 20-26" "4242")))
+          (csv (crlf-csv "title,," ",,"
+                         "Monday April 20,,Chevy" (format nil ",\"two~%lines\",") ",,Dep."
+                         ",," ",," ",," ",,"
+                         ",,Chevy" ",," ",,Dep." ",," ",,")))
+      (with-mocked-functions ((dexador:get (lambda (uri &rest args)
+                                             (declare (ignore uri args))
+                                             csv)))
+        (let ((rows (vb:read-range nil :sheet-name "Apr 20-26")))
+          (is = 14 (length rows))
+          (is equal '("Monday April 20" "" "Chevy") (third rows))
+          (is equal (list "" (format nil "two~%lines") "") (fourth rows))
+          (is equal '("" "" "Chevy") (tenth rows))
+          (is equal '(3 10)
+              (remove-duplicates
+               (mapcar #'trip-block-start-row (vb::parse-schedule rows)))))))))
 
 (define-test sheet-discovery-tests
   ;; The week tabs are discovered from the spreadsheet's public htmlview
@@ -1762,6 +1871,23 @@ BOOKING-INCOMPLETE signalled, if any."
                                            (declare (ignore uri args))
                                            "<html><body>Sign in</body></html>")))
       (fail (vb:sheet-tabs) error)))
+
+  (define-test sheet-gid-lookup
+    ;; READ-RANGE reads a tab by gid, so a sheet name has to be turned into
+    ;; one: from the week list when that carries it, else from the tab list.
+    (let ((fetches 0)
+          (vb::*weeks* '(("Apr 20-26" "11") ("Apr 27-May 3" nil))))
+      (with-mocked-functions ((vb:sheet-tabs
+                               (lambda ()
+                                 (incf fetches)
+                                 '(("Apr 27-May 3" "22") ("Dates" "33")))))
+        (is string= "11" (vb::sheet-gid "Apr 20-26"))
+        (is = 0 fetches)
+        (is string= "22" (vb::sheet-gid "Apr 27-May 3"))
+        (is string= "33" (vb::sheet-gid "Dates"))
+        (is = 2 fetches)
+        ;; an unknown name is an error rather than a read of some other tab
+        (fail (vb::sheet-gid "Nov 2-8") error))))
 
   (define-test week-sheets-filters-caches-and-refreshes
     (let ((fetches 0)
@@ -1898,7 +2024,19 @@ BOOKING-INCOMPLETE signalled, if any."
                                             :ret-passengers '("BW" "DM"))))
     (is string= "BW is the driver for the return from SHMS at 12 pm and DM, CG are passengers."
         (vb:remind-return-driver (make-trip :destination "SHMS" :return-time "12 pm"
-                                            :ret-passengers '("BW" "DM" "CG")))))
+                                            :ret-passengers '("BW" "DM" "CG"))))
+    ;; a trip that knows its vehicle names it
+    (is string= "BW is the driver of the LGH for the return from SHMS at 12 pm and DM is a passenger."
+        (vb:remind-return-driver (make-trip :vehicle :lgh :destination "SHMS"
+                                            :return-time "12 pm"
+                                            :ret-passengers '("BW" "DM")))))
+
+  (define-test vehicle-phrase-wording
+    (is string= "the DGH" (vb::vehicle-phrase :dgh))
+    (is string= "the LGH" (vb::vehicle-phrase :lgh))
+    (is string= "the Chevy" (vb::vehicle-phrase :chevy))
+    (is string= "a personal vehicle" (vb::vehicle-phrase :personal))
+    (false (vb::vehicle-phrase nil)))
 
   (define-test current-year-key
     (let ((year (nth-value 5 (decode-universal-time (get-universal-time)))))

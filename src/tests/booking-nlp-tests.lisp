@@ -353,7 +353,12 @@ new parser's terms (no articles in destinations, no default day).")
     ;; a day-first month-day
     ("MM to the pool on the 22nd of April, 9 am to noon"
      :destination "pool" :day-md "April 22" :passengers ("MM")
-     :dep-time "9:00 am" :ret-time "12:00 pm" :missing nil))
+     :dep-time "9:00 am" :ret-time "12:00 pm" :missing nil)
+    ;; "o'clock" between the hour and its meridiem, which the start of the
+    ;; range shares: this message was once booked for 8 to 9 in the morning
+    ("Book trip to the Detroit Airport pickup with BW as the driver and JC and BW as the returning passengers for yesterday from 8 to 9 o'clock p.m. Oct 11 Sunday. DGH is the vehicle."
+     :destination "Detroit Airport" :day-md "October 11" :passengers ("BW" "JC")
+     :vehicle :dgh :dep-time "8:00 pm" :ret-time "9:00 pm" :missing nil))
   "Free-form sentences the regex parser could not handle.")
 
 (defparameter *booking-corpus* (append *legacy-corpus* *free-form-corpus*))
@@ -482,6 +487,20 @@ new parser's terms (no articles in destinations, no default day).")
     (is equal '("8:00 am" "10:00 am") (times "back by 10 am, leaving at 8 am"))
     ;; a return after midnight-ish inference: return earlier than departure without meridiem
     (is equal '("10:00 am" "1:00 pm") (times "leaving at 10 am and back at 1"))
+    ;; the start of a range shares the end's meridiem after a cue as well
+    (is equal '("8:00 pm" "9:00 pm") (times "from 8 to 9 pm"))
+    (is equal '("8:30 pm" "10:00 pm") (times "from 8:30 to 10 pm"))
+    (is equal '("8:00 am" "9:00 pm") (times "from 8 am to 9 pm"))
+    ;; ... unless that would have the trip end before it starts
+    (is equal '("11:00 am" "1:00 pm") (times "from 11 to 1 pm"))
+    (is equal '("11:00 am" "1:00 pm") (times "11-1pm"))
+    (is equal '("9:00 am" "12:00 pm") (times "9 to 12 pm"))
+    ;; "o'clock" may stand between the hour and its meridiem, or alone
+    (is equal '("8:00 pm" "9:00 pm") (times "from 8 to 9 o'clock p.m."))
+    (is equal '("8:00 pm" "9:00 pm") (times "from 8 o'clock to 9 o'clock pm"))
+    (is equal '("9:00 pm" nil) (times "at nine o'clock pm"))
+    (is equal '("9:00 am" nil) (times "at 9 o'clock"))
+    (is equal '("8:00 am" "10:00 am") (times "leaving at eight o'clock and back by ten o'clock"))
     (is equal '(nil nil) (times "no times at all"))))
 
 (define-test destination-selection

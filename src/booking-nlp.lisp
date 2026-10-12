@@ -99,6 +99,9 @@ are missing; its report is ready to post to Slack."))
 
 (defparameter *meridiem-words* '("am" "pm" "a.m." "p.m." "a.m" "p.m"))
 
+(defparameter *oclock-words* '("o'clock" "o’clock" "oclock")
+  "How \"o'clock\" is written after an hour: \"9 o'clock\", \"nine o’clock pm\".")
+
 (defparameter *day-parts* '("morning" "afternoon" "evening" "night"))
 
 (defparameter *number-words*
@@ -217,6 +220,9 @@ trade-off DGH and LGH have always carried.")
        ((:regex "^\\d{1,2}(?:[ap]m|[ap]\\.m\\.?)$"))
        ((:regex "^\\d{1,2}$") (:lower ,*meridiem-words*))
        ((:lower ,*number-words*) (:lower ,*meridiem-words*))
+       ;; "9 o'clock", "nine o'clock p.m."
+       ((:regex "^\\d{1,2}$") (:lower ,*oclock-words*) (:lower ,*meridiem-words* :op "?"))
+       ((:lower ,*number-words*) (:lower ,*oclock-words*) (:lower ,*meridiem-words* :op "?"))
        ((:lower ("noon" "midnight")))
        ;; bare hour after a time cue: "at 7", "back around 11", "to 10"
        (:trim-leading 1
@@ -384,24 +390,34 @@ Slack-ready message asking the user to re-send the request.")
   (some (lambda (s) (nlp:span-covers-p s index)) spans))
 
 (defun promote-range-starts (doc)
-  "Add :TIME entities for bare numbers directly before a range connector that
-precedes a TIME (\"7-9pm\", \"7 to 9 pm\").  The new span inherits the
-following time's meridiem via :INHERIT-MERIDIEM-FROM in its data."
+  "Give the start of a time range the meridiem of its end: \"7-9pm\", \"7 to 9
+pm\", \"from 8 to 9 pm\".  A bare number directly before a range connector
+that precedes a TIME becomes a :TIME entity; a TIME already standing there
+\(\"from 8\" is one) is kept when it says neither am nor pm itself.  Either
+way the span's data gets :INHERIT-MERIDIEM-FROM, the time that follows."
   (let ((ents (nlp:doc-ents doc))
         (new '()))
     (dolist (e ents)
       (when (eq (nlp:span-label e) :time)
         (let* ((s (nlp:span-start e))
                (conn (nlp:doc-token doc (1- s)))
-               (num (nlp:doc-token doc (- s 2))))
+               (num (nlp:doc-token doc (- s 2)))
+               (before (find-if (lambda (p)
+                                  (and (eq (nlp:span-label p) :time)
+                                       (= (nlp:span-end p) (1- s))))
+                                ents)))
           (when (and conn num
-                     (member (nlp:token-lower conn) *range-connectors* :test #'string=)
-                     (cl-ppcre:scan "^(?:[1-9]|1[0-2])$" (nlp:token-text num))
-                     (not (covered-p (- s 2) ents))
-                     (not (covered-p (- s 2) new)))
-            (push (nlp:make-span :doc doc :start (- s 2) :end (1- s) :label :time
-                                 :data (list :priority 20 :inherit-meridiem-from e))
-                  new)))))
+                     (member (nlp:token-lower conn) *range-connectors* :test #'string=))
+            (cond
+              (before
+               (unless (time-phrase-meridiem (nlp:span-text before))
+                 (setf (getf (nlp:span-data before) :inherit-meridiem-from) e)))
+              ((and (cl-ppcre:scan "^(?:[1-9]|1[0-2])$" (nlp:token-text num))
+                    (not (covered-p (- s 2) ents))
+                    (not (covered-p (- s 2) new)))
+               (push (nlp:make-span :doc doc :start (- s 2) :end (1- s) :label :time
+                                    :data (list :priority 20 :inherit-meridiem-from e))
+                     new)))))))
     (when new
       (setf (nlp:doc-ents doc)
             (sort (append new ents) #'< :key #'nlp:span-start)))
@@ -415,8 +431,10 @@ following time's meridiem via :INHERIT-MERIDIEM-FROM in its data."
         (t nil)))
 
 (defun resolve-time-span (span)
-  "Return (values MINUTES-SINCE-MIDNIGHT HAS-MERIDIEM-P PHRASE) for a :TIME
-span, or NIL when chronicity cannot read it."
+  "Return (values MINUTES-SINCE-MIDNIGHT MERIDIEM-SOURCE PHRASE) for a :TIME
+span, or NIL when chronicity cannot read it.  MERIDIEM-SOURCE is :OWN when
+the span says am or pm itself, :INHERITED when it took that from the time it
+ranges to (PROMOTE-RANGE-STARTS), and NIL when it has neither."
   (let* ((text (nlp:span-text span))
          (inherit (getf (nlp:span-data span) :inherit-meridiem-from))
          (own (time-phrase-meridiem text))
@@ -424,9 +442,14 @@ span, or NIL when chronicity cannot read it."
          (phrase (if (and meridiem (not own))
                      (format nil "~a ~a" text (string-downcase (symbol-name meridiem)))
                      text))
-         (dt (ignore-errors (chronicity:parse phrase :context :future))))
+         ;; chronicity reads "9 pm" but not "9 o'clock pm"
+         (dt (ignore-errors
+              (chronicity:parse (cl-ppcre:regex-replace-all "(?i)\\s*o['’]?clock" phrase "")
+                                :context :future))))
     (when dt
-      (values (+ (* 60 (hour-of dt)) (minute-of dt)) (and meridiem t) phrase))))
+      (values (+ (* 60 (hour-of dt)) (minute-of dt))
+              (cond (own :own) (meridiem :inherited))
+              phrase))))
 
 (defun cue-in-window-p (cues label window-start window-end)
   (some (lambda (c) (and (eq (nlp:span-label c) label)
@@ -468,11 +491,16 @@ Returns (values DEP-SPAN RET-SPAN)."
 (defun resolve-times (dep-span ret-span)
   "Resolve the departure/return spans to \"H:MM am\" strings, inferring a
 missing meridiem when the return would otherwise precede the departure.
+An am or pm the departure only took from the return (\"7 to 9 pm\") is given
+up when it would put the departure at or after the return: \"11 to 1 pm\"
+leaves at 11 am.
 Returns (values DEP-TIME RET-TIME DEP-PHRASE RET-PHRASE)."
   (multiple-value-bind (dep-min dep-mer dep-phrase)
       (and dep-span (resolve-time-span dep-span))
     (multiple-value-bind (ret-min ret-mer ret-phrase)
         (and ret-span (resolve-time-span ret-span))
+      (when (and dep-min ret-min (eq dep-mer :inherited) (>= dep-min ret-min))
+        (setf dep-min (mod (+ dep-min 720) 1440)))
       (when (and dep-min (not dep-mer) (<= 1 (floor dep-min 60) 5))
         (incf dep-min 720))
       (when (and dep-min ret-min (not ret-mer) (<= ret-min dep-min))

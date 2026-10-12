@@ -942,15 +942,21 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
       (is equal '(("U7" . "BW")) subscribed)
       ;; the reply goes back to the conversation the message came from
       (is string= "D1" (car (first posted)))
-      (true (search "Subscribed" (cdr (first posted)))))))
+      (true (search "Subscribed" (cdr (first posted))))
+      ;; ... and says how far ahead the reminders come
+      (true (search "30 minutes before each departure or return that BW drives"
+                    (cdr (first posted)))))))
 
 (define-test scheduler-tick-window
   :parent slack-bot-suite
+  ;; A leg is due from *REMINDER-LEAD-MINUTES* plus the minute between sweeps
+  ;; until it leaves: with the lead at 30 minutes, 0 to 1860 seconds ahead.
   (let* ((trip (vb:make-trip :day "Monday" :vehicle :dgh :destination "SHMS"
                              :departure "8:00 am" :block-start-row 3
                              :dep-passengers '("BW")))
          (dep-offset 100)
          (posted '())
+         (sb::*reminder-lead-minutes* 30)
          (sb::*sent-reminders* (make-hash-table :test #'equal))
          (sb::*sent-reminders-date* (sb::today-date-key)))
     (with-mocked-functions ((db:all-slack-subscriptions
@@ -967,7 +973,7 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                                (format nil "reminder for ~a" initial)))
                             (sb::post-slack-message
                              (lambda (channel text) (push (cons channel text) posted))))
-      ;; inside the 5-minute window -> one DM to the subscriber
+      ;; inside the window -> one DM to the subscriber
       (sb::scheduler-tick)
       (is = 1 (length posted))
       (is string= "U1" (car (first posted)))
@@ -977,21 +983,35 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
       (is = 1 (length posted))
       ;; outside the window (too far ahead, or already departed) -> nothing
       (clrhash sb::*sent-reminders*)
-      (setf dep-offset 400)
+      (setf dep-offset 1900)
       (sb::scheduler-tick)
       (is = 1 (length posted))
       (setf dep-offset -10)
       (sb::scheduler-tick)
       (is = 1 (length posted))
       ;; the window's far edge is inclusive
-      (setf dep-offset 355)
+      (setf dep-offset 1855)
       (sb::scheduler-tick)
       (is = 2 (length posted))
+      ;; the lead is half an hour, not the five minutes it used to be: a
+      ;; departure 20 minutes off is already due
+      (clrhash sb::*sent-reminders*)
+      (setf dep-offset 1200)
+      (sb::scheduler-tick)
+      (is = 3 (length posted))
+      ;; ... and it is whatever *REMINDER-LEAD-MINUTES* says
+      (clrhash sb::*sent-reminders*)
+      (let ((sb::*reminder-lead-minutes* 10))
+        (sb::scheduler-tick)
+        (is = 3 (length posted))
+        (setf dep-offset 650)
+        (sb::scheduler-tick)
+        (is = 4 (length posted)))
       ;; a trip without a parseable departure is skipped
       (clrhash sb::*sent-reminders*)
       (with-mocked-functions ((vb:trip-departure-universal-time (lambda (tr) (declare (ignore tr)) nil)))
         (sb::scheduler-tick)
-        (is = 2 (length posted))))
+        (is = 4 (length posted))))
     ;; errors for one subscription are logged, not raised
     (with-mocked-functions ((db:all-slack-subscriptions (lambda () '(("U1" . "BW"))))
                             (vb:trips-for-driver-today (lambda (initial) (declare (ignore initial))
@@ -1032,11 +1052,11 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                              (lambda (channel text) (push (cons channel text) posted))))
       (let ((*error-output* (make-broadcast-stream)))
         ;; both legs in the window -> two DMs, the return one worded by
-        ;; REMIND-RETURN-DRIVER
+        ;; REMIND-RETURN-DRIVER and naming the vehicle to drive
         (sb::scheduler-tick)
         (is = 2 (length posted))
         (true (find "departure for BW" posted :key #'cdr :test #'string=))
-        (true (find "BW is the driver for the return from SHMS at 12 pm and DM, CG are passengers."
+        (true (find "BW is the driver of the DGH for the return from SHMS at 12 pm and DM, CG are passengers."
                     posted :key #'cdr :test #'string=))
         ;; neither leg repeats on the next tick
         (sb::scheduler-tick)

@@ -6,7 +6,6 @@
   (:import-from #:alexandria)
   (:import-from #:cl-ppcre)
   (:import-from #:com.inuoe.jzon)
-  (:import-from #:quri)
   (:import-from #:cl-csv)
   (:import-from #:dexador)
   (:import-from #:chronicity
@@ -180,9 +179,10 @@ the last row of each block.  Columns A and B are ignored because the merged
 day text lives in A on header rows.
 
 PARSE-SCHEDULE uses this to decide whether the row at the time offset really
-holds times: the gviz CSV drops empty rows, so for a block with no times the
-row found there is that weekday reminder, and reading it as data made every
-unbooked block look like a Personal trip departing at \"Saturday\"."
+holds times: in a read that has lost the block's empty rows (the gviz CSV
+dropped them), the row found there for a block with no times is that weekday
+reminder, and reading it as data made every unbooked block look like a
+Personal trip departing at \"Saturday\"."
   (every (lambda (cell)
            (let ((c (string-trim '(#\Space #\Tab) cell)))
              (or (not (non-blank-p c)) (header-cell-p c))))
@@ -206,12 +206,15 @@ unbooked block look like a Personal trip departing at \"Saturday\"."
 (defun parse-schedule (raw-rows &key sheet-name)
   "Parse spreadsheet RAW-ROWS into a list of TRIP structs.
    SHEET-NAME is stored on each trip for write-back.
-   Block start rows are computed as 3 + block_index * 15 (fixed layout)."
+   A block's start row is the sheet row its header (\"Chevy\" in column C) was
+   found on, so RAW-ROWS must be the whole tab with its empty rows in place,
+   which is what READ-RANGE returns.  Blocks are not assumed to sit a fixed
+   number of rows apart: a row inserted by hand into one block moves every
+   block below it, and a booking placed by counting blocks then landed that
+   many rows too high, over the \"Dep./Ret.\" labels."
   (multiple-value-bind (rows row-map) (clean-rows raw-rows)
-    (declare (ignore row-map))
     (let ((trips '())
           (current-day nil)
-          (block-index 0)
           (i 0))
       (loop while (< i (length rows))
             for row = (nth i rows)
@@ -220,9 +223,9 @@ unbooked block look like a Personal trip departing at \"Saturday\"."
                        (string-equal (string-trim " " (safe-nth 2 row)) "Chevy"))
                   (let ((day (extract-day-from-header row)))
                     (when day (setf current-day day)))
-                  (let ((sheet-row (+ 3 (* block-index 15))))
-                    ;; Verify next row is a destination row (not "Dep.")
-                    ;; In gviz output, empty rows between header and Dep. may be dropped
+                  (let ((sheet-row (aref row-map i)))
+                    ;; The row after the header is the destination row, unless
+                    ;; that row is missing and "Dep./Ret." follows directly.
                     (let* ((next-row (nth (1+ i) rows))
                            (has-dest-row (and next-row
                                               (not (string-equal "Dep."
@@ -232,10 +235,11 @@ unbooked block look like a Personal trip departing at \"Saturday\"."
                            (pass-offset (if has-dest-row 4 3)))
                       (when (and current-day (< (+ i time-offset) (length rows)))
                         (let* ((time-row (nth (+ i time-offset) rows))
-                               ;; gviz drops empty rows, so with no times the
-                               ;; row at this offset is the next block header,
-                               ;; a "Dep./Ret." row, or the weekday reminder in
-                               ;; column L.  LABEL-ROW-P covers all three.
+                               ;; With no times the row is blank, or, in a
+                               ;; read that has lost the block's empty rows,
+                               ;; it is the next block header, a "Dep./Ret."
+                               ;; row, or the weekday reminder in column L.
+                               ;; LABEL-ROW-P covers all four.
                                (time-row-empty (label-row-p time-row)))
                           (iterate ((vspec (scan *vehicles*)))
                             (destructuring-bind (vname dep-col ret-col) vspec
@@ -259,7 +263,6 @@ unbooked block look like a Personal trip departing at \"Saturday\"."
                                        :ret-col ret-col
                                        :sheet-name sheet-name)
                                       trips))))))))
-                  (incf block-index)
                   (incf i))
                  (t (incf i))))
       (nreverse trips))))
@@ -771,11 +774,21 @@ discovered from the spreadsheet (DISCOVER-WEEK-SHEETS) and cached for
                (when (and start (<= start target-key end))
                  (return name))))))
 
+(defun vehicle-phrase (vehicle)
+  "VEHICLE, a key of *VEHICLES*, as a sentence names it: \"the DGH\", \"the
+Chevy\", \"a personal vehicle\".  NIL for no vehicle."
+  (case vehicle
+    ((nil) nil)
+    (:chevy "the Chevy")
+    (:personal "a personal vehicle")
+    (t (format nil "the ~a" vehicle))))
+
 (defun remind-driver (driver &optional (day-phrase "today"))
   "Return a string summarizing the trips DRIVER (e.g. \"BW\") is driving on
 DAY-PHRASE (natural-language string parsed by chronicity, defaults to today).
-The driver is the first initial in dep-passengers. If multiple trips match,
-all are listed in one string separated by spaces."
+The driver is the first initial in dep-passengers.  Each trip names the
+vehicle to be driven (VEHICLE-PHRASE).  If multiple trips match, all are
+listed in one string separated by spaces."
   (let* ((day-dt (chronicity:parse day-phrase :context :future))
          (day-str (format-booking-day day-dt))
          (sheet (find-week-sheet day-dt)))
@@ -796,25 +809,26 @@ all are listed in one string separated by spaces."
           (format nil "~{~a~^ ~}"
                   (mapcar
                    (lambda (tr)
-                     (let ((others (rest (trip-dep-passengers tr))))
+                     (let ((others (rest (trip-dep-passengers tr)))
+                           (lead (format nil "~a is the driver~@[ of ~a~] for a trip to ~a departing at ~a"
+                                         driver (vehicle-phrase (trip-vehicle tr))
+                                         (trip-destination tr) (trip-departure tr))))
                        (cond
                          ((null others)
-                          (format nil "~a is the driver for a trip to ~a departing at ~a with no other passengers."
-                                  driver (trip-destination tr) (trip-departure tr)))
+                          (format nil "~a with no other passengers." lead))
                          ((null (rest others))
-                          (format nil "~a is the driver for a trip to ~a departing at ~a and ~a is a passenger."
-                                  driver (trip-destination tr) (trip-departure tr) (first others)))
+                          (format nil "~a and ~a is a passenger." lead (first others)))
                          (t
-                          (format nil "~a is the driver for a trip to ~a departing at ~a and ~{~a~^, ~} are passengers."
-                                  driver (trip-destination tr) (trip-departure tr) others)))))
+                          (format nil "~a and ~{~a~^, ~} are passengers." lead others)))))
                    driver-trips))))))
 
 (defun remind-return-driver (trip)
   "Return the reminder for the driver of TRIP's return leg, the first of its
-ret-passengers, worded like REMIND-DRIVER's."
+ret-passengers, worded like REMIND-DRIVER's and naming the vehicle likewise."
   (destructuring-bind (&optional driver &rest others) (trip-ret-passengers trip)
-    (let ((lead (format nil "~a is the driver for the return from ~a at ~a"
-                        driver (trip-destination trip) (trip-return-time trip))))
+    (let ((lead (format nil "~a is the driver~@[ of ~a~] for the return from ~a at ~a"
+                        driver (vehicle-phrase (trip-vehicle trip))
+                        (trip-destination trip) (trip-return-time trip))))
       (cond
         ((null others)
          (format nil "~a with no other passengers." lead))
@@ -1266,19 +1280,36 @@ empty list would look like a spreadsheet with no weeks."
              *spreadsheet-id*))
     (nreverse tabs)))
 
+(defun sheet-gid (sheet-name)
+  "Return the gid of the tab named SHEET-NAME: the one WEEK-SHEETS lists for
+it, or else the one found in the spreadsheet's own tab list (SHEET-TABS).
+Signals an error when no tab has that name, since reading some other tab in
+its place would put bookings on the wrong week."
+  (flet ((gid-in (tabs)
+           (second (find sheet-name tabs :key #'first :test #'string=))))
+    (or (gid-in (week-sheets))
+        (gid-in (sheet-tabs))
+        (error "The spreadsheet has no tab named ~s." sheet-name))))
+
 (defun read-range (range &key sheet-name)
   "Read cells from the public Google Sheet via CSV export. Returns a list of rows.
-   If SHEET-NAME is given, uses gviz endpoint (supports sheet names)."
-  (if sheet-name
-      (let* ((url (format nil "https://docs.google.com/spreadsheets/d/~a/gviz/tq?tq=select+*&sheet=~a&headers=0&tqx=out:csv"
-                          *spreadsheet-id* (quri:url-encode sheet-name)))
-             (body (dex:get url)))
-        (cl-csv:read-csv body))
-      (let* ((url (format nil
-                          "https://docs.google.com/spreadsheets/d/~a/export?format=csv&range=~a&gid=~a"
-                          *spreadsheet-id* range *gid*))
-             (body (dex:get url)))
-        (cl-csv:read-csv body))))
+   If SHEET-NAME is given, the whole of that tab is returned (see SHEET-GID)
+   and RANGE is ignored.
+
+   The export keeps the tab's empty rows, so the Nth row returned is row N of
+   the sheet, and PARSE-SCHEDULE relies on that to know which rows a booking
+   is written to.  The gviz endpoint read before dropped empty rows, which
+   left the row numbers to be assumed from a fixed layout.
+
+   Google ends each record with CR LF, which makes CL-CSV emit a spurious
+   one-cell row after some empty rows; the CRs are removed first so that the
+   rows come out one per sheet row."
+  (let ((url (if sheet-name
+                 (format nil "https://docs.google.com/spreadsheets/d/~a/export?format=csv&gid=~a"
+                         *spreadsheet-id* (sheet-gid sheet-name))
+                 (format nil "https://docs.google.com/spreadsheets/d/~a/export?format=csv&range=~a&gid=~a"
+                         *spreadsheet-id* range *gid*))))
+    (cl-csv:read-csv (remove #\Return (dex:get url)))))
 
 (defun write-range (range values &key sheet-name)
   "Write VALUES (list of rows) to RANGE via the Apps Script doPost endpoint.

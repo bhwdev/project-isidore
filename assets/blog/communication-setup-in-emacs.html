@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- 2026-09-01 Tue 13:49 -->
+<!-- 2026-10-12 Mon 19:46 -->
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Communication Setup in Emacs</title>
@@ -9,10 +9,6 @@
 <meta name="generator" content="Org Mode" />
 
                       <link rel="stylesheet" type="text/css" href="../global.css"/>
-                      <link rel="stylesheet"
-                            href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.2.0/styles/base16/solarized-light.min.css">
-                      <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.2.0/highlight.min.js" defer></script>
-                      <script>var hlf=function(){Array.prototype.forEach.call(document.querySelectorAll("pre.src"),function(t){var e;e=t.getAttribute("class"),e=e.replace(/src-(\w+)/,"src-$1 $1"),t.setAttribute("class",e),hljs.highlightElement(t)})};addEventListener("DOMContentLoaded",hlf);</script>
 </head>
 <body>
 <div id="preamble" class="status">
@@ -34,10 +30,10 @@
                                     </div>
                                     <h1 class="title">Communication Setup in Emacs</h1>
                                     <p class="subtitle">Much ink has been spilled on&hellip;how best to spill ink?</p> <br/>
-                                    <p class="updated"><a href="/contact#article-history">Updated:</a> 2026-09-01 Tue 13:49</p>
+                                    <p class="updated"><a href="/contact#article-history">Updated:</a> 2026-10-12 Mon 19:44</p>
 </div>
 <div id="content" class="content">
-<div class="abstract" id="org183315b">
+<div class="abstract" id="org2be3b1c">
 <p>
 
 </p>
@@ -117,10 +113,10 @@ similar fashion as Email. Three options exist:
 Options 1. and 2. can be <a href="https://matrix.org/ecosystem/bridges/">bridged to third party services</a> at your convenience
 while 3. has no bridging capabilities as of this writing. The focus of this
 article is option 1. although 2. <a href="https://www.reddit.com/r/emacs/comments/1crerbh/access_signalwhatsapp_messages_with_ement_via/">could be possible</a> to use with <a href="https://github.com/alphapapa/ement.el">Ement.el.</a> I am
-living the dream with Facebook Messenger, WhatsApp, Slack, Discord, Google
-Voice and SMS (Google Messages) bridged onto a self-hosted Matrix server. A server that has Emacs as the client on my computer
-and <a href="https://element.io/download">element</a> on mobile. The whole process shouldn&rsquo;t take you more than 1 hour. My
-own notes follow, hope that helps.
+living the dream with Facebook Messenger, WhatsApp, Slack, and Google Voice
+bridged onto a self-hosted Matrix server. A server that has Emacs as the client
+on my computer and <a href="https://element.io/download">element</a> on mobile. The whole process shouldn&rsquo;t take you more
+than 1 hour. My own notes follow, hope that helps.
 </p>
 </div>
 <div id="outline-container-ID-20260901T134925.240856" class="outline-3">
@@ -137,18 +133,16 @@ Prerequisites:
 </ul>
 
 <p>
-I am installing the <a href="https://github.com/matrix-construct/tuwunel">Tuwunel</a> (as of writing, v1.7.0) implementation of the
-Matrix protocol on Debian 13. Tuwunel, the official successor to conduwuit, is
-a single Rust binary with an embedded RocksDB database and prebuilt <code>.deb</code>
-packages; compared to my old matrix-synapse deployment there is no Python
-virtualenv and no PostgreSQL to administer. Do note that automatic migration
-from Synapse is <a href="https://github.com/matrix-construct/tuwunel">planned but not yet supported</a>, so I started with a fresh
-database. Replace all instances of <code>matrix.bhw.name</code> with your domain name
-<code>matrix.example.com</code>. For the older matrix-synapse versions of this article
-see <a href="https://gitlab.com/bhw/project-isidore/-/blob/2f4d9517352862d21b4e19267f9bc91642859712/assets/blog/communication-setup-in-emacs.html">commit 2f4d9517</a> (Debian 12, distribution package) or <a href="https://gitlab.com/bhw/project-isidore/-/blob/befe72fb930420716cca3f58c3f3a5dd66f2e3f6/assets/blog/communication-setup-in-emacs.html">commit befe72fb</a>
-(Debian 13, building from source). The steps outlined here are only what&rsquo;s
-required for a single user to self-host a tuwunel server with user defined
-<a href="https://matrix.org/ecosystem/bridges/">bridges</a>. Voice/video calling via MatrixRTC and LiveKit is supported by
+I am installing the <a href="https://github.com/matrix-construct/tuwunel">Tuwunel</a> (as of writing, v1.7.0) implementation of the Matrix
+protocol on Debian 13. Tuwunel, the official successor to conduwuit, is a single
+Rust binary with an embedded RocksDB database and prebuilt <code>.deb</code> packages;
+compared to my old matrix-synapse deployment there is no Python virtualenv and
+no PostgreSQL to administer. Replace all instances of <code>matrix.bhw.name</code> with
+your domain name <code>matrix.example.com</code>. For the older matrix-synapse versions of
+this article see <a href="https://gitlab.com/bhw/project-isidore/-/blob/2f4d9517352862d21b4e19267f9bc91642859712/assets/blog/communication-setup-in-emacs.html">commit 2f4d9517</a> (Debian 12, distribution package) or <a href="https://gitlab.com/bhw/project-isidore/-/blob/befe72fb930420716cca3f58c3f3a5dd66f2e3f6/assets/blog/communication-setup-in-emacs.html">commit
+befe72fb</a> (Debian 13, building from source). The steps outlined here are only
+what&rsquo;s required for a single user to self-host a tuwunel server with user
+defined <a href="https://matrix.org/ecosystem/bridges/">bridges</a>. Voice/video calling via MatrixRTC and LiveKit is supported by
 tuwunel but out of scope for this article.
 </p>
 
@@ -159,8 +153,8 @@ tuwunel but out of scope for this article.
 </span>  <span class="org-comment-delimiter"># </span><span class="org-comment">On the server machine, download the prebuilt .deb from
 </span>  <span class="org-comment-delimiter"># </span><span class="org-comment">https://github.com/matrix-construct/tuwunel/releases
 </span>  <span class="org-comment-delimiter"># </span><span class="org-comment">Note I am downloading the aarch64 (arm64) build.
-</span>  <span class="org-type">curl</span> -L -O https://github.com/matrix-construct/tuwunel/releases/download/v1.7.0/v1.7.0-release-all-aarch64-v8-linux-gnu-tuwunel.deb
-  <span class="org-type">sudo</span> apt install ./v1.7.0-release-all-aarch64-v8-linux-gnu-tuwunel.deb
+</span>  <span class="org-type">curl</span> -L -O https://github.com/matrix-construct/tuwunel/releases/download/v1.9.4/v1.9.4-release-all-aarch64-v8-linux-gnu-tuwunel.deb
+  <span class="org-type">sudo</span> apt install ./v1.9.4-release-all-aarch64-v8-linux-gnu-tuwunel.deb
   <span class="org-comment-delimiter"># </span><span class="org-comment">Upgrading tuwunel later is the same, download the newer .deb and
 </span>  <span class="org-comment-delimiter"># </span><span class="org-comment">apt install it again. An apt repository is also available,
 </span>  <span class="org-comment-delimiter"># </span><span class="org-comment">https://matrix-construct.github.io/tuwunel/deploying/debian.html</span>
@@ -240,15 +234,13 @@ response of <code>M_UNRECOGNIZED: Not Found</code>.
 </div>
 
 <p>
-Now our aim is to create an administrator user. There is no need for
-matrix-synapse&rsquo;s shared secret registration workarounds and database surgery;
-tuwunel grants the first user to register admin privileges by joining them to
-the admin room. Opening my web browser to <a href="https://app.element.io/#/register">https://app.element.io/#/register</a> &ndash;
-note that we must change the &ldquo;Homeserver&rdquo; from <code>matrix.org</code> to
-<code>https://matrix.bhw.name</code> &ndash; I create a user, supplying the
-<code>registration_token</code> set in <code>tuwunel.toml</code>. Our new user is invited to the
-admin room, from which the server is administered by messaging <code>!admin</code>
-commands. With the account created, close registration.
+Now our aim is to create an administrator user. tuwunel grants the first user to
+register admin privileges by joining them to the admin room. Opening my web
+browser to <a href="https://app.element.io/#/register">https://app.element.io/#/register</a> &ndash; note that we must change the
+&ldquo;Homeserver&rdquo; from <code>matrix.org</code> to <code>https://matrix.bhw.name</code> &ndash; I create a user,
+supplying the <code>registration_token</code> set in <code>tuwunel.toml</code>. Our new user is
+invited to the admin room, from which the server is administered by messaging
+<code>!admin</code> commands. With the account created, close registration.
 </p>
 
 <div class="org-src-container">
@@ -277,11 +269,10 @@ extract it to <code>/opt/mautrix-whatsapp/</code>.
 </span><span class="org-type">mkdir</span> /opt/mautrix-whatsapp/
 <span class="org-comment-delimiter"># </span><span class="org-comment">If updating, </span><span class="org-type"><span class="org-comment">make</span></span><span class="org-comment"> sure to 'systemctl stop mautrix-whatsapp'.
 </span><span class="org-type">curl</span> -L -o /opt/mautrix-whatsapp/mautrix-whatsapp https://github.com/mautrix/whatsapp/releases/download/v0.2607.0/mautrix-whatsapp-arm64
-<span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-gvoice/mautrix-gvoice https://github.com/mautrix/gvoice/releases/download/v0.2605.0/mautrix-gvoice-arm64
-</span><span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-gmessages/mautrix-gmessages https://github.com/mautrix/gmessages/releases/download/v0.2605.0/mautrix-gmessages-arm64
+<span class="org-comment-delimiter"># </span><span class="org-comment">See https://github.com/mautrix for more mautrix bridges
+</span><span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-gvoice/mautrix-gvoice https://github.com/mautrix/gvoice/releases/download/v0.2605.0/mautrix-gvoice-arm64
 </span><span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-slack/mautrix-slack https://github.com/mautrix/slack/releases/download/v0.2607.0/mautrix-slack-arm64
 </span><span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-meta/mautrix-meta https://github.com/mautrix/meta/releases/download/v0.2607.0/mautrix-meta-arm64
-</span><span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-discord/mautrix-discord https://github.com/mautrix/discord/releases/download/v0.7.6/mautrix-discord-arm64
 </span><span class="org-type">cd</span> /opt/mautrix-whatsapp
 <span class="org-comment-delimiter"># </span><span class="org-comment">Grant executable permissiosn to the "mautrix-whatsapp" go executable.
 </span><span class="org-type">chmod</span> +x mautrix-whatsapp
@@ -338,7 +329,7 @@ room our first user was invited to upon registration. Send the following
 message to the admin room, pasting in the contents of <code>registration.yaml</code>.
 </p>
 
-<pre class="example" id="orgccc5f2c">
+<pre class="example" id="orgdd4d576">
   !admin appservices register
   ```yaml
   id: whatsapp
@@ -415,18 +406,11 @@ Install <a href="https://github.com/alphapapa/ement.el">ement.el</a> and login,
 <p>
 My own <a href="dotemacs.html#ID-20220829T170131.891099">config</a> is available <a href="https://www.bhw.name/assets/blog/dotspacemacs.html">here.</a> Three parting thoughts. I am somewhat
 optimistic about Matrix&rsquo;s longevity <a href="https://element.io/case-studies/bundeswehr">as the German armed forces has adopted the
-standard.</a> Secondly, Emacs users often have to deal with their complex
-configurations falling apart on mobile phones but this is not that case with the
-<a href="https://element.io/download">element client available on android</a>. Last but not least, is my thanks for the
-many hours of love poured in by these open source developers &lt;3.
-</p>
-
-<p>
-References
-</p>
-
-<p>
-<a href="https://docs.vultr.com/create-a-chat-server-using-matrix-synapse-and-element-on-debian-11">Create a Chat Server Using Matrix Synapse and Element on Debian 11 | Vultr Docs</a>
+standard</a> as well as the <a href="https://cfp.matrix.org/matrixconf2024/talk/FUXFHY/">Swiss Government</a>. Secondly, Emacs users often have to
+deal with their complex configurations falling apart on mobile phones but this
+is not that case with the <a href="https://element.io/download">element client available on android</a>. Last but not
+least, is my thanks for the many hours of love poured in by these open source
+developers &lt;3.
 </p>
 </div>
 </div>
@@ -434,6 +418,10 @@ References
 <div id="outline-container-ID-20251222T135426.198501" class="outline-2">
 <h2 id="ID-20251222T135426.198501"><span class="section-number-2">3.</span> Email - GMail with Mbsync and Mu4e</h2>
 <div class="outline-text-2" id="text-3">
+<p>
+<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-10-12T19:44:00">[2026-10-12 Mon 19:44]</time></span> &lt;- <a href="../cpb.html#ID-6588253f-4a2e-4a8c-ac23-bcb073e47213">Linux Program Directory</a>
+</p>
+
 <p>
 <a href="https://wiki.archlinux.org/title/isync">Mbsync</a> synchronizes email from your <a href="https://www.cloudflare.com/learning/email-security/what-is-imap/">IMAP</a> server (Gmail/Outlook/<a href="https://proton.me/blog/email-is-your-digital-id">Proton</a>) and
 stores it locally as specified in <code>~/.mbsyncrc</code>. <a href="https://www.djcbsoftware.nl/code/mu/">Mu</a> uses the open source <a href="https://xapian.org/">Xapian</a>

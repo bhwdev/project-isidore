@@ -1,14 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- 2026-10-12 Mon 19:46 -->
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- 2026-10-22 Thu 21:02 -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Installation of Spacemacs on Windows via WSL2</title>
-<meta name="author" content="Site Admin." />
-<meta name="generator" content="Org Mode" />
+<meta name="author" content="Site Admin.">
+<meta name="generator" content="Org Mode">
 
                       <link rel="stylesheet" type="text/css" href="../global.css"/>
+                      <script src="../theme.js"></script>
 <script>
   window.MathJax = {
     tex: {
@@ -58,6 +59,7 @@
                                             <li><a href="/contact">Contact</a></li>
                                           </ul>
                                         </nav>
+                                        <button type="button" class="theme-toggle" aria-label="Colour theme"></button>
                                       </div>
                                     </div>
                                     <h1 class="title">Installation of Spacemacs on Windows via WSL2</h1>
@@ -65,7 +67,7 @@
                                     <p class="updated"><a href="/contact#article-history">Updated:</a> 2026-09-11 Fri 00:53</p>
 </div>
 <div id="content" class="content">
-<div class="abstract" id="org4ed5034">
+<div class="abstract" id="orgf0177f9">
 <p>
 
 </p>
@@ -182,14 +184,14 @@ system &ndash; shortened to subsystem if you will.
 
 <div class="org-src-container">
 <pre class="src src-sh"><code>  wsl --install
-  <span class="org-comment-delimiter"># </span><span class="org-comment">Installs WSL and sets the default distribution to Debian.
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">Use wsl --list --online to list available Linux distributions.
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">See https://docs.microsoft.com/en-us/windows/wsl/install for more.
-</span>  wsl --install -d Debian
-  <span class="org-comment-delimiter"># </span><span class="org-comment">(OPTIONAL) Enables Sparse VHD &#8211; Automatically shrinks the WSL virtual hard
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">disk (VHD) as you use it. Otherwise large artifacts like docker containers
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">would pile up.
-</span>  wsl --manage Debian --set-sparse true --allow-unsafe
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Installs WSL and sets the default distribution to Debian.</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Use wsl --list --online to list available Linux distributions.</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">See https://docs.microsoft.com/en-us/windows/wsl/install for more.</span>
+  wsl --install -d Debian
+  <span class="org-comment-delimiter"># </span><span class="org-comment">(OPTIONAL) Enables Sparse VHD &#8211; Automatically shrinks the WSL virtual hard</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">disk (VHD) as you use it. Otherwise large artifacts like docker containers</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">would pile up.</span>
+  wsl --manage Debian --set-sparse true --allow-unsafe
 </code></pre>
 </div>
 
@@ -199,10 +201,10 @@ shell,
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Why not emacs-pgtk? See https://github.com/microsoft/wslg/issues/294#issuecomment-1911481055
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">As of December 2025, the above issue of pgtk windows disappearing
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">after laptop </span><span class="org-type"><span class="org-comment">sleep</span></span><span class="org-comment"> still applies. Lucid is unaffected by this.
-</span>  <span class="org-type">sudo</span> apt update &amp;&amp; <span class="org-type">sudo</span> apt upgrade
+<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Why not emacs-pgtk? See https://github.com/microsoft/wslg/issues/294#issuecomment-1911481055</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">As of December 2025, the above issue of pgtk windows disappearing</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">after laptop </span><span class="org-type"><span class="org-comment">sleep</span></span><span class="org-comment"> still applies. Lucid is unaffected by this.</span>
+  <span class="org-type">sudo</span> apt update &amp;&amp; <span class="org-type">sudo</span> apt upgrade
   <span class="org-type">sudo</span> apt install emacs-lucid
 </code></pre>
 </div>
@@ -221,8 +223,8 @@ next instruction is to download a copy of Spacemacs onto our local computer.
 
 <div class="org-src-container">
 <pre class="src src-sh"><code>  <span class="org-type">sudo</span> apt install <span class="org-type">git</span>
-  <span class="org-comment-delimiter"># </span><span class="org-comment">Note for myself, at this point head to =dotspacemacs.org= to load my custom config
-</span>  <span class="org-type">git</span> clone https://github.com/syl20bnr/spacemacs ~/.emacs.d
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Note for myself, at this point head to =dotspacemacs.org= to load my custom config</span>
+  <span class="org-type">git</span> clone https://github.com/syl20bnr/spacemacs ~/.emacs.d
 </code></pre>
 </div>
 
@@ -258,8 +260,8 @@ manually after having consulted: <a href="https://wiki.debian.org/Fonts#Manually
 </p>
 
 <div class="org-src-container">
-<pre class="src src-bash"><code>  <span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/bash
-</span>  <span class="org-builtin">set</span>  -euo pipefail
+<pre class="src src-bash"><code>  <span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/bash</span>
+  <span class="org-builtin">set</span>  -euo pipefail
   <span class="org-variable-name">I1FS</span>=$<span class="org-string">'\n\t'</span>
   <span class="org-type">mkdir</span> -p /tmp/adodefont
   <span class="org-type">cd</span> /tmp/adodefont
@@ -606,8 +608,8 @@ Decorations.
 <div class="org-src-container">
 <pre class="src src-sh"><code>  <span class="org-type">sudo</span> apt install x11-apps
   xeyes
-  <span class="org-comment-delimiter"># </span><span class="org-comment">or
-</span>  xclock
+  <span class="org-comment-delimiter"># </span><span class="org-comment">or</span>
+  xclock
   <span class="org-comment-delimiter"># </span><span class="org-comment">look at the white window frame in all its glory.</span>
 </code></pre>
 </div>
@@ -660,10 +662,10 @@ Issue tracker,
 </p>
 
 <div class="org-src-container">
-<pre class="src src-bash"><code><span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/</span><span class="org-keyword">bash</span><span class="org-comment">
-</span>
-<span class="org-comment-delimiter"># </span><span class="org-comment">Check if arguments were passed
-</span><span class="org-keyword">if</span> [ $<span class="org-variable-name">#</span> -eq 0 ]; <span class="org-keyword">then</span>
+<pre class="src src-bash"><code><span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/</span><span class="org-keyword">bash</span>
+
+<span class="org-comment-delimiter"># </span><span class="org-comment">Check if arguments were passed</span>
+<span class="org-keyword">if</span> [ $<span class="org-variable-name">#</span> -eq 0 ]; <span class="org-keyword">then</span>
   <span class="org-type">echo</span> <span class="org-string">"Usage: </span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">0</span></span><span class="org-string"> &lt;window_name&gt;"</span>
   <span class="org-keyword">exit</span> 1
 <span class="org-keyword">fi</span>
@@ -677,35 +679,35 @@ Issue tracker,
 <span class="org-keyword">fi</span>
 
 <span class="org-keyword">for</span> window_id<span class="org-keyword"> in</span> $<span class="org-variable-name">window_ids</span>; <span class="org-keyword">do</span>
-  <span class="org-comment-delimiter"># </span><span class="org-comment">Check if the window is currently fullscreen
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">We look for _NET_WM_STATE_FULLSCREEN in the window properties
-</span>  <span class="org-variable-name">is_fullscreen</span>=$(<span class="org-sh-quoted-exec">xprop -id "$window_id" _NET_WM_STATE | grep "_NET_WM_STATE_FULLSCREEN"</span>)
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Check if the window is currently fullscreen</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">We look for _NET_WM_STATE_FULLSCREEN in the window properties</span>
+  <span class="org-variable-name">is_fullscreen</span>=$(<span class="org-sh-quoted-exec">xprop -id "$window_id" _NET_WM_STATE | grep "_NET_WM_STATE_FULLSCREEN"</span>)
 
   <span class="org-keyword">if</span> [ -z <span class="org-string">"</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">is_fullscreen</span></span><span class="org-string">"</span> ]; <span class="org-keyword">then</span>
     <span class="org-type">echo</span> <span class="org-string">"Processing ID </span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">window_id</span></span><span class="org-string">: Enabling Fullscreen &amp; Removing Borders"</span>
-    <span class="org-comment-delimiter"># </span><span class="org-comment">Remove borders
-</span>    xprop -id <span class="org-string">"</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">window_id</span></span><span class="org-string">"</span> -f _MOTIF_WM_HINTS 32c -set _MOTIF_WM_HINTS <span class="org-string">"2, 0, 0, 0, 0"</span>
-    <span class="org-comment-delimiter"># </span><span class="org-comment">Add fullscreen state
-</span>    wmctrl -ir <span class="org-string">"</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">window_id</span></span><span class="org-string">"</span> -b add,fullscreen
+    <span class="org-comment-delimiter"># </span><span class="org-comment">Remove borders</span>
+    xprop -id <span class="org-string">"</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">window_id</span></span><span class="org-string">"</span> -f _MOTIF_WM_HINTS 32c -set _MOTIF_WM_HINTS <span class="org-string">"2, 0, 0, 0, 0"</span>
+    <span class="org-comment-delimiter"># </span><span class="org-comment">Add fullscreen state</span>
+    wmctrl -ir <span class="org-string">"</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">window_id</span></span><span class="org-string">"</span> -b add,fullscreen
   <span class="org-keyword">else</span>
     <span class="org-type">echo</span> <span class="org-string">"Processing ID </span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">window_id</span></span><span class="org-string">: Restoring Borders &amp; Exiting Fullscreen"</span>
-    <span class="org-comment-delimiter"># </span><span class="org-comment">Restore borders (The '1' in the third position re-enables decorations)
-</span>    xprop -id <span class="org-string">"</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">window_id</span></span><span class="org-string">"</span> -f _MOTIF_WM_HINTS 32c -set _MOTIF_WM_HINTS <span class="org-string">"2, 0, 1, 0, 0"</span>
-    <span class="org-comment-delimiter"># </span><span class="org-comment">Remove fullscreen state
-</span>    wmctrl -ir <span class="org-string">"</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">window_id</span></span><span class="org-string">"</span> -b remove,fullscreen
+    <span class="org-comment-delimiter"># </span><span class="org-comment">Restore borders (The '1' in the third position re-enables decorations)</span>
+    xprop -id <span class="org-string">"</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">window_id</span></span><span class="org-string">"</span> -f _MOTIF_WM_HINTS 32c -set _MOTIF_WM_HINTS <span class="org-string">"2, 0, 1, 0, 0"</span>
+    <span class="org-comment-delimiter"># </span><span class="org-comment">Remove fullscreen state</span>
+    wmctrl -ir <span class="org-string">"</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">window_id</span></span><span class="org-string">"</span> -b remove,fullscreen
   <span class="org-keyword">fi</span>
 <span class="org-keyword">done</span>
 </code></pre>
 </div>
 
 <div class="org-src-container">
-<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Place the above shell script in a file.
-</span>  <span class="org-type">sudo</span> apt install xdotool wmctrl
+<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Place the above shell script in a file.</span>
+  <span class="org-type">sudo</span> apt install xdotool wmctrl
   <span class="org-type">chmod</span> +x /path/to/above/script
   emacs &amp;
   ./fullscreen.sh emacs
-  <span class="org-comment-delimiter"># </span><span class="org-comment">call the script again to remove fullscreen
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">./fullscreen.sh emacs</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">call the script again to remove fullscreen</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">./fullscreen.sh emacs</span>
 </code></pre>
 </div>
 
@@ -952,8 +954,8 @@ Now we are ready to proceed to <a href="#Install-Spacemacs">3</a>
 <h3 id="Bonus-Why-is-my-GUI-Spacemacs-interrupted-by-Sleep"><span class="section-number-3">8.4.</span> Why is my GUI Spacemacs interrupted by Sleep?</h3>
 <div class="outline-text-3" id="text-Bonus-Why-is-my-GUI-Spacemacs-interrupted-by-Sleep">
 <div class="org-src-container">
-<pre class="src src-bash"><code><span class="org-comment-delimiter"># </span><span class="org-comment">Allows us to open links in Spacemacs to our Windows 10 browser
-</span><span class="org-function-name">fix_wsl2_interop</span>() {
+<pre class="src src-bash"><code><span class="org-comment-delimiter"># </span><span class="org-comment">Allows us to open links in Spacemacs to our Windows 10 browser</span>
+<span class="org-function-name">fix_wsl2_interop</span>() {
     <span class="org-keyword">for</span> i<span class="org-keyword"> in</span> $(<span class="org-sh-quoted-exec">pstree -np -s $$ | grep -o -E '[0-9]+'</span>); <span class="org-keyword">do</span>
         <span class="org-keyword">if</span> [[ -e <span class="org-string">"/run/WSL/</span><span class="org-string"><span class="org-constant">$</span></span><span class="org-string"><span class="org-variable-name">{i}</span></span><span class="org-string">_interop"</span> ]]; <span class="org-keyword">then</span>
             <span class="org-builtin">export</span> <span class="org-variable-name">WSL_INTEROP</span>=/run/WSL/${<span class="org-variable-name">i</span>}_interop
@@ -961,8 +963,8 @@ Now we are ready to proceed to <a href="#Install-Spacemacs">3</a>
     <span class="org-keyword">done</span>
 }
 
-<span class="org-comment-delimiter">#</span><span class="org-comment">Call the function
-</span><span class="org-builtin">export</span> -f fix_wsl2_interop
+<span class="org-comment-delimiter">#</span><span class="org-comment">Call the function</span>
+<span class="org-builtin">export</span> -f fix_wsl2_interop
 fix_wsl2_interop
 </code></pre>
 </div>
@@ -1061,7 +1063,7 @@ Ubuntu</a>
                                     Comments? Corrections? <a href="https://bhw.name/contact"> Please do reach out.</a><a href="https://bhw.name/assets/blog/atom.xml"> RSS Feed. </a><a href="https://bhw.name/subscribe"> Mailing List. </a><br/>
                                     Copyright 2021 Ben H. W. <br/>
                                     Blog content is available under <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"> CC-BY-SA 4.0 </a> unless otherwise noted.<br/>
-                                    Created with <a href="https://www.gnu.org/software/emacs/">Emacs</a> 30.1 (<a href="https://orgmode.org">Org</a> mode 9.8.9) on <a href="https://www.gnu.org">GNU</a>/<a href="https://www.kernel.org/">Linux</a><br/>
+                                    Created with <a href="https://www.gnu.org/software/emacs/">Emacs</a> 31.1 (<a href="https://orgmode.org">Org</a> mode 10.0-pre) on <a href="https://www.gnu.org">GNU</a>/<a href="https://www.kernel.org/">Linux</a><br/>
                                 </div>
                               </footer>
 </div>

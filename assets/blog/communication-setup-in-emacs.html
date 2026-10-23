@@ -1,14 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- 2026-10-12 Mon 19:46 -->
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- 2026-10-22 Thu 21:02 -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Communication Setup in Emacs</title>
-<meta name="author" content="Site Admin." />
-<meta name="generator" content="Org Mode" />
+<meta name="author" content="Site Admin.">
+<meta name="generator" content="Org Mode">
 
                       <link rel="stylesheet" type="text/css" href="../global.css"/>
+                      <script src="../theme.js"></script>
 </head>
 <body>
 <div id="preamble" class="status">
@@ -26,14 +27,15 @@
                                             <li><a href="/contact">Contact</a></li>
                                           </ul>
                                         </nav>
+                                        <button type="button" class="theme-toggle" aria-label="Colour theme"></button>
                                       </div>
                                     </div>
                                     <h1 class="title">Communication Setup in Emacs</h1>
                                     <p class="subtitle">Much ink has been spilled on&hellip;how best to spill ink?</p> <br/>
-                                    <p class="updated"><a href="/contact#article-history">Updated:</a> 2026-10-12 Mon 19:44</p>
+                                    <p class="updated"><a href="/contact#article-history">Updated:</a> 2026-10-12 Mon 19:48</p>
 </div>
 <div id="content" class="content">
-<div class="abstract" id="org2be3b1c">
+<div class="abstract" id="orgf8fd7b1">
 <p>
 
 </p>
@@ -58,7 +60,7 @@ superiority, no presumption.” &ndash; C.S. Lewis
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
 <li><a href="#Introduction">1. Introduction</a></li>
-<li><a href="#ID-20260901T134925.237524">2. Instant Messaging - Meta with Matrix and Ement</a>
+<li><a href="#ID-20260901T134925.237524">2. Instant Messaging - Matrix and Ement</a>
 <ul>
 <li><a href="#ID-20260901T134925.240856">2.1. Tuwunel server Installation</a></li>
 <li><a href="#ID-20260901T134925.244834">2.2. WhatsApp Bridge Installation</a></li>
@@ -74,12 +76,6 @@ superiority, no presumption.” &ndash; C.S. Lewis
 </ul>
 </div>
 </nav>
-<p>
-<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-04-07T15:47:00">[2026-04-07 Tue 15:47]</time></span> &lt;- <a href="dotemacs.html#ID-20220829T170201.833199">Elfeed Config</a>
-<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-04-07T15:47:00">[2026-04-07 Tue 15:47]</time></span> &lt;- <a href="dotemacs.html#ID-20220829T170149.630909">Email Config</a>
-<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-04-07T15:47:00">[2026-04-07 Tue 15:47]</time></span> &lt;- <a href="dotemacs.html#ID-20220829T170131.891099">Ement Config</a>
-<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-04-07T15:47:00">[2026-04-07 Tue 15:47]</time></span> &lt;- <a href="../cpb.html#ID-4a9ea0cd-0b3a-4e9e-9236-dfe3b917fd50">GNU Emacs</a>
-</p>
 <ul class="org-ul">
 <li><a href="../cpb.html#ID-4a9ea0cd-0b3a-4e9e-9236-dfe3b917fd50">&lt;&ndash;GNU Emacs</a></li>
 </ul>
@@ -96,7 +92,7 @@ Workflow configuration specific to myself is relegated to my dotfiles.
 </div>
 </div>
 <div id="outline-container-ID-20260901T134925.237524" class="outline-2">
-<h2 id="ID-20260901T134925.237524"><span class="section-number-2">2.</span> Instant Messaging - Meta with Matrix and Ement</h2>
+<h2 id="ID-20260901T134925.237524"><span class="section-number-2">2.</span> Instant Messaging - Matrix and Ement</h2>
 <div class="outline-text-2" id="text-2">
 <p>
 <a href="https://matrix.org/docs/matrix-concepts/elements-of-matrix/">Matrix</a> is a protocol for secure, decentralized real time communication in a
@@ -147,17 +143,17 @@ tuwunel but out of scope for this article.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">My server environment,
-</span>  uname -a
-  <span class="org-comment-delimiter"># </span><span class="org-comment">Linux oci-a1-flex 6.12.90+deb13.1-cloud-arm64 #1 SMP Debian 6.12.90-2 (2026-05-27) aarch64 GNU/Linux
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">On the server machine, download the prebuilt .deb from
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">https://github.com/matrix-construct/tuwunel/releases
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">Note I am downloading the aarch64 (arm64) build.
-</span>  <span class="org-type">curl</span> -L -O https://github.com/matrix-construct/tuwunel/releases/download/v1.9.4/v1.9.4-release-all-aarch64-v8-linux-gnu-tuwunel.deb
+<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">My server environment,</span>
+  uname -a
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Linux oci-a1-flex 6.12.90+deb13.1-cloud-arm64 #1 SMP Debian 6.12.90-2 (2026-05-27) aarch64 GNU/Linux</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">On the server machine, download the prebuilt .deb from</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">https://github.com/matrix-construct/tuwunel/releases</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Note I am downloading the aarch64 (arm64) build.</span>
+  <span class="org-type">curl</span> -L -O https://github.com/matrix-construct/tuwunel/releases/download/v1.9.4/v1.9.4-release-all-aarch64-v8-linux-gnu-tuwunel.deb
   <span class="org-type">sudo</span> apt install ./v1.9.4-release-all-aarch64-v8-linux-gnu-tuwunel.deb
-  <span class="org-comment-delimiter"># </span><span class="org-comment">Upgrading tuwunel later is the same, download the newer .deb and
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">apt install it again. An apt repository is also available,
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">https://matrix-construct.github.io/tuwunel/deploying/debian.html</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Upgrading tuwunel later is the same, download the newer .deb and</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">apt install it again. An apt repository is also available,</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">https://matrix-construct.github.io/tuwunel/deploying/debian.html</span>
 </code></pre>
 </div>
 
@@ -172,19 +168,19 @@ enough to create our user below.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-conf"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Configuration file for Tuwunel.
-</span>  <span class="org-comment-delimiter">#</span><span class="org-comment">
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">This is a TOML file. For a complete accounting of each option see
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">https://matrix-construct.github.io/tuwunel/configuration/examples.html
-</span>  [<span class="org-type">global</span>]
+<pre class="src src-conf"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Configuration file for Tuwunel.</span>
+  <span class="org-comment-delimiter">#</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">This is a TOML file. For a complete accounting of each option see</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">https://matrix-construct.github.io/tuwunel/configuration/examples.html</span>
+  [<span class="org-type">global</span>]
   <span class="org-variable-name">server_name</span> = <span class="org-string">"matrix.bhw.name"</span>
-  <span class="org-comment-delimiter"># </span><span class="org-comment">Embedded RocksDB database. No PostgreSQL required.
-</span>  <span class="org-variable-name">database_path</span> = <span class="org-string">"/var/lib/tuwunel"</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Embedded RocksDB database. No PostgreSQL required.</span>
+  <span class="org-variable-name">database_path</span> = <span class="org-string">"/var/lib/tuwunel"</span>
   <span class="org-variable-name">port</span> = 8008
   <span class="org-variable-name">allow_federation</span> = true
-  <span class="org-comment-delimiter"># </span><span class="org-comment">Set allow_registration to false and restart tuwunel
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">once your account is created below.
-</span>  <span class="org-variable-name">allow_registration</span> = true
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Set allow_registration to false and restart tuwunel</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">once your account is created below.</span>
+  <span class="org-variable-name">allow_registration</span> = true
   <span class="org-variable-name">registration_token</span> = <span class="org-string">"correct-horse-battery-staple"</span>
 
   [<span class="org-type">global.well_known</span>]
@@ -227,8 +223,8 @@ response of <code>M_UNRECOGNIZED: Not Found</code>.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">The .deb ships tuwunel.service, aliased as matrix-tuwunel.service.
-</span>  systemctl enable --now tuwunel
+<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">The .deb ships tuwunel.service, aliased as matrix-tuwunel.service.</span>
+  systemctl enable --now tuwunel
   systemctl status tuwunel
 </code></pre>
 </div>
@@ -244,9 +240,9 @@ invited to the admin room, from which the server is administered by messaging
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">In /etc/tuwunel/tuwunel.toml set,
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">allow_registration = false
-</span>  systemctl restart tuwunel
+<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">In /etc/tuwunel/tuwunel.toml set,</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">allow_registration = false</span>
+  systemctl restart tuwunel
 </code></pre>
 </div>
 
@@ -265,19 +261,19 @@ extract it to <code>/opt/mautrix-whatsapp/</code>.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sh"><code><span class="org-comment-delimiter"># </span><span class="org-comment">Create folder if it doesn't exist. Note I am downloading arm64 executable.
-</span><span class="org-type">mkdir</span> /opt/mautrix-whatsapp/
-<span class="org-comment-delimiter"># </span><span class="org-comment">If updating, </span><span class="org-type"><span class="org-comment">make</span></span><span class="org-comment"> sure to 'systemctl stop mautrix-whatsapp'.
-</span><span class="org-type">curl</span> -L -o /opt/mautrix-whatsapp/mautrix-whatsapp https://github.com/mautrix/whatsapp/releases/download/v0.2607.0/mautrix-whatsapp-arm64
-<span class="org-comment-delimiter"># </span><span class="org-comment">See https://github.com/mautrix for more mautrix bridges
-</span><span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-gvoice/mautrix-gvoice https://github.com/mautrix/gvoice/releases/download/v0.2605.0/mautrix-gvoice-arm64
-</span><span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-slack/mautrix-slack https://github.com/mautrix/slack/releases/download/v0.2607.0/mautrix-slack-arm64
-</span><span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-meta/mautrix-meta https://github.com/mautrix/meta/releases/download/v0.2607.0/mautrix-meta-arm64
-</span><span class="org-type">cd</span> /opt/mautrix-whatsapp
-<span class="org-comment-delimiter"># </span><span class="org-comment">Grant executable permissiosn to the "mautrix-whatsapp" go executable.
-</span><span class="org-type">chmod</span> +x mautrix-whatsapp
-<span class="org-comment-delimiter"># </span><span class="org-comment">Generate an example config file.
-</span>./mautrix-whatsapp -e
+<pre class="src src-sh"><code><span class="org-comment-delimiter"># </span><span class="org-comment">Create folder if it doesn't exist. Note I am downloading arm64 executable.</span>
+<span class="org-type">mkdir</span> /opt/mautrix-whatsapp/
+<span class="org-comment-delimiter"># </span><span class="org-comment">If updating, </span><span class="org-type"><span class="org-comment">make</span></span><span class="org-comment"> sure to 'systemctl stop mautrix-whatsapp'.</span>
+<span class="org-type">curl</span> -L -o /opt/mautrix-whatsapp/mautrix-whatsapp https://github.com/mautrix/whatsapp/releases/download/v0.2607.0/mautrix-whatsapp-arm64
+<span class="org-comment-delimiter"># </span><span class="org-comment">See https://github.com/mautrix for more mautrix bridges</span>
+<span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-gvoice/mautrix-gvoice https://github.com/mautrix/gvoice/releases/download/v0.2605.0/mautrix-gvoice-arm64</span>
+<span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-slack/mautrix-slack https://github.com/mautrix/slack/releases/download/v0.2607.0/mautrix-slack-arm64</span>
+<span class="org-comment-delimiter"># </span><span class="org-type"><span class="org-comment">curl</span></span><span class="org-comment"> -L -o /opt/mautrix-meta/mautrix-meta https://github.com/mautrix/meta/releases/download/v0.2607.0/mautrix-meta-arm64</span>
+<span class="org-type">cd</span> /opt/mautrix-whatsapp
+<span class="org-comment-delimiter"># </span><span class="org-comment">Grant executable permissiosn to the "mautrix-whatsapp" go executable.</span>
+<span class="org-type">chmod</span> +x mautrix-whatsapp
+<span class="org-comment-delimiter"># </span><span class="org-comment">Generate an example config file.</span>
+./mautrix-whatsapp -e
 </code></pre>
 </div>
 
@@ -315,8 +311,8 @@ Now we can generate an appservice registration file.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Generate the appservice registration file.
-</span>  <span class="org-type">cd</span> /opt/mautrix-whatsapp/
+<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Generate the appservice registration file.</span>
+  <span class="org-type">cd</span> /opt/mautrix-whatsapp/
   ./mautrix-whatsapp -g
 </code></pre>
 </div>
@@ -329,7 +325,7 @@ room our first user was invited to upon registration. Send the following
 message to the admin room, pasting in the contents of <code>registration.yaml</code>.
 </p>
 
-<pre class="example" id="orgdd4d576">
+<pre class="example" id="org050f85d">
   !admin appservices register
   ```yaml
   id: whatsapp
@@ -366,11 +362,11 @@ Enable and start the <code>mautrix-whatsapp.service</code>.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Will start this service at boot.
-</span>  systemctl enable mautrix-whatsapp.service
+<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Will start this service at boot.</span>
+  systemctl enable mautrix-whatsapp.service
   systemctl start mautrix-whatsapp.service
-  <span class="org-comment-delimiter"># </span><span class="org-comment">When updating a bridge, only the bridge service needs restarting;
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">the appservice registration persists in tuwunel's database.</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">When updating a bridge, only the bridge service needs restarting;</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">the appservice registration persists in tuwunel's database.</span>
 </code></pre>
 </div>
 
@@ -394,10 +390,10 @@ Install <a href="https://github.com/alphapapa/ement.el">ement.el</a> and login,
 </p>
 
 <div class="org-src-container">
-<pre class="src src-emacs-lisp"><code>  <span class="org-comment-delimiter">;; </span><span class="org-comment">First login; subsequent logins will used a cached session if
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">ement-save-sessions</span></span><span class="org-comment">' is TRUE. Also run `</span><span class="org-comment"><span class="org-constant">ement-disconnect</span></span><span class="org-comment">'
-</span>  <span class="org-comment-delimiter">;; </span><span class="org-comment">to save login in `</span><span class="org-comment"><span class="org-constant">~/.cache/ement.el</span></span><span class="org-comment">'
-</span>  (<span class="org-constant">ement-connect</span> <span class="org-builtin">:user-id</span> <span class="org-string">"@ben:matrix.bhw.name"</span>
+<pre class="src src-emacs-lisp"><code>  <span class="org-comment-delimiter">;; </span><span class="org-comment">First login; subsequent logins will used a cached session if</span>
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">`</span><span class="org-comment"><span class="org-constant">ement-save-sessions</span></span><span class="org-comment">' is TRUE. Also run `</span><span class="org-comment"><span class="org-constant">ement-disconnect</span></span><span class="org-comment">'</span>
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">to save login in `</span><span class="org-comment"><span class="org-constant">~/.cache/ement.el</span></span><span class="org-comment">'</span>
+  (<span class="org-function-name">ement-connect</span> <span class="org-builtin">:user-id</span> <span class="org-string">"@ben:matrix.bhw.name"</span>
                  <span class="org-builtin">:password</span>  <span class="org-string">"password"</span>
                  <span class="org-builtin">:uri-prefix</span> <span class="org-string">"https://matrix.bhw.name"</span>)
 </code></pre>
@@ -419,10 +415,6 @@ developers &lt;3.
 <h2 id="ID-20251222T135426.198501"><span class="section-number-2">3.</span> Email - GMail with Mbsync and Mu4e</h2>
 <div class="outline-text-2" id="text-3">
 <p>
-<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-10-12T19:44:00">[2026-10-12 Mon 19:44]</time></span> &lt;- <a href="../cpb.html#ID-6588253f-4a2e-4a8c-ac23-bcb073e47213">Linux Program Directory</a>
-</p>
-
-<p>
 <a href="https://wiki.archlinux.org/title/isync">Mbsync</a> synchronizes email from your <a href="https://www.cloudflare.com/learning/email-security/what-is-imap/">IMAP</a> server (Gmail/Outlook/<a href="https://proton.me/blog/email-is-your-digital-id">Proton</a>) and
 stores it locally as specified in <code>~/.mbsyncrc</code>. <a href="https://www.djcbsoftware.nl/code/mu/">Mu</a> uses the open source <a href="https://xapian.org/">Xapian</a>
 to index the local email database. Mu4e (Mu for Emacs) provides an user
@@ -442,12 +434,12 @@ Operation Analogy (<a href="https://explained-from-first-principles.com/email/%2
 </ol>
 
 <div class="org-src-container">
-<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">My workstation environment,
-</span>  uname -a
-  <span class="org-comment-delimiter"># </span><span class="org-comment">Linux bhw-yoga 6.6.87.2-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025 x86_64 GNU/Linux
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">Isync is the name of the program, but mbsync is the name of the binary.
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">See and tangle .mbsyncrc in dotfiles.org.
-</span>  <span class="org-type">sudo</span> apt install mu4e gnutls-bin sendmail isync
+<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">My workstation environment,</span>
+  uname -a
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Linux bhw-yoga 6.6.87.2-microsoft-standard-WSL2 #1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025 x86_64 GNU/Linux</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Isync is the name of the program, but mbsync is the name of the binary.</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">See and tangle .mbsyncrc in dotfiles.org.</span>
+  <span class="org-type">sudo</span> apt install mu4e gnutls-bin sendmail isync
 </code></pre>
 </div>
 
@@ -486,11 +478,11 @@ instead I mark it as read and move it out of my inbox to &ldquo;All mail&rdquo;.
 </div>
 
 <div class="org-src-container">
-<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Inital sync will take much longer than consequent syncs.
-</span>  mbsync -a -V
-  <span class="org-comment-delimiter"># </span><span class="org-comment">See mu4e manual section 2.4
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">https://www.djcbsoftware.nl/code/mu/mu4e/
-</span>  mu init --maildir=~/project-jerome/email-archive/ --my-address=myemailaddress@gmail.com
+<pre class="src src-sh"><code>  <span class="org-comment-delimiter"># </span><span class="org-comment">Inital sync will take much longer than consequent syncs.</span>
+  mbsync -a -V
+  <span class="org-comment-delimiter"># </span><span class="org-comment">See mu4e manual section 2.4</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">https://www.djcbsoftware.nl/code/mu/mu4e/</span>
+  mu init --maildir=~/project-jerome/email-archive/ --my-address=myemailaddress@gmail.com
   mu index
 </code></pre>
 </div>
@@ -529,12 +521,12 @@ files through Windows.
 <pre class="src src-emacs-lisp"><code>  (<span class="org-keyword">setf</span> <span class="org-variable-name">browse-url-generic-program</span>  <span class="org-string">"/mnt/c/Windows/System32/cmd.exe"</span>
         <span class="org-variable-name">browse-url-generic-args</span>     <span class="org-highlight-quoted-quote">'</span>(<span class="org-string">"/c"</span> <span class="org-string">"start"</span>)
         <span class="org-variable-name">browse-url-browser-function</span> <span class="org-highlight-quoted-quote">#'</span><span class="org-highlight-quoted-symbol">browse-url-generic</span>
-        <span class="org-comment-delimiter">;; </span><span class="org-comment">Needed for `</span><span class="org-comment"><span class="org-constant">mu4e-action-view-in-browser</span></span><span class="org-comment">'
-</span>        <span class="org-variable-name">browse-url-filename-alist</span>
+        <span class="org-comment-delimiter">;; </span><span class="org-comment">Needed for `</span><span class="org-comment"><span class="org-constant">mu4e-action-view-in-browser</span></span><span class="org-comment">'</span>
+        <span class="org-variable-name">browse-url-filename-alist</span>
         <span class="org-highlight-quoted-quote">'</span>((<span class="org-string">"^/</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">ftp@</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">|</span></span><span class="org-string">anonymous@</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">?</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">[</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">:/]+</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">:/*"</span> . <span class="org-string">"ftp://\\2/"</span>)
           (<span class="org-string">"^/</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">[</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">:@/]+@</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">?</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">(</span></span><span class="org-string">[</span><span class="org-string"><span class="org-negation-char">^</span></span><span class="org-string">:/]+</span><span class="org-string"><span class="org-regexp-grouping-backslash">\\</span></span><span class="org-string"><span class="org-regexp-grouping-construct">)</span></span><span class="org-string">:/*"</span> . <span class="org-string">"ftp://\\1\\2/"</span>)
-          <span class="org-comment-delimiter">;; </span><span class="org-comment">For gnus-article-browse-html-article on Windows Subsystem for Linux.
-</span>          (<span class="org-string">"^/+"</span> . <span class="org-string">"file://///wsl$/Debian/"</span>)))
+          <span class="org-comment-delimiter">;; </span><span class="org-comment">For gnus-article-browse-html-article on Windows Subsystem for Linux.</span>
+          (<span class="org-string">"^/+"</span> . <span class="org-string">"file://///wsl$/Debian/"</span>)))
 </code></pre>
 </div>
 
@@ -607,7 +599,7 @@ to assist in taking notes on books, spaced repetition and concept mapping.
                                     Comments? Corrections? <a href="https://bhw.name/contact"> Please do reach out.</a><a href="https://bhw.name/assets/blog/atom.xml"> RSS Feed. </a><a href="https://bhw.name/subscribe"> Mailing List. </a><br/>
                                     Copyright 2021 Ben H. W. <br/>
                                     Blog content is available under <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"> CC-BY-SA 4.0 </a> unless otherwise noted.<br/>
-                                    Created with <a href="https://www.gnu.org/software/emacs/">Emacs</a> 30.1 (<a href="https://orgmode.org">Org</a> mode 9.8.9) on <a href="https://www.gnu.org">GNU</a>/<a href="https://www.kernel.org/">Linux</a><br/>
+                                    Created with <a href="https://www.gnu.org/software/emacs/">Emacs</a> 31.1 (<a href="https://orgmode.org">Org</a> mode 10.0-pre) on <a href="https://www.gnu.org">GNU</a>/<a href="https://www.kernel.org/">Linux</a><br/>
                                 </div>
                               </footer>
 </div>

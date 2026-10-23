@@ -9,23 +9,38 @@
    links were #609cdb on #FDF6E3 (2.68:1) with text-decoration:none, so colour
    was both insufficient and the only cue; and the source-block language badge
    was white on #b3b3b3 (2.10:1), the worst ratio in the file.
+
+   Parchment is the theme whatever the system prefers.  The warm dark palette
+   below applies only when theme.js has set data-theme="dark" on <html>,
+   because the reader chose dark, or chose "auto" and the system is dark.
+   An earlier version followed prefers-color-scheme directly, with a
+   Solarized (blue) palette, so every reader with a dark OS lost the
+   parchment without asking.
    --------------------------------------------------------------------------- */
 :root {
-  /* Tells the UA both themes are supported, so scrollbars, form controls and
-     the canvas behind the page follow the preference too. */
-  color-scheme: light dark;
+  color-scheme: light;
+
+  /* Not a colour, but shared by every monospaced element.  Courier New, the
+     old face, is a thin typewriter cut; these are screen faces with a
+     slashed or dotted zero. */
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo,
+               "DejaVu Sans Mono", "Liberation Mono", monospace;
 
   --page-bg: #FDF6E3;
   --text: #333;
   --heading: #A5573E;
   --title-fg: black;
-  --link: #0f5ea8;
-  --link-hover: #003355;
+  /* Rubric rather than blue, after https://gwern.net/web-color.  Visited links
+     turn a muted brown, so a reader can see what they have already read. */
+  --link: #8b3a1f;
+  --link-visited: #6b4f3a;
+  --link-hover: #5c2410;
   --selection-bg: #D6EDFF;
   --rule: #ccc;
   --rule-soft: #eee;
   --table-rule: gray;
   --table-rule-soft: lightgray;
+  --table-stripe: #F5EBD0;
 
   /* Site chrome: the fixed bar, and the full-screen overlay under 768px. */
   --chrome-bg: #FDF6E3;
@@ -51,7 +66,7 @@
   --tag-border: #bbb;
   --mark-bg: #ffff00;
   --inlinetask-bg: #ffffcc;
-  --timestamp-kwd: #5f9ea0;
+  --timestamp-kwd: #2f6f70;
 
   --button-bg: #F5DEB3;
   --button-fg: #222222;
@@ -73,61 +88,68 @@
   --syn-regexp: #a03060;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --page-bg: #002b36;
-    --text: #c3cdd0;
-    --heading: #e0946f;
-    --title-fg: #e6dfcf;
-    --link: #7fbcf0;
-    --link-hover: #b8dcff;
-    --selection-bg: #14526b;
-    --rule: #3a4b52;
-    --rule-soft: #05222b;
-    --table-rule: #55666d;
-    --table-rule-soft: #3a4b52;
+/* Warm dark: sepia browns, the parchment inverted rather than replaced.
+   Screen only, so a page printed in dark mode still prints on white. */
+@media screen {
+  :root[data-theme="dark"] {
+    color-scheme: dark;
 
-    --chrome-bg: #073642;
-    --chrome-fg: #e6dfcf;
-    --chrome-fg-dim: #93a1a1;
-    --chrome-hover: #0f4a5a;
-    --burger: #e6dfcf;
-    --menu-bg: #073642;
-    --menu-fg: #e6dfcf;
-    --menu-hover-bg: #0f4a5a;
+    --page-bg: #211b14;
+    --text: #dccfb6;
+    --heading: #e0a07a;
+    --title-fg: #f0e6d0;
+    --link: #e8a77f;
+    --link-visited: #c4ab8c;
+    --link-hover: #f6cfae;
+    --selection-bg: #5a4630;
+    --rule: #4d3f30;
+    --rule-soft: #1a150f;
+    --table-rule: #77654f;
+    --table-rule-soft: #4d3f30;
+    --table-stripe: #2a2219;
+
+    --chrome-bg: #2a2219;
+    --chrome-fg: #f0e6d0;
+    --chrome-fg-dim: #a8987f;
+    --chrome-hover: #3b3024;
+    --burger: #f0e6d0;
+    --menu-bg: #2a2219;
+    --menu-fg: #f0e6d0;
+    --menu-hover-bg: #3b3024;
     --menu-hover-fg: #e8a87c;
 
-    --code-bg: #073642;
-    --code-fg: #c3cdd0;
-    --badge-bg: #55666d;
+    --code-bg: #2b241b;
+    --code-fg: #dccfb6;
+    --badge-bg: #77654f;
     --badge-fg: #ffffff;
-    --inline-code-bg: #0b3b48;
-    --inline-code-border: #3a4b52;
-    --inline-code-fg: #c3cdd0;
-    --kbd-bg: #0f4a5a;
-    --tag-bg: #0f4a5a;
-    --tag-fg: #c3cdd0;
-    --tag-border: #55666d;
-    --mark-bg: #6b5d00;
-    --inlinetask-bg: #3a3a1a;
-    --timestamp-kwd: #7fc6c0;
+    --inline-code-bg: #2e261d;
+    --inline-code-border: #4d3f30;
+    --inline-code-fg: #dccfb6;
+    --kbd-bg: #3b3024;
+    --tag-bg: #3b3024;
+    --tag-fg: #dccfb6;
+    --tag-border: #77654f;
+    --mark-bg: #6b5300;
+    --inlinetask-bg: #3a3120;
+    --timestamp-kwd: #a9c49a;
 
-    --button-bg: #0f4a5a;
-    --button-fg: #e6dfcf;
-    --button-border: #93a1a1;
-    --button-active-bg: #14526b;
-    --button-disabled: #55666d;
+    --button-bg: #3b3024;
+    --button-fg: #f0e6d0;
+    --button-border: #a8987f;
+    --button-active-bg: #4d3f30;
+    --button-disabled: #6e6050;
 
-    --syn-comment: #93a1a1;
-    --syn-string: #45c0b6;
-    --syn-keyword: #c39bee;
-    --syn-builtin: #a99fe0;
-    --syn-function: #6cb6ff;
-    --syn-variable: #d9a86a;
-    --syn-constant: #5fd3c8;
-    --syn-type: #8fce87;
-    --syn-warning: #ff7b72;
-    --syn-regexp: #e88fc0;
+    /* Gruvbox's accents, which were made for a brown-black ground. */
+    --syn-comment: #a89984;
+    --syn-string: #b8bb26;
+    --syn-keyword: #fb7a5e;
+    --syn-builtin: #fe8019;
+    --syn-function: #fabd2f;
+    --syn-variable: #83a598;
+    --syn-constant: #d3869b;
+    --syn-type: #8ec07c;
+    --syn-warning: #ff6b5a;
+    --syn-regexp: #e7a0c0;
   }
 }
 
@@ -168,12 +190,61 @@
       bold; cursor:  pointer; transition:  all 0.3s ease-out; } .navbar nav li:hover  { background:  var(--menu-hover-bg); } .navbar nav li:hover a  { color:  var(--menu-hover-fg); transition:  all 0.3s ease-out; } .navbar nav li a  { font-family:  'Cinzel', 'Times New Roman', serif; color:  var(--menu-fg); } }
 @media (min-width: 768px)  { .navbar nav ul  { margin:  0; padding:  0; display:  flex; justify-content:  space-around; text-align:  center; list-style:  none; } .navbar nav li  { flex:  1; } .navbar nav li a  { display:  block; padding:  0 8px; font-size:  16px; font-weight:  400; font-family:  'Cinzel'; line-height:  60px; color:
       var(--chrome-fg); text-decoration:  none; } .navbar nav li.active  { background:  #555; } .navbar nav li:hover  { background:  var(--chrome-hover); } .navbar label  { display:  none; } }
+/* The theme switch, cycled by theme.js: parchment, dark, automatic.  The
+   glyph shows the current choice; VS15 (U+FE0E) keeps the sun and moon from
+   turning into emoji.  Hidden when the script has not run, since it would
+   do nothing. */
+.theme-toggle  { display:  none; }
+:root[data-theme-pref] .navbar .theme-toggle  { display:  block; flex:  none; margin:  0 8px; padding:  0 12px;
+     border:  0; border-radius:  0; background:  none; color:  var(--chrome-fg);
+     font:  400 20px/60px "Segoe UI Symbol", "DejaVu Sans", sans-serif; }
+:root[data-theme-pref] .navbar .theme-toggle:hover  { background:  var(--chrome-hover); }
+:root[data-theme-pref="light"] .theme-toggle::before  { content:  "\2600\FE0E"; }
+:root[data-theme-pref="dark"] .theme-toggle::before  { content:  "\263E\FE0E"; }
+:root[data-theme-pref="auto"] .theme-toggle::before  { content:  "\25D0\FE0E"; }
 html { background-color:  var(--page-bg); }
-body  { width:  95%; margin:  2% auto; font-size:  14px; line-height:
-     1.4em; font-family: Palatino, "Palatino Linotype", "Palantino LT STD", "Book Antiqua", Georgia, serif; font-weight:  400; color:  var(--text); }
-@media screen and (min-width: 600px)  { body  { font-size:  18px; } }
+body  { width:  95%; margin:  2% auto; font-size:  18px; line-height:
+     1.4em; font-family: Palatino, "Palatino Linotype", "Palatino LT STD", "Book Antiqua", Georgia, serif; font-weight:  400; color:  var(--text); }
+/* gwern.net's body sizes: 18px on phones, where 14px was below every
+   guideline, and 20px from 650px, which also brings the 900px column
+   closer to a readable measure (about 100 characters of Palatino). */
+@media screen and (min-width: 650px)  { body  { font-size:  20px; } }
 @media screen and (min-width: 910px)  { body  { width:  900px; } }
-#content  { width:  100%; }
+/* ---------------------------------------------------------------------------
+   Running text in Org pages, after gwern.net's head.css.
+
+   Justified with hyphenation where the column is wide; flush left on
+   phones, where a greedy line breaker would open rivers.  Hyphenation
+   needs the page's language, which Org declares (<html lang="en">) and
+   CLOG's boot page does not, so this stays inside #content.  Blocks that
+   are centred or right-aligned say so through --text-align.
+
+   Leading grows with the measure: gwern.net's brackets, cut at 910px,
+   where this column stops widening.
+
+   Old-style figures sit in the text like lower-case letters.  Places where
+   figures are read as data -- links, whose underline they would cross,
+   headings and the table of contents, tables, code -- keep lining ones.
+   --------------------------------------------------------------------------- */
+#content  { --text-align:  justify; --line-height:  1.5; width:  100%;
+     overflow-wrap:  break-word; font-variant-numeric:  oldstyle-nums; }
+@media screen and (max-width: 649px)  { #content  { --text-align:  start; --line-height:  1.45; } }
+@media screen and (min-width: 910px)  { #content  { --line-height:  1.55; } }
+#content p  { text-align:  var(--text-align); line-height:  var(--line-height);
+     -webkit-hyphens:  auto; hyphens:  auto; text-wrap:  pretty; }
+#content li  { -webkit-hyphens:  auto; hyphens:  auto; text-wrap:  pretty; }
+/* A hyphen the dictionary adds inside an identifier reads as part of it. */
+#content code, #content kbd, #content pre  { -webkit-hyphens:  manual; hyphens:  manual; }
+#content figure, #content .abstract, #content .org-center  { --text-align:  center; }
+#content .org-right  { --text-align:  right; }
+#content a, #content h1, #content h2, #content h3, #content h4, #content h5,
+#content h6, #content code, #content pre, #content kbd,
+#content sub, #content sup  { font-variant-numeric:  lining-nums; }
+.title, .subtitle, h1, h2, h3, h4, h5, h6, caption, figcaption  { text-wrap:  balance; }
+/* Footnote markers no longer push their line away from the one above. */
+sub, sup  { font-size:  75%; line-height:  0; position:  relative; vertical-align:  baseline; }
+sup  { top:  -0.5em; }
+sub  { bottom:  -0.25em; }
 ::selection  { background:  var(--selection-bg); }
 p  { line-height: 1.5em; margin:  1em auto; }
 ol,ul  { margin:  0 auto; }
@@ -202,26 +273,34 @@ a  { color:  var(--link); text-decoration:  underline;
    resting state had text-decoration:none.  Now that links are underlined
    at rest it would draw a second, offset line, so thicken the underline
    instead of stacking two rules on top of each other. */
+a:visited  { color:  var(--link-visited); }
 a:hover  { color:  var(--link-hover); text-decoration-thickness:  2px; }
+/* The table of contents and the headings' self-links are navigation within
+   the page, so they have no visited state. */
+#table-of-contents a:visited  { color:  var(--link); }
+#table-of-contents a:hover  { color:  var(--link-hover); }
 figure  { padding:  0px; margin:  1em auto; text-align:  center; }
 img  { max-width:  100%; vertical-align:  middle; }
 .MathJax_Display  { margin:  0!important; width:  90%!important; }
 h1,h2,h3,h4,h5,h6  { color:  var(--heading); line-height:  1em; font-weight: 400; font-style: italic; font-family: inherit; }
-h2 a  { color:  var(--heading); }
-h3 a  { color:  var(--heading); }
-h4 a  { color:  var(--heading); }
-h5 a  { color:  var(--heading); }
-h6 a  { color:  var(--heading); }
+h2 a, h3 a, h4 a, h5 a, h6 a,
+:is(h2,h3,h4,h5,h6) a:visited  { color:  var(--heading); }
+:is(h2,h3,h4,h5,h6) a:hover  { color:  var(--link-hover); }
 h1,h2,h3  { line-height:  1.4em; }
 h4,h5,h6  { font-size:  1em; }
 @media screen and (min-width: 600px)  { h1  { font-size:  2em; } h2  { font-size:  1.5em; } h3  { font-size:  1.3em; } h1,h2,h3  { line-height:  1.4em; } h4,h5,h6  { font-size:  1.1em; } }
 dt  { font-weight:  bold; }
 table  { margin:  1em auto; border-top:  2px solid; border-bottom:  2px
-     solid; border-collapse:  collapse; }
+     solid; border-collapse:  collapse; font-variant-numeric:  lining-nums tabular-nums; }
 thead  { border-bottom:  2px solid; }
 table td + td, table th + th  { border-left:  1px solid var(--table-rule); }
 table tr  { border-top:  1px solid var(--table-rule-soft); }
 td,th  { padding:  0.3em 0.6em; vertical-align:  middle; }
+/* gwern.net's cell leading, and zebra rows: the eye keeps its row across a
+   wide table.  Org pages only; the CLOG Bible tables are a page layout,
+   with their own leading on each row. */
+#content td, #content th  { line-height:  1.35; }
+#content tbody tr:nth-child(odd) td  { background-color:  var(--table-stripe); }
 caption.t-above  { caption-side:  top; }
 caption.t-bottom  { caption-side:  bottom; }
 caption  { margin-bottom:  0.3em; }
@@ -232,14 +311,19 @@ th.org-center  { text-align:  center; }
 td.org-right  { text-align:  right; }
 td.org-left  { text-align:  left; }
 td.org-center  { text-align:  center; }
+/* Section breaks as an asterism, after gwern.net's ornamental rules. */
+hr  { border:  0; height:  auto; overflow:  visible; margin:  1.5em auto;
+     text-align:  center; color:  var(--heading); }
+hr::after  { content:  "\2042"; font-size:  1.4em; line-height:  1; }
 blockquote  { margin:  1em 2em; padding-left:  1em; border-left:  3px
      solid var(--rule); }
+code, kbd, samp, pre  { font-family:  var(--font-mono); }
 kbd  { background-color:  var(--kbd-bg); font-size:  80%; margin:  0 .1em; padding:  .1em .6em; }
-.todo  { background-color:  red; color:  white; padding:  .1em 0.3em; border-radius:  3px; background-clip:  padding-box; font-size:  80%; font-family:  'Courier New', monospace; line-height:  1; }
-.done  { background-color:  green; color:  white; padding:  .1em 0.3em; border-radius:  3px; background-clip:  padding-box; font-size:  80%; font-family:  'Courier New', monospace; line-height:  1; }
-.priority  { color:  orange; font-family:  'Courier New', monospace; }
+.todo  { background-color:  red; color:  white; padding:  .1em 0.3em; border-radius:  3px; background-clip:  padding-box; font-size:  80%; font-family:  var(--font-mono); line-height:  1; }
+.done  { background-color:  green; color:  white; padding:  .1em 0.3em; border-radius:  3px; background-clip:  padding-box; font-size:  80%; font-family:  var(--font-mono); line-height:  1; }
+.priority  { color:  orange; font-family:  var(--font-mono); }
 #table-of-contents li  { clear:  both; }
-.tag  { font-family:  'Courier New', monospace; font-size:  0.7em; font-weight:  normal; }
+.tag  { font-family:  var(--font-mono); font-size:  0.7em; font-weight:  normal; }
 .tag span  { padding:  0.3em 0.3em; float:  right; margin-right:  .5em; border:  1px solid var(--tag-border); border-radius:  3px; background-clip:
      padding-box; color:  var(--tag-fg); background-color:  var(--tag-bg); line-height:  1; }
 .timestamp  { color:  var(--text); font-size:  90%; }
@@ -251,13 +335,14 @@ kbd  { background-color:  var(--kbd-bg); font-size:  80%; margin:  0 .1em; paddi
 .underline  { text-decoration:  underline; }
 #postamble p, #preamble p  { font-size:  90%; margin:  .2em; }
 .copyright-container  { align-items:  center; padding:  0.4ex 1em; }
-.generated  { font-family:  'Courier New', monospace; text-align:
+.generated  { font-family:  var(--font-mono); text-align:
      center; }
 p.verse  { margin-left:  3%; }
 :not(pre) > code  { padding:  2px 5px; margin:  auto 1px; border:  1px
-     solid var(--inline-code-border); border-radius:  3px; background-clip:  padding-box; background-color: var(--inline-code-bg); color:  var(--inline-code-fg); font-size:  80%; }
+     solid var(--inline-code-border); border-radius:  3px; background-clip:  padding-box; background-color: var(--inline-code-bg); color:  var(--inline-code-fg); font-size:  80%;
+     -webkit-box-decoration-break:  clone; box-decoration-break:  clone; }
 .org-src-container  { border:  1px solid var(--rule); box-shadow:  3px 3px 3px
-     var(--rule-soft); background-color: var(--code-bg); color:  var(--code-fg); font-family:  'Courier New', monospace; font-size:  80%; margin:  1em auto; padding:  0.1em 0.5em; position:
+     var(--rule-soft); background-color: var(--code-bg); color:  var(--code-fg); font-family:  var(--font-mono); font-size:  80%; margin:  1em auto; padding:  0.1em 0.5em; position:
      relative; }
 .org-src-container>pre  { overflow:  auto; }
 .org-src-container>pre:before  { display:  block; position:  absolute; background-color:  var(--badge-bg); top:  0; right:  0; padding:  0 0.5em; border-bottom-left-radius:  8px; border:  0; color:  var(--badge-fg); font-size:
@@ -424,3 +509,18 @@ button:disabled {
 .org-sh-quoted-exec  { color:  var(--syn-function); }
 .org-sh-escaped-newline  { color:  var(--syn-regexp); }
 .org-org-level-1  { color:  var(--heading); }
+
+/* ---------------------------------------------------------------------------
+   Print, after gwern.net's print styles: no site chrome, white paper, and
+   blocks kept whole across pages.  The dark palette is screen-only, so
+   this always starts from parchment.
+   --------------------------------------------------------------------------- */
+@media print {
+  :root  { --page-bg:  #fff; --code-bg:  #f6f6f6; }
+  .header, .theme-toggle, #org-div-home-and-up,
+  #content :is(h2,h3,h4,h5,h6) > a[href="#table-of-contents"]  { display:  none; }
+  body  { width:  auto; margin:  0; font-size:  11pt; }
+  .org-src-container  { box-shadow:  none; }
+  pre, blockquote, table, figure, .org-src-container  { break-inside:  avoid; }
+  h1, h2, h3, h4, h5, h6  { break-after:  avoid; }
+}

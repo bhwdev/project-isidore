@@ -1,46 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- 2026-10-12 Mon 19:46 -->
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- 2026-10-22 Thu 21:02 -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Project Isidore Design Notebook</title>
-<meta name="author" content="Site Admin." />
-<meta name="generator" content="Org Mode" />
+<meta name="author" content="Site Admin.">
+<meta name="generator" content="Org Mode">
 
                       <link rel="stylesheet" type="text/css" href="../global.css"/>
-<script>
-  window.MathJax = {
-    tex: {
-      ams: {
-        multlineWidth: '85%'
-      },
-      tags: 'ams',
-      tagSide: 'right',
-      tagIndent: '.8em'
-    },
-    chtml: {
-      scale: 1.0,
-      displayAlign: 'center',
-      displayIndent: '0em'
-    },
-    svg: {
-      scale: 1.0,
-      displayAlign: 'center',
-      displayIndent: '0em'
-    },
-    output: {
-      font: 'mathjax-modern',
-      displayOverflow: 'overflow'
-    }
-  };
-</script>
-
-<script
-  id="MathJax-script"
-  async
-  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
-</script>
+                      <script src="../theme.js"></script>
 </head>
 <body>
 <div id="preamble" class="status">
@@ -58,14 +27,15 @@
                                             <li><a href="/contact">Contact</a></li>
                                           </ul>
                                         </nav>
+                                        <button type="button" class="theme-toggle" aria-label="Colour theme"></button>
                                       </div>
                                     </div>
                                     <h1 class="title">Project Isidore Design Notebook</h1>
                                     <p class="subtitle">Divus Isidorus Hispalensis ora pro nobis</p> <br/>
-                                    <p class="updated"><a href="/contact#article-history">Updated:</a> 2026-09-11 Fri 00:53</p>
+                                    <p class="updated"><a href="/contact#article-history">Updated:</a> 2026-10-15 Thu 23:36</p>
 </div>
 <div id="content" class="content">
-<div class="abstract" id="orgd5c4cc9">
+<div class="abstract" id="org8c54eb2">
 <p>
 
 </p>
@@ -185,11 +155,6 @@ otherwise noted.
 <div id="outline-container-Common-Lisp-Environment-Setup" class="outline-2">
 <h2 id="Common-Lisp-Environment-Setup"><span class="section-number-2">2.</span> Common Lisp Environment Setup</h2>
 <div class="outline-text-2" id="text-Common-Lisp-Environment-Setup">
-<p>
-<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-03-22T16:14:00">[2026-03-22 Sun 16:14]</time></span> &lt;- <a href="../cpb.html#ID-6754d0e8-1c8c-43eb-bdc3-0072f9aa4acd">Library of Babel</a>
-<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-03-22T16:14:00">[2026-03-22 Sun 16:14]</time></span> &lt;- <a href="../cpb.html#ID-6588253f-4a2e-4a8c-ac23-bcb073e47213">Linux Program Directory</a>
-<span class="timestamp-wrapper"><time class="timestamp" datetime="2026-03-22T16:14:00">[2026-03-22 Sun 16:14]</time></span> &lt;- <a href="../bibtex-notes/seibelPracticalCommonLisp2005.html#ID-031a3b02-b36c-4875-b714-6ff8e9a3978c">Practical Common Lisp</a>
-</p>
 <ul class="org-ul">
 <li><a href="dotemacs.html#ID-0d5cd091-ec8a-420d-9585-8d6ed856a00c">&lt;&ndash;Common Lisp Config</a></li>
 <li><a href="../bibtex-notes/seibelPracticalCommonLisp2005.html#ID-031a3b02-b36c-4875-b714-6ff8e9a3978c">&lt;&ndash;Practical Common Lisp</a></li>
@@ -286,10 +251,10 @@ In the shell,
 <div class="org-src-container">
 <pre class="src src-bash"><code>  <span class="org-type">curl</span> -O https://beta.quicklisp.org/quicklisp.lisp
   sbcl --load quicklisp.lisp
-  <span class="org-comment-delimiter">## </span><span class="org-comment">Inside the SBCL prompt,
-</span>  (quicklisp-quickstart:install)
-  (ql:add-to-init-file) <span class="org-comment-delimiter"># </span><span class="org-comment">autoload into sbcl initialization
-</span>  (quit)
+  <span class="org-comment-delimiter">## </span><span class="org-comment">Inside the SBCL prompt,</span>
+  (quicklisp-quickstart:install)
+  (ql:add-to-init-file) <span class="org-comment-delimiter"># </span><span class="org-comment">autoload into sbcl initialization</span>
+  (quit)
 </code></pre>
 </div>
 
@@ -389,9 +354,9 @@ browser <a href="https://www.gnu.org/software/emacs/manual/html_mono/eww.html">E
 
 <div class="org-src-container">
 <pre class="src src-emacs-lisp"><code>    (<span class="org-keyword">setf</span> common-lisp-hyperspec-root <span class="org-string">"file:///home/$USER/HyperSpec/"</span>)
-    <span class="org-comment-delimiter">;; </span><span class="org-comment">Optionally, execute the HYPERSPEC-LOOKUP function with local variable
-</span>    <span class="org-comment-delimiter">;; </span><span class="org-comment">changes to view HyperSpec links exclusively in EWW.
-</span>    (<span class="org-constant">advice-add</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">hyperspec-lookup</span>
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">Optionally, execute the HYPERSPEC-LOOKUP function with local variable</span>
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">changes to view HyperSpec links exclusively in EWW.</span>
+    (<span class="org-constant">advice-add</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">hyperspec-lookup</span>
                 <span class="org-builtin">:around</span>
                 (<span class="org-keyword">lambda</span> (orig-fun <span class="org-type">&amp;rest</span> args)
                   (<span class="org-keyword">setq-local</span> <span class="org-variable-name">browse-url-browser-function</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">eww-browse-url</span>)
@@ -432,7 +397,7 @@ notebook. Get lisp in org-babel blocks by, adding to your init.el/user-config.el
 </p>
 
 <div class="org-src-container">
-<pre class="src src-emacs-lisp"><code>     (<span class="org-constant">org-babel-do-load-languages</span>
+<pre class="src src-emacs-lisp"><code>     (<span class="org-function-name">org-babel-do-load-languages</span>
       <span class="org-highlight-quoted-quote">'</span><span class="org-variable-name">org-babel-load-languages</span>
       <span class="org-highlight-quoted-quote">'</span>((lisp . t)))
 </code></pre>
@@ -467,9 +432,9 @@ end-of-file respectively. The following emacs lisp snippet fixes that.
 
 <div class="org-src-container">
 <pre class="src src-emacs-lisp"><code>  (<span class="org-keyword">with-eval-after-load</span> <span class="org-string">"poly-org"</span>
-    <span class="org-comment-delimiter">;; </span><span class="org-comment">sly-compile-file sends entire .org file. Narrow to span as done in poly-R
-</span>    <span class="org-comment-delimiter">;; </span><span class="org-comment">https://github.com/polymode/poly-org/issues/25
-</span>    (<span class="org-keyword">when</span> (<span class="org-constant">fboundp</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">advice-add</span>)
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">sly-compile-file sends entire .org file. Narrow to span as done in poly-R</span>
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">https://github.com/polymode/poly-org/issues/25</span>
+    (<span class="org-keyword">when</span> (<span class="org-constant">fboundp</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">advice-add</span>)
       (<span class="org-constant">advice-add</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">slime-compile-file</span> <span class="org-builtin">:around</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">pm-execute-narrowed-to-span</span>)
       (<span class="org-constant">advice-add</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">slime-compile-defun</span> <span class="org-builtin">:around</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">pm-execute-narrowed-to-span</span>)
       (<span class="org-constant">advice-add</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">slime-load-file</span> <span class="org-builtin">:around</span> <span class="org-highlight-quoted-quote">'</span><span class="org-highlight-quoted-symbol">pm-execute-narrowed-to-span</span>)
@@ -536,17 +501,17 @@ Looking for a library? In addition to <a href="https://quickdocs.org/">online se
 </p>
 
 <div class="org-src-container">
-<pre class="src src-lisp"><code>     (ql:system-apropos <span class="org-builtin">:library</span>) <span class="org-comment">; search for term in quicklisp dist
-</span>     (ql:who-depends-on <span class="org-builtin">:library</span>) <span class="org-comment">; usage in lisp ecosystem
-</span>     (ql-dist:dependency-tree <span class="org-builtin">:library</span>) <span class="org-comment">; number of dependencies upstream
-</span>     <span class="org-comment-delimiter">;; </span><span class="org-comment">git clone https://github.com/varjagg/deptree.git
-</span>     (deptree:deptree <span class="org-string">"hunchentoot"</span>)
-     <span class="org-comment-delimiter">;; </span><span class="org-comment">See quicklisp-stats README for example usage.
-</span>     (ql:quickload <span class="org-string">"quicklisp-stats"</span>) <span class="org-comment">; look at quicklisp download stats
-</span>     (ql:quickload <span class="org-string">"quicksearch"</span>)
+<pre class="src src-lisp"><code>     (ql:system-apropos <span class="org-builtin">:library</span>) <span class="org-comment">; search for term in quicklisp dist</span>
+     (ql:who-depends-on <span class="org-builtin">:library</span>) <span class="org-comment">; usage in lisp ecosystem</span>
+     (ql-dist:dependency-tree <span class="org-builtin">:library</span>) <span class="org-comment">; number of dependencies upstream</span>
+     <span class="org-comment-delimiter">;; </span><span class="org-comment">git clone https://github.com/varjagg/deptree.git</span>
+     (deptree:deptree <span class="org-string">"hunchentoot"</span>)
+     <span class="org-comment-delimiter">;; </span><span class="org-comment">See quicklisp-stats README for example usage.</span>
+     (ql:quickload <span class="org-string">"quicklisp-stats"</span>) <span class="org-comment">; look at quicklisp download stats</span>
+     (ql:quickload <span class="org-string">"quicksearch"</span>)
      (qs:? <span class="org-string">"bluetooth"</span> <span class="org-builtin">:du</span> 100)
-     <span class="org-comment-delimiter">;; </span><span class="org-comment">Search for a term across all quicklisp libraries.
-</span>     <span class="org-comment-delimiter">;; </span><span class="org-comment">https://github.com/mmontone/quicklisp-apropos</span>
+     <span class="org-comment-delimiter">;; </span><span class="org-comment">Search for a term across all quicklisp libraries.</span>
+     <span class="org-comment-delimiter">;; </span><span class="org-comment">https://github.com/mmontone/quicklisp-apropos</span>
 </code></pre>
 </div>
 
@@ -586,21 +551,21 @@ Call <code>sly-eval-buffer</code> on the following code block to update the grap
 </p>
 
 <div class="org-src-container">
-<pre class="src src-lisp"><code>     <span class="org-comment-delimiter">;; </span><span class="org-comment">https://40ants.com/lisp-project-of-the-day/2020/05/0063-asdf-viz.html
-</span>     <span class="org-comment-delimiter">;; </span><span class="org-comment">Inside shell "sudo apt install graphviz".
-</span>     (ql:quickload <span class="org-builtin">:cl-dot</span>)
-     <span class="org-comment-delimiter">;; </span><span class="org-comment">Not present in quicklisp, retrieve from https://github.com/guicho271828/asdf-viz
-</span>     (ql:quickload <span class="org-builtin">:asdf-viz</span>)
-     (ql:quickload <span class="org-builtin">:project-isidore</span>) <span class="org-comment">; also loads cl-ppcre.
-</span>     (setf cl-dot:*dot-path* (string-trim '(#\space #\newline) (second (ppcre:split <span class="org-string">" "</span>(nth-value 0 (uiop:run-program <span class="org-string">"whereis -b dot"</span> <span class="org-builtin">:output</span> <span class="org-builtin">:string</span>))))))
-     <span class="org-comment-delimiter">;; </span><span class="org-comment">Tilde char "~" in destination pathname throws an error.
-</span>     (asdf-viz:visualize-asdf-hierarchy (asdf:system-relative-pathname <span class="org-string">"project-isidore"</span> <span class="org-string">"assets/project-isidore-dependency-graph.png"</span>) (list (asdf:find-system <span class="org-builtin">:project-isidore</span>)))
+<pre class="src src-lisp"><code>     <span class="org-comment-delimiter">;; </span><span class="org-comment">https://40ants.com/lisp-project-of-the-day/2020/05/0063-asdf-viz.html</span>
+     <span class="org-comment-delimiter">;; </span><span class="org-comment">Inside shell "sudo apt install graphviz".</span>
+     (ql:quickload <span class="org-builtin">:cl-dot</span>)
+     <span class="org-comment-delimiter">;; </span><span class="org-comment">Not present in quicklisp, retrieve from https://github.com/guicho271828/asdf-viz</span>
+     (ql:quickload <span class="org-builtin">:asdf-viz</span>)
+     (ql:quickload <span class="org-builtin">:project-isidore</span>) <span class="org-comment">; also loads cl-ppcre.</span>
+     (setf cl-dot:*dot-path* (string-trim '(#\space #\newline) (second (ppcre:split <span class="org-string">" "</span>(nth-value 0 (uiop:run-program <span class="org-string">"whereis -b dot"</span> <span class="org-builtin">:output</span> <span class="org-builtin">:string</span>))))))
+     <span class="org-comment-delimiter">;; </span><span class="org-comment">Tilde char "~" in destination pathname throws an error.</span>
+     (asdf-viz:visualize-asdf-hierarchy (asdf:system-relative-pathname <span class="org-string">"project-isidore"</span> <span class="org-string">"assets/project-isidore-dependency-graph.png"</span>) (list (asdf:find-system <span class="org-builtin">:project-isidore</span>)))
      <span class="org-comment-delimiter">;; </span><span class="org-comment">"asdf-viz" also can draw class hierarchies and call graphs.</span>
 </code></pre>
 </div>
 
 
-<figure id="org4803f6b">
+<figure id="org3a788da">
 <img src="../project-isidore-dependency-graph.png" alt="Project Isidore dependency graph">
 
 <figcaption><span class="figure-number">Figure 1: </span>Project Isidore dependency graph</figcaption>
@@ -803,7 +768,7 @@ In the following breakdown, I explain how to run the steps on the local machine.
 
 <p>
 For the uninitiated, an excellent git porcelain (with spacemacs layer
-integration) is <a href="https://magit.vc">Magit.</a> This, paired with \cite{chaconProGit2014}, takes care of
+integration) is <a href="https://magit.vc">Magit.</a> This, paired with cite:chaconProGit2014, takes care of
 your version control needs.
 </p>
 </div>
@@ -889,23 +854,23 @@ text, e.g., &ldquo;OK&rdquo;
 </div>
 <div id="outline-container-ID-20260901T134924.956001" class="outline-5">
 <h5 id="ID-20260901T134924.956001">Notes on CL-SMTP</h5>
-<div class="outline-text-5" id="text-org8552b55">
+<div class="outline-text-5" id="text-org904b8c3">
 <p>
 <a href="https://jay.gooby.org/2022/05/06/use-a-basic-gmail-account-to-send-mail-as-with-a-domain-that-uses-cloudflare-email-routing">Use a basic Gmail account to “Send mail as” with a domain that uses Cloudflar&hellip;</a>
 </p>
 
 <div class="org-src-container">
-<pre class="src src-lisp"><code><span class="org-comment-delimiter">;; </span><span class="org-comment">https://gist.github.com/carboleum/cf03b4c16655f257d96bda8f41f51471
-</span><span class="org-comment-delimiter">;; </span><span class="org-comment">Gmail is limited to 500 emails a day.
-</span>(ql:quickload <span class="org-string">"cl-smtp"</span>)
+<pre class="src src-lisp"><code><span class="org-comment-delimiter">;; </span><span class="org-comment">https://gist.github.com/carboleum/cf03b4c16655f257d96bda8f41f51471</span>
+<span class="org-comment-delimiter">;; </span><span class="org-comment">Gmail is limited to 500 emails a day.</span>
+(ql:quickload <span class="org-string">"cl-smtp"</span>)
 (<span class="org-keyword">let</span> ((from <span class="org-string">"placeholder@gmail.com"</span>)
       (to <span class="org-string">"placeholder@gmail.com"</span>)
       (subject <span class="org-string">"test"</span>)
       (message <span class="org-string">"Hello ;-) from cl-smtp"</span>)
       (login <span class="org-string">"placeholder@gmail.com"</span>)
-      <span class="org-comment-delimiter">;; </span><span class="org-comment">Generate an application password via google account settings.
-</span>      <span class="org-comment-delimiter">;; </span><span class="org-comment">Use fly.io secrets for production deployments.
-</span>      (passwd <span class="org-string">"replace-me-with-app-pwd"</span>))
+      <span class="org-comment-delimiter">;; </span><span class="org-comment">Generate an application password via google account settings.</span>
+      <span class="org-comment-delimiter">;; </span><span class="org-comment">Use fly.io secrets for production deployments.</span>
+      (passwd <span class="org-string">"replace-me-with-app-pwd"</span>))
   (cl-smtp:send-email <span class="org-string">"smtp.gmail.com"</span> from to subject message
                       <span class="org-builtin">:ssl</span> <span class="org-builtin">:tls</span> <span class="org-builtin">:authentication</span> `(,login ,passwd)))
 </code></pre>
@@ -1093,17 +1058,17 @@ Edi.
 <h5 id="Generate-Code-Coverage-Report">Generate Code Coverage Report</h5>
 <div class="outline-text-5" id="text-Generate-Code-Coverage-Report">
 <div class="org-src-container">
-<pre class="src src-lisp"><code>   <span class="org-comment-delimiter">;;; </span><span class="org-comment">Generate Code Coverage Report
-</span>   <span class="org-comment-delimiter">;; </span><span class="org-comment">SBCL specific contrib module.
-</span>   (<span class="org-keyword">require</span> <span class="org-constant">:sb-cover</span>)
-   <span class="org-comment-delimiter">;; </span><span class="org-comment">Compiler knob: Turn on generation instrumentation
-</span>   (<span class="org-keyword">declaim</span> (optimize sb-cover:store-coverage-data))
-   <span class="org-comment-delimiter">;; </span><span class="org-comment">Load while ensuring that it's recompiled with the new optimization
-</span>   <span class="org-comment-delimiter">;; </span><span class="org-comment">policy.
-</span>   (asdf:load-system <span class="org-builtin">:project-isidore</span> <span class="org-builtin">:force</span> t)
+<pre class="src src-lisp"><code>   <span class="org-comment-delimiter">;;; </span><span class="org-comment">Generate Code Coverage Report</span>
+   <span class="org-comment-delimiter">;; </span><span class="org-comment">SBCL specific contrib module.</span>
+   (<span class="org-keyword">require</span> <span class="org-constant">:sb-cover</span>)
+   <span class="org-comment-delimiter">;; </span><span class="org-comment">Compiler knob: Turn on generation instrumentation</span>
+   (<span class="org-keyword">declaim</span> (optimize sb-cover:store-coverage-data))
+   <span class="org-comment-delimiter">;; </span><span class="org-comment">Load while ensuring that it's recompiled with the new optimization</span>
+   <span class="org-comment-delimiter">;; </span><span class="org-comment">policy.</span>
+   (asdf:load-system <span class="org-builtin">:project-isidore</span> <span class="org-builtin">:force</span> t)
    (asdf:test-system <span class="org-builtin">:project-isidore</span>)
-   <span class="org-comment-delimiter">;; </span><span class="org-comment">HTML report output location
-</span>   (sb-cover:report <span class="org-string">"../assets/code-coverage-report/"</span>)
+   <span class="org-comment-delimiter">;; </span><span class="org-comment">HTML report output location</span>
+   (sb-cover:report <span class="org-string">"../assets/code-coverage-report/"</span>)
    (<span class="org-keyword">declaim</span> (optimize (sb-cover:store-coverage-data 0)))
 </code></pre>
 </div>
@@ -1390,8 +1355,8 @@ default user would be &ldquo;debian&rdquo;. So in our local shell,
 
 <div class="org-src-container">
 <pre class="src src-sh"><code>     ssh debian@140.291.294.154 -i ~/.ssh/oracle-vm-key
-     <span class="org-comment-delimiter"># </span><span class="org-comment">Setup Root SSH access.
-</span>     <span class="org-type">sudo</span> sed -i -e <span class="org-string">'s/#PermitRootLogin prohibit-password/PermitRootLogin prohibit-password/'</span> /etc/ssh/sshd_config
+     <span class="org-comment-delimiter"># </span><span class="org-comment">Setup Root SSH access.</span>
+     <span class="org-type">sudo</span> sed -i -e <span class="org-string">'s/#PermitRootLogin prohibit-password/PermitRootLogin prohibit-password/'</span> /etc/ssh/sshd_config
      <span class="org-type">sudo</span> <span class="org-type">cp</span> -f /home/debian/.ssh/authorized_keys /root/.ssh/authorized_keys
      <span class="org-type">sudo</span> systemctl restart ssh
      <span class="org-type">sudo</span> systemctl reboot
@@ -2090,24 +2055,24 @@ using the Data Access Objects.</a>
 <li>To start PostgreSQL server process</li>
 </ol>
 <div class="org-src-container">
-<pre class="src src-bash"><code><span class="org-comment-delimiter"># </span><span class="org-comment">Install PostgreSQL.
-</span><span class="org-type">sudo</span> apt install postgresql
-<span class="org-comment-delimiter"># </span><span class="org-comment">Start server process. PostgreSQL defaults to PORT 5432
-</span><span class="org-type">sudo</span> service postgresql start
-<span class="org-comment-delimiter"># </span><span class="org-comment">Login as PostgreSQL Superuser "postgres" via "psql" Client
-</span><span class="org-type">sudo</span> -u postgres psql
-<span class="org-comment-delimiter"># </span><span class="org-comment">Create database "Test"
-</span>createdb test
-<span class="org-comment-delimiter"># </span><span class="org-comment">Delete database "Test"
-</span>dropdb test
-<span class="org-comment-delimiter"># </span><span class="org-comment">Login as superuser to create user for database "Test"
-</span><span class="org-type">sudo</span> -u postgres psql
-<span class="org-comment-delimiter"># </span><span class="org-comment">See defparameter `*local-db-params*' in MODEL.LISP.
-</span>CREATE USER user1 WITH PASSWORD <span class="org-string">'user1'</span>;
-<span class="org-comment-delimiter"># </span><span class="org-comment">Use Shell to login as host: localhost with database: test and user:user1
-</span>psql -h localhost -d test -U user1
-<span class="org-comment-delimiter"># </span><span class="org-comment">Once logged in,
-</span><span class="org-variable-name">test</span>=# select * from tablename;
+<pre class="src src-bash"><code><span class="org-comment-delimiter"># </span><span class="org-comment">Install PostgreSQL.</span>
+<span class="org-type">sudo</span> apt install postgresql
+<span class="org-comment-delimiter"># </span><span class="org-comment">Start server process. PostgreSQL defaults to PORT 5432</span>
+<span class="org-type">sudo</span> service postgresql start
+<span class="org-comment-delimiter"># </span><span class="org-comment">Login as PostgreSQL Superuser "postgres" via "psql" Client</span>
+<span class="org-type">sudo</span> -u postgres psql
+<span class="org-comment-delimiter"># </span><span class="org-comment">Create database "Test"</span>
+createdb test
+<span class="org-comment-delimiter"># </span><span class="org-comment">Delete database "Test"</span>
+dropdb test
+<span class="org-comment-delimiter"># </span><span class="org-comment">Login as superuser to create user for database "Test"</span>
+<span class="org-type">sudo</span> -u postgres psql
+<span class="org-comment-delimiter"># </span><span class="org-comment">See defparameter `*local-db-params*' in MODEL.LISP.</span>
+CREATE USER user1 WITH PASSWORD <span class="org-string">'user1'</span>;
+<span class="org-comment-delimiter"># </span><span class="org-comment">Use Shell to login as host: localhost with database: test and user:user1</span>
+psql -h localhost -d test -U user1
+<span class="org-comment-delimiter"># </span><span class="org-comment">Once logged in,</span>
+<span class="org-variable-name">test</span>=# select * from tablename;
 </code></pre>
 </div>
 </div>
@@ -2740,14 +2705,14 @@ system, I would try a library like <a href="https://gitlab.common-lisp.net/dkoch
 </p>
 
 <div class="org-src-container">
-<pre class="src src-lisp"><code>  <span class="org-comment-delimiter">;; </span><span class="org-comment">Load project into image.
-</span>  (ql:quickload <span class="org-builtin">:project-isidore</span>)
-  <span class="org-comment-delimiter">;; </span><span class="org-comment">Load SBCL's statisical profiler.
-</span>  (<span class="org-keyword">require</span> <span class="org-constant">:sb-sprof</span>)
-  <span class="org-comment-delimiter">;; </span><span class="org-comment">Includes COMMON LISP USER package symbols as defined in the Hyperspec.
-</span>  (sb-sprof:profile-call-counts <span class="org-string">"CL-USER"</span>)
-  <span class="org-comment-delimiter">;; </span><span class="org-comment">Profile and output both graph and flat formats.
-</span>  (sb-sprof:with-profiling (<span class="org-builtin">:max-samples</span> 5000
+<pre class="src src-lisp"><code>  <span class="org-comment-delimiter">;; </span><span class="org-comment">Load project into image.</span>
+  (ql:quickload <span class="org-builtin">:project-isidore</span>)
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">Load SBCL's statisical profiler.</span>
+  (<span class="org-keyword">require</span> <span class="org-constant">:sb-sprof</span>)
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">Includes COMMON LISP USER package symbols as defined in the Hyperspec.</span>
+  (sb-sprof:profile-call-counts <span class="org-string">"CL-USER"</span>)
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">Profile and output both graph and flat formats.</span>
+  (sb-sprof:with-profiling (<span class="org-builtin">:max-samples</span> 5000
                             <span class="org-builtin">:report</span> <span class="org-builtin">:graph</span>
                             <span class="org-builtin">:loop</span> t
                             <span class="org-builtin">:show-progress</span> t)
@@ -2968,8 +2933,8 @@ manual of whatever library I am using.
 
 <div class="org-src-container">
 <pre class="src src-lisp"><code>(<span class="org-keyword">defun</span> <span class="org-function-name">get-haydock-text</span> (bible-uid)
-  <span class="org-doc">"Returns a string if bible-uid is valid else return NIL.
-The bible-uid can be found by calling `</span><span class="org-doc"><span class="org-constant">get-bible-uid</span></span><span class="org-doc">' with valid arguments."</span>
+  <span class="org-doc">"Returns a string if bible-uid is valid else return NIL.</span>
+<span class="org-doc">The bible-uid can be found by calling `</span><span class="org-doc"><span class="org-constant">get-bible-uid</span></span><span class="org-doc">' with valid arguments."</span>
   (<span class="org-keyword">let</span> ((cpylist (remove-if-not
                   (<span class="org-keyword">lambda</span> (x)
                     (and x
@@ -2987,8 +2952,8 @@ The bible-uid can be found by calling `</span><span class="org-doc"><span class=
 
 <div class="org-src-container">
 <pre class="src src-lisp"><code>(<span class="org-keyword">defun</span> <span class="org-function-name">get-haydock-text</span> (bible-uid)
-  <span class="org-doc">"Returns a string if bible-uid is valid else return NIL.
-The bible-uid can be found by calling `</span><span class="org-doc"><span class="org-constant">get-bible-uid</span></span><span class="org-doc">' with valid arguments."</span>
+  <span class="org-doc">"Returns a string if bible-uid is valid else return NIL.</span>
+<span class="org-doc">The bible-uid can be found by calling `</span><span class="org-doc"><span class="org-constant">get-bible-uid</span></span><span class="org-doc">' with valid arguments."</span>
     (<span class="org-keyword">if</span> (slot-boundp (bknr.datastore:store-object-with-id bible-uid) 'haydock-text)
         (slot-value (bknr.datastore:store-object-with-id bible-uid) 'haydock-text)
         (format t <span class="org-string">"GET-HAYDOCK-TEXT called with invalid bible-uid ~a"</span> bible-uid)))
@@ -3186,13 +3151,13 @@ it will regenerate the reference manual and include changes into the commit.
 </p>
 
 <div class="org-src-container">
-<pre class="src src-sh" id="pre-commit"><code>  <span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/sh
-</span>
-  <span class="org-comment-delimiter"># </span><span class="org-comment">Generate updated manual. SBCL must be installed. See documentation for
-</span>  <span class="org-comment-delimiter"># </span><span class="org-comment">environment setup
-</span>  sbcl --load /home/ben/quicklisp/local-projects/project-isidore/src/generate-doc.lisp
-  <span class="org-comment-delimiter"># </span><span class="org-comment">Add updated manual.html to commit
-</span>  <span class="org-type">git</span> add /home/ben/quicklisp/local-projects/project-isidore/assets/reference-manual.html
+<pre class="src src-sh" id="pre-commit"><code>  <span class="org-comment-delimiter">#</span><span class="org-comment">!/bin/sh</span>
+
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Generate updated manual. SBCL must be installed. See documentation for</span>
+  <span class="org-comment-delimiter"># </span><span class="org-comment">environment setup</span>
+  sbcl --load /home/ben/quicklisp/local-projects/project-isidore/src/generate-doc.lisp
+  <span class="org-comment-delimiter"># </span><span class="org-comment">Add updated manual.html to commit</span>
+  <span class="org-type">git</span> add /home/ben/quicklisp/local-projects/project-isidore/assets/reference-manual.html
 </code></pre>
 </div>
 </div>
@@ -3202,55 +3167,55 @@ it will regenerate the reference manual and include changes into the commit.
 <h2 id="ID-20260901T134925.021881"><span class="section-number-2">11.</span> Bible data migration script</h2>
 <div class="outline-text-2" id="text-11">
 <div class="org-src-container">
-<pre class="src src-lisp"><code><span class="org-comment-delimiter">;;;; </span><span class="org-comment">SPDX-FileCopyrightText: 2021  Ben H. W.<a href="mailto:foss%40bhw.name">&lt;foss@bhw.name&gt;</a>
-</span><span class="org-comment-delimiter">;;;; </span><span class="org-comment">SPDX-License-Identifier: AGPL-3.0-or-later
-</span>
+<pre class="src src-lisp"><code><span class="org-comment-delimiter">;;;; </span><span class="org-comment">SPDX-FileCopyrightText: 2021  Ben H. W.<a href="mailto:foss%40bhw.name">&lt;foss@bhw.name&gt;</a></span>
+<span class="org-comment-delimiter">;;;; </span><span class="org-comment">SPDX-License-Identifier: AGPL-3.0-or-later</span>
+
 (uiop:define-package <span class="org-builtin">#:project-isidore/migration</span>
   (<span class="org-builtin">:use</span> <span class="org-builtin">#:common-lisp</span>
         <span class="org-builtin">#:series</span>
         <span class="org-builtin">#:project-isidore/bible</span>
         <span class="org-builtin">#:project-isidore/database</span>)
-  <span class="org-comment-delimiter">;; </span><span class="org-comment">No package local nicknames. See commit 1962a26.
-</span>  (<span class="org-builtin">:documentation</span>
-   <span class="org-doc">"Data import: USFM (Unified Standard Format Markers) -&gt; CLOS objects
-backed by graph-db (Vivace Graph V3).
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">No package local nicknames. See commit 1962a26.</span>
+  (<span class="org-builtin">:documentation</span>
+   <span class="org-doc">"Data import: USFM (Unified Standard Format Markers) -&gt; CLOS objects</span>
+<span class="org-doc">backed by graph-db (Vivace Graph V3).</span>
 
-Source text: https://github.com/bhw-foss/ENG-B-Haydock1883-pd-PSFM
+<span class="org-doc">Source text: https://github.com/bhwdev/ENG-B-Haydock1883-pd-PSFM</span>
 
-The functions in this file are sequential one-shots for re-ingesting the
-bible corpus. They are not called at runtime.
+<span class="org-doc">The functions in this file are sequential one-shots for re-ingesting the</span>
+<span class="org-doc">bible corpus. They are not called at runtime.</span>
 
-Two-step import for the SFM source:
-  (migrate-data \"/path/to/ENG-B-Haydock1883-pd-PSFM/\")
+<span class="org-doc">Two-step import for the SFM source:</span>
+<span class="org-doc">  (migrate-data \"/path/to/ENG-B-Haydock1883-pd-PSFM/\")</span>
 
-One-shot import from a previously dumped sexp (used by the rucksack
--&gt; graph-db migration):
-  (migrate-from-dump #P\"data/migration-dump/\")"</span>))
+<span class="org-doc">One-shot import from a previously dumped sexp (used by the rucksack</span>
+<span class="org-doc">-&gt; graph-db migration):</span>
+<span class="org-doc">  (migrate-from-dump #P\"data/migration-dump/\")"</span>))
 
 (<span class="org-keyword">in-package</span> <span class="org-builtin">#:project-isidore/migration</span>)
 
-<span class="org-comment-delimiter">;;; </span><span class="org-comment">UNIQUE-ID assignment for fresh imports. The bible CLOS class no longer
-</span><span class="org-comment-delimiter">;;; </span><span class="org-comment">has a hook analogous to rucksack's INITIALIZE-INSTANCE :AFTER that
-</span><span class="org-comment-delimiter">;;; </span><span class="org-comment">auto-assigns unique-id (graph-db's MAKE-VERTEX skips initialize-instance
-</span><span class="org-comment-delimiter">;;; </span><span class="org-comment">on the subclass). Callers must pass :unique-id explicitly, using
-</span><span class="org-comment-delimiter">;;; </span><span class="org-comment">NEXT-UNIQUE-ID for sequential allocation.
-</span>
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">UNIQUE-ID assignment for fresh imports. The bible CLOS class no longer</span>
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">has a hook analogous to rucksack's INITIALIZE-INSTANCE :AFTER that</span>
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">auto-assigns unique-id (graph-db's MAKE-VERTEX skips initialize-instance</span>
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">on the subclass). Callers must pass :unique-id explicitly, using</span>
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">NEXT-UNIQUE-ID for sequential allocation.</span>
+
 (<span class="org-keyword">defvar</span> <span class="org-variable-name">*unique-id*</span> -1)
 
 (<span class="org-keyword">defun</span> <span class="org-function-name">next-unique-id</span> ()
   (incf *unique-id*))
 
 (<span class="org-keyword">defun</span> <span class="org-function-name">create-bible</span> (heading text <span class="org-type">&amp;key</span> (unique-id (next-unique-id)))
-  <span class="org-doc">"Create a BIBLE vertex with the given HEADING and TEXT.
-Auto-assigns UNIQUE-ID via NEXT-UNIQUE-ID unless explicitly supplied."</span>
+  <span class="org-doc">"Create a BIBLE vertex with the given HEADING and TEXT.</span>
+<span class="org-doc">Auto-assigns UNIQUE-ID via NEXT-UNIQUE-ID unless explicitly supplied."</span>
   (<span class="org-keyword">with-db-transaction</span> (<span class="org-builtin">:context</span> <span class="org-string">"create-bible"</span> <span class="org-builtin">:graph</span> *bible-database*)
     (make-bible <span class="org-builtin">:unique-id</span> unique-id
                 <span class="org-builtin">:heading</span> heading
                 <span class="org-builtin">:text</span> text)))
 
 (<span class="org-keyword">defun</span> <span class="org-function-name">set-bible-slot</span> (bible-uid slot value)
-  <span class="org-doc">"Update a single slot on the BIBLE vertex with UNIQUE-ID = BIBLE-UID.
-Invalidates the bible-obj cache so subsequent reads see the new value."</span>
+  <span class="org-doc">"Update a single slot on the BIBLE vertex with UNIQUE-ID = BIBLE-UID.</span>
+<span class="org-doc">Invalidates the bible-obj cache so subsequent reads see the new value."</span>
   (<span class="org-keyword">with-db-transaction</span> (<span class="org-builtin">:context</span> <span class="org-string">"set-bible-slot"</span> <span class="org-builtin">:graph</span> *bible-database*)
     (<span class="org-keyword">let</span> ((obj (bible-obj-with-id bible-uid)))
       (<span class="org-keyword">when</span> obj
@@ -3268,8 +3233,8 @@ Invalidates the bible-obj cache so subsequent reads see the new value."</span>
 
 (<span class="org-keyword">defun</span> <span class="org-function-name">import-bible-text</span> (file)
   <span class="org-doc">"Process USFM text to vertex slots depending on markup tags."</span>
-  <span class="org-comment-delimiter">;; </span><span class="org-comment">FIXME There are two Genesis fr 1:1. The later one replaces the earlier.
-</span>  (<span class="org-keyword">let</span> ((book) (chapter) (verse))
+  <span class="org-comment-delimiter">;; </span><span class="org-comment"><span class="org-bold"><span class="org-error">FIXME</span></span></span><span class="org-comment"> There are two Genesis fr 1:1. The later one replaces the earlier.</span>
+  (<span class="org-keyword">let</span> ((book) (chapter) (verse))
     (iterate ((line (scan (uiop:read-file-lines file))))
              (<span class="org-keyword">cond</span>
                ((string-equal <span class="org-string">"\\h"</span> (car (ppcre:split <span class="org-string">" "</span> line)))
@@ -3339,8 +3304,8 @@ Invalidates the bible-obj cache so subsequent reads see the new value."</span>
                     (setf text nil))))))))
 
 (<span class="org-keyword">defun</span> <span class="org-function-name">create-search-index</span> ()
-  <span class="org-doc">"Run after MIGRATE-DATA. Populates Montezuma index in data/montezuma/ keyed
-by the same UNIQUE-ID values as the BIBLE vertices."</span>
+  <span class="org-doc">"Run after MIGRATE-DATA. Populates Montezuma index in data/montezuma/ keyed</span>
+<span class="org-doc">by the same UNIQUE-ID values as the BIBLE vertices."</span>
   (iterate ((x (scan-range <span class="org-builtin">:from</span> 0 <span class="org-builtin">:upto</span> 37198)))
            (montezuma:add-document-to-index
             *search-index*
@@ -3361,10 +3326,10 @@ by the same UNIQUE-ID values as the BIBLE vertices."</span>
   (create-search-index))
 
 
-<span class="org-comment-delimiter">;;; </span><span class="org-comment">One-shot rucksack -&gt; graph-db import. Run after producing the sexp
-</span><span class="org-comment-delimiter">;;; </span><span class="org-comment">dumps under DUMP-DIR. Idempotency: does NOT clear existing data; only
-</span><span class="org-comment-delimiter">;;; </span><span class="org-comment">run against a freshly created (empty) graph-db.
-</span>
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">One-shot rucksack -&gt; graph-db import. Run after producing the sexp</span>
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">dumps under DUMP-DIR. Idempotency: does NOT clear existing data; only</span>
+<span class="org-comment-delimiter">;;; </span><span class="org-comment">run against a freshly created (empty) graph-db.</span>
+
 (<span class="org-keyword">defun</span> <span class="org-function-name">read-sexp-file</span> (path)
   (<span class="org-keyword">with-open-file</span> (in path <span class="org-builtin">:direction</span> <span class="org-builtin">:input</span> <span class="org-builtin">:external-format</span> <span class="org-builtin">:utf-8</span>)
     (<span class="org-keyword">with-standard-io-syntax</span>
@@ -3376,9 +3341,9 @@ by the same UNIQUE-ID values as the BIBLE vertices."</span>
                             (dump-dir
                              (asdf:system-relative-pathname
                               <span class="org-builtin">:project-isidore</span> <span class="org-string">"data/migration-dump/"</span>)))
-  <span class="org-doc">"Import bible vertices, bible-metadata, and slack-subscriptions from
-the SEXP dump under DUMP-DIR into the currently open *BIBLE-DATABASE*
-and *DATABASE* graphs."</span>
+  <span class="org-doc">"Import bible vertices, bible-metadata, and slack-subscriptions from</span>
+<span class="org-doc">the SEXP dump under DUMP-DIR into the currently open *BIBLE-DATABASE*</span>
+<span class="org-doc">and *DATABASE* graphs."</span>
   (<span class="org-keyword">let</span> ((bible-file (merge-pathnames <span class="org-string">"bible.sexp"</span> dump-dir))
         (metadata-file (merge-pathnames <span class="org-string">"bible-metadata.sexp"</span> dump-dir))
         (subs-file (merge-pathnames <span class="org-string">"slack-subscriptions.sexp"</span> dump-dir)))
@@ -3460,7 +3425,7 @@ From the bottom of my heart, thank you!
                                     Comments? Corrections? <a href="https://bhw.name/contact"> Please do reach out.</a><a href="https://bhw.name/assets/blog/atom.xml"> RSS Feed. </a><a href="https://bhw.name/subscribe"> Mailing List. </a><br/>
                                     Copyright 2021 Ben H. W. <br/>
                                     Blog content is available under <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"> CC-BY-SA 4.0 </a> unless otherwise noted.<br/>
-                                    Created with <a href="https://www.gnu.org/software/emacs/">Emacs</a> 30.1 (<a href="https://orgmode.org">Org</a> mode 9.8.9) on <a href="https://www.gnu.org">GNU</a>/<a href="https://www.kernel.org/">Linux</a><br/>
+                                    Created with <a href="https://www.gnu.org/software/emacs/">Emacs</a> 31.1 (<a href="https://orgmode.org">Org</a> mode 10.0-pre) on <a href="https://www.gnu.org">GNU</a>/<a href="https://www.kernel.org/">Linux</a><br/>
                                 </div>
                               </footer>
 </div>

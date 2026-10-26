@@ -321,10 +321,13 @@ Example:
                 +bible-chapter-url-alist+))))))))
 
 (defparameter *search-index*
-  (make-instance 'search-engine:index
-                 :path (index-path)
-                 :default-field "*"
-                 :fields '("b" "c" "v" "t" "f" "x"))
+  ;; Montezuma creates a missing index directory, which a sandboxed build
+  ;; cannot do under /var/local/ (see BIBLE-STORE-PRESENT-P).
+  (when (uiop:directory-exists-p (index-path))
+    (make-instance 'search-engine:index
+                   :path (index-path)
+                   :default-field "*"
+                   :fields '("b" "c" "v" "t" "f" "x")))
   "Used in `search-bible' to query Bible data. Since `sb-ext:save-lisp-and-die'
   closes all open streams, this parameter is set during
   `initialize-application'.")

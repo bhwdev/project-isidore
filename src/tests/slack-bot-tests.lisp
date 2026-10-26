@@ -221,16 +221,22 @@ top-level)."
 
 (define-test bible-and-general-databases-are-distinct
   :parent slack-bot-suite
-  (false (eq db:*database* db:*bible-database*))
-  ;; CRUD writes go to *database*, never *bible-database*. Snapshot bible
-  ;; object count before and after a subscription round-trip.
-  (let ((bible-count-before (count-bible-objects)))
-    (with-temp-database
-        (db:add-slack-subscription +test-user-id+ "BW")
-      (db:remove-slack-subscription +test-user-id+))
-    (let ((bible-count-after (count-bible-objects)))
-      (is = bible-count-before bible-count-after)
-      (true (> bible-count-before 0)))))
+  ;; Needs the bible store under /var/local/, which the guix.scm build
+  ;; sandbox does not have.
+  (if (not db:*bible-database*)
+      (skip "no bible graph-db store on this machine"
+        (true db:*bible-database*))
+      (progn
+        (false (eq db:*database* db:*bible-database*))
+        ;; CRUD writes go to *database*, never *bible-database*. Snapshot bible
+        ;; object count before and after a subscription round-trip.
+        (let ((bible-count-before (count-bible-objects)))
+          (with-temp-database
+              (db:add-slack-subscription +test-user-id+ "BW")
+            (db:remove-slack-subscription +test-user-id+))
+          (let ((bible-count-after (count-bible-objects)))
+            (is = bible-count-before bible-count-after)
+            (true (> bible-count-before 0)))))))
 
 (define-test database-creates-missing-directory
   :parent slack-bot-suite

@@ -33,6 +33,8 @@
 
    #:reopen-database
    #:reopen-bible-database
+   #:bible-store-present-p
+   #:load-bible-tables
 
    #:slack-subscription
    #:user-id-of #:initial-of
@@ -95,6 +97,13 @@ content shipped alongside *BIBLE-DATABASE*."
   "Return the directory pathname for the bible graph-db store.
 Same path in development and production."
   #p"/var/local/project-isidore/graph-db/bible/")
+
+(defun bible-store-present-p ()
+  "True when the bible graph-db directory exists on this machine.  The
+package build (guix.scm) runs in a sandbox with no /var/local/, so loading
+leaves *BIBLE-DATABASE* NIL there and REOPEN-BIBLE-DATABASE opens the
+store, mounted into the container, when the application starts."
+  (uiop:directory-exists-p (bible-graph-path)))
 
 (defun open-or-make-graph (name path)
   "Open the graph at PATH if it has a schema, else create a fresh one.
@@ -215,8 +224,11 @@ already built the table."
 
 (defparameter *bible-database*
   (or (graph-db:lookup-graph :isidore-bible)
-      (open-or-make-graph :isidore-bible (bible-graph-path)))
-  "Vendored bible graph-db store. Read-only at runtime.
+      (when (bible-store-present-p)
+        (open-or-make-graph :isidore-bible (bible-graph-path))))
+  "Vendored bible graph-db store. Read-only at runtime.  NIL until
+REOPEN-BIBLE-DATABASE when the store is absent at load time (see
+BIBLE-STORE-PRESENT-P).
 On reload, reuses the entry from GRAPH-DB::*GRAPHS* so we don't double-open
 files (which can leave fd's leaked) and don't trip GC/schema-init paths
 that assume the graph isn't already registered.")
@@ -276,7 +288,8 @@ if they do not already exist. Idempotent across reopens."
              (when uid
                (graph-db:yield (string-downcase uid) nil)))))))))
 
-(ensure-bible-views)
+(when *bible-database*
+  (ensure-bible-views))
 (ensure-crud-views)
 
 ;;; Bible accessors
@@ -326,50 +339,54 @@ Eagerly hydrates the vertex's data alist (see BIBLE-OBJ-WITH-ID)."
       (graph-db::maybe-init-node-data result :graph *bible-database*))
     result))
 
-(defparameter *bible-metadata* (ensure-bible-metadata))
+;;; The tables below are read from *BIBLE-DATABASE* by LOAD-BIBLE-TABLES, at
+;;; load time when the store is present and again on every
+;;; REOPEN-BIBLE-DATABASE, so a binary built without the store (guix.scm)
+;;; fills them from the store it is started against.
 
-(defparameter +bible-book-numbers-alist+
-  (when *bible-metadata*
-    (let ((graph-db:*graph* *bible-database*))
-      (book-numbers-of *bible-metadata*))))
+(defparameter *bible-metadata* nil
+  "The singleton BIBLE-METADATA vertex, or NIL. Set by LOAD-BIBLE-TABLES.")
 
-(defparameter +bible-chapter-url-alist+
-  (when *bible-metadata*
-    (let ((graph-db:*graph* *bible-database*))
-      (chapter-urls-of *bible-metadata*))))
+(defparameter +bible-book-numbers-alist+ nil)
 
-(defparameter +bible-book-url-alist+
-  (when *bible-metadata*
-    (let ((graph-db:*graph* *bible-database*))
-      (book-urls-of *bible-metadata*))))
+(defparameter +bible-chapter-url-alist+ nil)
+
+(defparameter +bible-book-url-alist+ nil)
 
 (defparameter +bible-heading-to-uid+
-  (let ((ht (make-hash-table :test 'equalp :size 40000))
-        (graph-db:*graph* *bible-database*))
+  (make-hash-table :test 'equalp :size 40000)
+  "Maps (book chapter verse) lists to bible unique IDs for O(1) lookup.")
+
+(defparameter +bible-uid-to-heading+
+  (make-hash-table :test 'eql :size 40000)
+  "Maps bible unique IDs to heading alists for O(1) reverse lookup.")
+
+(defun load-bible-tables ()
+  "Set *BIBLE-METADATA* and the +BIBLE-...+ lookup tables from
+*BIBLE-DATABASE*, in one pass over its BIBLE vertices."
+  (let ((graph-db:*graph* *bible-database*)
+        (heading-to-uid (make-hash-table :test 'equalp :size 40000))
+        (uid-to-heading (make-hash-table :test 'eql :size 40000))
+        (metadata (ensure-bible-metadata)))
     (graph-db:map-vertices
      (lambda (v)
        (let ((h   (heading-of v))
              (uid (unique-id-of v)))
          (when (and h uid)
-           (setf (gethash (list (cdar h) (cdadr h) (cdaddr h)) ht) uid))))
+           (setf (gethash (list (cdar h) (cdadr h) (cdaddr h)) heading-to-uid) uid
+                 (gethash uid uid-to-heading) h))))
      *bible-database*
      :vertex-type 'bible)
-    ht)
-  "Maps (book chapter verse) lists to bible unique IDs for O(1) lookup.")
+    (setf *bible-metadata* metadata
+          +bible-book-numbers-alist+ (when metadata (book-numbers-of metadata))
+          +bible-chapter-url-alist+ (when metadata (chapter-urls-of metadata))
+          +bible-book-url-alist+ (when metadata (book-urls-of metadata))
+          +bible-heading-to-uid+ heading-to-uid
+          +bible-uid-to-heading+ uid-to-heading)
+    *bible-database*))
 
-(defparameter +bible-uid-to-heading+
-  (let ((ht (make-hash-table :test 'eql :size 40000))
-        (graph-db:*graph* *bible-database*))
-    (graph-db:map-vertices
-     (lambda (v)
-       (let ((uid (unique-id-of v))
-             (h   (heading-of v)))
-         (when (and uid h)
-           (setf (gethash uid ht) h))))
-     *bible-database*
-     :vertex-type 'bible)
-    ht)
-  "Maps bible unique IDs to heading alists for O(1) reverse lookup.")
+(when *bible-database*
+  (load-bible-tables))
 
 (defun reopen-bible-database ()
   "Reopen the vendored bible graph-db after sb-ext:save-lisp-and-die."
@@ -377,7 +394,7 @@ Eagerly hydrates the vertex's data alist (see BIBLE-OBJ-WITH-ID)."
   (setf *bible-database*
         (open-or-make-graph :isidore-bible (bible-graph-path)))
   (ensure-bible-views *bible-database*)
-  *bible-database*)
+  (load-bible-tables))
 
 (defun reopen-database ()
   "Reopen the general-purpose CRUD graph-db after sb-ext:save-lisp-and-die.

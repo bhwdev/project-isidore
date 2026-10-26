@@ -224,7 +224,7 @@ CONTENT-FN is called with the main content div as argument."
       (create-p main :content "My PGP Public Key is available <a target=\"_blank\" href=\"pubkey.asc\">here</a> and as a secondary source, at <a target=\"_blank\" href=\"https://keys.openpgp.org\">https://keys.openpgp.org.</a>")
       (create-p main :content "To receive blog article updates please use <a target=\"_blank\" href=\"https://bhw.name/assets/blog/atom.xml\">the Blog RSS Feed</a> or <a href=\"https://bhw.name/subscribe\">Subscribe to the Mailing List.</a>")
       (create-section main :h1 :content "Blog Article Transparency Policy")
-      (create-p main :content "All edits made to an article after the initial publication date can be found <a target=\"_blank\" href=\"https://gitlab.com/bhw/project-isidore/tree/master/assets/blog\">in the version-controlled Gitlab repository.</a>"))))
+      (create-p main :content "All edits made to an article after the initial publication date can be found <a target=\"_blank\" href=\"https://github.com/bhwdev/project-isidore/tree/master/assets/blog\">in the version-controlled GitHub repository.</a>"))))
 
 (defun on-subscribe-handler (body)
   "Subscribe page."
@@ -254,7 +254,7 @@ CONTENT-FN is called with the main content div as argument."
         (create-p main :content
                   (format nil "The requested URL <code>~A</code> was not found on this server. But that's not all we know..." path))
         (create-p main :content
-                  "Please validate the URL. <a href=\"https://www.w3.org/Provider/Style/URI\">Although I try my best to keep permanent, eternal, everlasting URLs,</a> Mea culpa. If you have a vague certainty that something should be here but isn't; <a href=\"https://gitlab.com/bhw/project-isidore/\">please browse the source repository</a> or <a href=\"/contact\">contact me for more information.</a>")))))
+                  "Please validate the URL. <a href=\"https://www.w3.org/Provider/Style/URI\">Although I try my best to keep permanent, eternal, everlasting URLs,</a> Mea culpa. If you have a vague certainty that something should be here but isn't; <a href=\"https://github.com/bhwdev/project-isidore\">please browse the source repository</a> or <a href=\"/contact\">contact me for more information.</a>")))))
 
 (defun render-400-page (obj)
   "Render 400 Bad Request content into OBJ."
@@ -262,7 +262,7 @@ CONTENT-FN is called with the main content div as argument."
   (create-section obj :h4 :content "Error Code 400 - Bad Request")
   (create-p obj :content "Please validate the URL. Resource exists but invalid arguments passed.")
   (create-p obj :content
-            "An example of a valid URL is <code>/bible/matthew-4-14/john-3-15</code> where the ending input is optional. Instead of <code>matthew</code> the number 47 may be used instead. This does not hold true for the chapter or verse which must be numeric. <a href=\"https://gitlab.com/bhw/project-isidore/blob/master/src/webserver.lisp\">Consult the source repository on what constitutes a valid URL (N.B. the function PARSE-UID-SYM)</a> or <a href=\"/contact\">contact me for more information.</a>"))
+            "An example of a valid URL is <code>/bible/matthew-4-14/john-3-15</code> where the ending input is optional. Instead of <code>matthew</code> the number 47 may be used instead. This does not hold true for the chapter or verse which must be numeric. <a href=\"https://github.com/bhwdev/project-isidore/blob/master/src/webserver.lisp\">Consult the source repository on what constitutes a valid URL (N.B. the function PARSE-UID-SYM)</a> or <a href=\"/contact\">contact me for more information.</a>"))
 
 (defun render-negative-range-page (obj invalid-range)
   "Render 416 Range Not Specifiable content into OBJ."
@@ -282,7 +282,7 @@ CONTENT-FN is called with the main content div as argument."
               (format nil "Please validate the URL. The beginning input <code>~A</code> subtracted from the ending input <code>~A</code> results in a negative interval range. Perhaps swapping the values will provide a valid URL: <a href=\"~A\">~A</a>"
                       bi ei corrected-link corrected-link))
     (create-p obj :content
-              "An example of a valid URL is <code>/bible/matthew-4-14/john-3-15</code> where the ending input is optional. Instead of <code>matthew</code> the number 47 may be used instead. This does not hold true for the chapter or verse which must be numeric. <a href=\"https://gitlab.com/bhw/project-isidore/blob/master/src/webserver.lisp\">Consult the source repository on what constitutes a valid URL (N.B. the function PARSE-UID-SYM)</a> or <a href=\"/contact\">contact me for more information.</a>")))
+              "An example of a valid URL is <code>/bible/matthew-4-14/john-3-15</code> where the ending input is optional. Instead of <code>matthew</code> the number 47 may be used instead. This does not hold true for the chapter or verse which must be numeric. <a href=\"https://github.com/bhwdev/project-isidore/blob/master/src/webserver.lisp\">Consult the source repository on what constitutes a valid URL (N.B. the function PARSE-UID-SYM)</a> or <a href=\"/contact\">contact me for more information.</a>")))
 
 ;;; Slideshow Component
 
@@ -744,7 +744,7 @@ https://www.gnu.org/licenses/agpl-3.0.html for License details.
 
 Homepage: https://www.bhw.name/assets/blog/project-isidore-doc.html
 
-Source code repository: https://gitlab.com/bhw/project-isidore
+Source code repository: https://github.com/bhwdev/project-isidore
 
 Navigate to http://localhost:~A to continue... ~%" port)
   ;; clack:clackup with :use-thread t returns before hunchentoot:start

@@ -10,69 +10,102 @@ otherwise noted.
 
 ** Development Quick Start
 
-Prerequisite(s):
+Prerequisite(s): [[https://guix.gnu.org/][GNU Guix]], which provides [[http://www.sbcl.org/][SBCL]] and every Common Lisp dependency.
+=guix.scm= defines the package, including the dependencies Guix lacks;
+=manifest.scm= is the development environment made of its inputs;
+=channels.scm= pins the Guix revision CI builds with.
 
-An ANSI Common Lisp implementation. The development platform is x86_64 Debian
-GNU/Linux with [[http://www.sbcl.org/][SBCL.]]
-
-#+begin_src bash
-$ sudo apt install sbcl
-#+end_src
-
-The [[https://www.quicklisp.org/beta/][Quicklisp]] library manager to download system dependencies.
-
-#+begin_src bash
-$ curl -O https://beta.quicklisp.org/quicklisp.lisp
-$ sbcl --load quicklisp.lisp
-,* (quicklisp-quickstart:install)
-,* (ql:add-to-init-file)
-,* (quit)
-#+end_src
-
-1. Clone the repository,
+1. Clone the repository and enter the development environment,
 
    #+begin_src bash
-   $ git clone https://gitlab.com/bhw/project-isidore.git /home/$USER/quicklisp/local-projects/
+   $ git clone https://github.com/bhwdev/project-isidore.git && cd project-isidore
+   $ guix shell -m manifest.scm
+   # Or, with exactly the Guix revision CI uses,
+   $ guix time-machine -C channels.scm -- shell -m manifest.scm
    #+end_src
 
-2. Within [[https://www.gnu.org/software/emacs/][Emacs]], start a Common Lisp IDE ([[https://github.com/joaotavora/sly][SLY]]) REPL buffer with =M-x sly=.
-   Depending on the current working directory, =M-x sly-mrepl-set-directory= to
-   Project Isidore root directory may be needed. [[https://lispcookbook.github.io/cl-cookbook/editor-support.html#vscode][Here are some Non-Emacs Common
-   Lisp IDE options.]] Or you may use the REPL inside your shell, as outlined in
-   the Quicklisp installation steps.
+2. Within [[https://www.gnu.org/software/emacs/][Emacs]] started from that shell, start a Common Lisp IDE ([[https://github.com/joaotavora/sly][SLY]]) REPL
+   buffer with =M-x sly=. ASDF finds the dependencies through =XDG_CONFIG_DIRS=,
+   which the shell sets.
 
-3. Load Project Isidore & start local development server.
+3. Load Project Isidore & start local development server. The bible pages and
+   search need the bible graph-db and Montezuma index under
+   =/var/local/project-isidore/=, which are not in the repository.
 
    #+begin_src lisp
-     CL-USER> (ql:quickload "project-isidore/test")
+     CL-USER> (asdf:load-system "project-isidore/tests")
      CL-USER> (asdf:test-system "project-isidore")
-     ;; Switch to package namespace.
-     CL-USER> (in-package :project-isidore)
      ;; Starts web server at http://localhost:8080.
-     PROJECT-ISIDORE> (initialize-application)
-     PROJECT-ISIDORE> (terminate-application)
+     CL-USER> (project-isidore/webserver:initialize-application)
+     CL-USER> (project-isidore/webserver:terminate-application)
    #+end_src
 
-4. To build a standalone executable binary locally,
+4. To build a standalone executable binary locally, which runs every test
+   suite first (=PROJECT_ISIDORE_OFFLINE=1= skips the one needing the bible store
+   and the network),
 
    #+begin_src bash
-     $ sbcl --load /home/$USER/quicklisp/local-projects/project-isidore/make.lisp
-     # Run the executable.
-     $ /home/$USER/quicklisp/local-projects/project-isidore/bin/ProjectIsidore
+     $ guix shell -m manifest.scm -- sbcl --dynamic-space-size 8Gb \
+         --control-stack-size 16Mb --script make.lisp
+     $ bin/ProjectIsidore
+     # Or as Guix builds it, in a sandbox and with the offline suites only:
+     $ guix build -f guix.scm
    #+end_src
 
-5. To build a docker image first create a Dockerfile at the repository root. See
-   commit c23d6a7e661dc42b21008b7ece8b4254e517c6d4 for an example Dockerfile.
+5. To build the container image that production runs,
+
+   #+begin_src bash
+     $ guix time-machine -C channels.scm -- pack -f docker \
+         --image-tag=project-isidore --entry-point=bin/ProjectIsidore \
+         --symlink=/etc/ssl=etc/ssl --symlink=/usr/share/zoneinfo=share/zoneinfo \
+         --file=guix.scm nss-certs tzdata
+     $ podman load --input /gnu/store/...-docker-pack.tar.gz
+   #+end_src
+
+   [[file:deploy/project-isidore.container][deploy/project-isidore.container]] shows how it runs: host networking, the bible
+   store and the CRUD graph-db mounted from the host, secrets from an
+   environment file.
+
+** Deployment
+
+A push to =master= deploys. [[file:.github/workflows/deploy.yml][.github/workflows/deploy.yml]] builds the image with =guix
+pack= on a GitHub-hosted arm64 runner (production is aarch64), pushes it to
+=ghcr.io/bhwdev/project-isidore=, and connects to the production host with a key
+that can do nothing there but run [[file:deploy/project-isidore-deploy][deploy/project-isidore-deploy]]: pull that image
+by digest, tag it =localhost/project-isidore:latest= and restart the Quadlet unit.
+The host's other configuration (Caddy, llama-server, firewalld) and the unit
+file itself are managed there by hand. One-time setup:
+
+1. On the host, as root, install the hook (=install -m 755
+   deploy/project-isidore-deploy /usr/local/sbin/=) and allow a new deploy key in
+   =/root/.ssh/authorized_keys= for the hook only:
+
+   #+begin_src text
+     restrict,command="/usr/local/sbin/project-isidore-deploy" ssh-ed25519 AAAA... project-isidore-deploy
+   #+end_src
+
+2. In the repository's settings on GitHub, create the environment =production=,
+   limited to the =master= branch, with the secret =DEPLOY_SSH_KEY= (the private
+   key) and the variables =DEPLOY_HOST= (the host's address) and =DEPLOY_KNOWN_HOSTS=
+   (=ssh-keyscan= output for it).
+
+3. Push. Once the image is on ghcr.io, make the =project-isidore= package public
+   (its settings page on GitHub), or the host cannot pull it anonymously. Until
+   step 4 the deploy job only restarts the pre-container service.
+
+4. On the host, switch from the pre-container unit, which would shadow the one
+   Quadlet generates, then deploy the pushed image:
 
    #+begin_src sh
-     $ sudo dockerd
-     # After creating said Dockerfile.
-     $ docker build -t project-isidore-image /home/$USER/quicklisp/local-projects/project-isidore/
-     $ docker run -dp 8080:8080 project-isidore-image
-     $ docker stop $(docker ps -a -q)
-     $ docker system prune
-     $ sudo pkill -9 dockerd
+     install -m 644 deploy/project-isidore.container /etc/containers/systemd/
+     systemctl disable --now project-isidore.service
+     rm /etc/systemd/system/project-isidore.service
+     systemctl daemon-reload
+     SSH_ORIGINAL_COMMAND=ghcr.io/bhwdev/project-isidore@sha256:... project-isidore-deploy
    #+end_src
+
+After changing [[file:deploy/project-isidore.container][deploy/project-isidore.container]], install it on the host again and
+run =systemctl daemon-reload=.
 
 Please visit https://www.bhw.name/assets/blog/project-isidore-doc.html for
 online documentation.

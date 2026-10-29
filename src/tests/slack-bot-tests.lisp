@@ -120,44 +120,36 @@ WITH-MOCKED-FUNCTIONS."))
 ;;; Each CRUD test runs against a fresh, temporary graph-db store so nothing
 ;;; leaks into ~/.local/share/project-isidore/ (or wherever
 ;;; PROJECT_ISIDORE_DATA points). WITH-TEMP-DATABASE handles the open,
-;;; the *database* rebind, the slack-subscription schema
-;;; registration, and the teardown.
+;;; the *database* rebind, and the teardown.
 
 (defparameter +test-user-id+ "__TEST_USER_slack_bot_tests__"
   "Sentinel Slack user_id used inside the temp DB.")
 
 (defmacro with-temp-database (&body body)
   "Open a fresh graph-db CRUD store in a unique temp dir, swap it in for
-DB:*DATABASE*, install the SUBSCRIPTION-BY-USER-CI view, run BODY, then
-close and delete. The graph is opened under name :ISIDORE-CRUD so the
-SLACK-SUBSCRIPTION schema (registered globally at load time) is auto-
-instantiated by UPDATE-SCHEMA. The previous binding in graph-db's
-*GRAPHS* registry is saved and restored on unwind so subsequent tests
-keep seeing the production graph."
+DB:*DATABASE*, run BODY, then close and delete it and reopen the real store.
+The graph is opened under name :ISIDORE-CRUD so the vertex types and views
+declared for that store at load time are attached to it, and so the real
+store is closed meanwhile: graph-db allows one open store per name in a
+system directory."
   (let ((dir (gensym "DIR"))
-        (saved-graph (gensym "SAVED"))
-        (saved-db (gensym "SAVED-DB"))
         (g (gensym "G")))
-    `(let* ((,dir (uiop:ensure-directory-pathname
-                   (format nil "/tmp/pi-crud-test-~A-~A/"
-                           (get-universal-time) (random 1000000))))
-            (,saved-graph (graph-db:lookup-graph :isidore-crud))
-            (,saved-db db:*database*)
-            (,g nil))
+    `(let ((,dir (uiop:ensure-directory-pathname
+                  (format nil "/tmp/pi-crud-test-~A-~A/"
+                          (get-universal-time) (random 1000000))))
+           (,g nil))
        (ensure-directories-exist ,dir)
+       (when db:*database*
+         (graph-db:close-graph db:*database* :snapshot-p nil))
        (unwind-protect
             (let ((db:*database* nil))
-              (declare (special db:*database*))
               (setf ,g (db:open-or-make-graph :isidore-crud ,dir))
               (setf db:*database* ,g)
-              (db:ensure-crud-views ,g)
               (locally ,@body))
          (when ,g
            (graph-db:close-graph ,g :snapshot-p nil))
-         (when ,saved-graph
-           (setf (gethash :isidore-crud graph-db::*graphs*) ,saved-graph))
-         (setf db:*database* ,saved-db)
-         (uiop:delete-directory-tree ,dir :validate (constantly t))))))
+         (uiop:delete-directory-tree ,dir :validate (constantly t))
+         (db:reopen-database)))))
 
 (define-test subscription-add-upsert-remove
   :parent slack-bot-suite
@@ -207,12 +199,8 @@ keep seeing the production graph."
           (setf (uiop:getenv "PROJECT_ISIDORE_DATA") "")))))
 
 (defun count-bible-objects ()
-  "Count BIBLE vertices in DB:*BIBLE-DATABASE*. Binds GRAPH-DB:*GRAPH*
-because MAP-VERTICES' :VERTEX-TYPE branch routes through
-LOOKUP-NODE-TYPE-BY-NAME, which defaults :GRAPH to *GRAPH* (unbound at
-top-level)."
-  (let ((c 0)
-        (graph-db:*graph* db:*bible-database*))
+  "Count BIBLE vertices in DB:*BIBLE-DATABASE*."
+  (let ((c 0))
     (graph-db:map-vertices
      (lambda (v) (declare (ignore v)) (incf c))
      db:*bible-database*
@@ -245,7 +233,8 @@ top-level)."
          (target (uiop:ensure-directory-pathname
                   (merge-pathnames "deeply/nested/subdir/" tmp-root)))
          (graph-db-dir (merge-pathnames "graph-db/" target))
-         (saved (uiop:getenvp "PROJECT_ISIDORE_DATA")))
+         (saved (uiop:getenvp "PROJECT_ISIDORE_DATA"))
+         (bible-open-p (graph-db:lookup-graph :isidore-bible)))
     (unwind-protect
          (progn
            (false (uiop:directory-exists-p graph-db-dir))
@@ -257,6 +246,11 @@ top-level)."
            (when db:*database*
              (let ((graph-db:*graph* db:*database*))
                (graph-db:close-graph db:*database* :snapshot-p nil)))
+           ;; The bible store too: the new data root brings a new graph-db
+           ;; system directory, whose store ids may give the CRUD store the
+           ;; one the open bible store holds.
+           (when bible-open-p
+             (graph-db:close-graph db:*bible-database* :snapshot-p nil))
            (setf (uiop:getenv "PROJECT_ISIDORE_DATA") (namestring target))
            (db:reopen-database)
            (true (uiop:directory-exists-p graph-db-dir))
@@ -272,6 +266,8 @@ top-level)."
       (if saved
           (setf (uiop:getenv "PROJECT_ISIDORE_DATA") saved)
           (setf (uiop:getenv "PROJECT_ISIDORE_DATA") ""))
+      (when bible-open-p
+        (db:reopen-bible-database))
       (db:reopen-database)
       (when (uiop:directory-exists-p tmp-root)
         (uiop:delete-directory-tree tmp-root :validate (constantly t))))))

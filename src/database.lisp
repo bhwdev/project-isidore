@@ -11,6 +11,7 @@
    #:*bible-database*
    #:data-root
    #:database-path
+   #:system-directory
    #:index-path
 
    #:bible-metadata
@@ -52,20 +53,18 @@
    #:with-db-transaction
    #:open-or-make-graph
    #:bible-graph-path
-   #:ensure-bible-views
-   #:ensure-crud-views
    #:make-bible
    #:make-bible-metadata
    #:make-slack-subscription
    #:make-slack-identity)
   (:documentation
    "Project Isidore database setup and teardown.
-Manages two graph-db (Vivace Graph V3) stores:
+Manages two graph-db (VivaceGraph 4) stores:
   *BIBLE-DATABASE* — read-only at runtime, lives at /var/local/project-isidore/graph-db/bible/.
   *DATABASE*       — general-purpose runtime CRUD store at <data-root>/graph-db/.
-Both *DATABASE* and the Montezuma search index resolve relative to a single
-data root (DATA-ROOT): $PROJECT_ISIDORE_DATA, falling back to
-$XDG_DATA_HOME/project-isidore/.
+*DATABASE* and graph-db's system directory (SYSTEM-DIRECTORY) resolve
+relative to a single data root (DATA-ROOT): $PROJECT_ISIDORE_DATA, falling
+back to $XDG_DATA_HOME/project-isidore/.
 Defines the persistent vertex schema."))
 
 (in-package #:project-isidore/database)
@@ -87,6 +86,18 @@ development and production."
 Lives at <data-root>/graph-db/."
   (merge-pathnames "graph-db/" (data-root)))
 
+(defun system-directory ()
+  "Return the directory pathname OPEN-OR-MAKE-GRAPH points graph-db's
+*SYSTEM-DIRECTORY* at: the state graph-db shares between every store of an
+image, chiefly the registry that gives each vertex type one type-id across
+both stores.  Lives at <data-root>/graph-db-system/, beside the CRUD store,
+because the registry is written to whenever a store first meets a type.
+
+The registry adopts the ids a store already uses when it first opens it, and
+refuses to open a store whose ids it has given to other types.  Copying a
+store from another machine therefore means copying this directory with it."
+  (merge-pathnames "graph-db-system/" (data-root)))
+
 (defun index-path ()
   "Return the directory pathname for the Montezuma search index.
 Same path in development and production: the index is read-only bible
@@ -107,30 +118,32 @@ store, mounted into the container, when the application starts."
 
 (defun open-or-make-graph (name path)
   "Open the graph at PATH if it has a schema, else create a fresh one.
-Tolerates a stale .dirty file from an unclean shutdown by removing it
-before OPEN-GRAPH (which would otherwise refuse). A production-grade
-recovery would replay the txn log; for our workload the snapshot is
-sufficient.
+Points graph-db's *SYSTEM-DIRECTORY* at SYSTEM-DIRECTORY first, which graph-db
+requires before any store is opened.
 
-Disables graph-db's buffer pool (:BUFFER-POOL-P NIL) on both make-graph
-and open-graph paths. The pool is an optional vertex/edge recycler — when
-absent, GET-VERTEX-BUFFER falls back to MAKE-INSTANCE. The upstream calls
-ENSURE-BUFFER-POOL with zero arguments inside OPEN-GRAPH, which fails at
-SBCL's arity check regardless of pool state, and the background thread
-has been a source of worker crashes during long imports."
-  (ensure-directories-exist path)
+A .dirty file left by an unclean shutdown is removed before OPEN-GRAPH, which
+then recovers the store by replaying its transaction log: graph-db's own
+procedure for its STORE-NOT-CLOSED-CLEANLY-ERROR.  Nothing closes the graphs
+when the application stops, so every production start takes this path.
+
+Opens without graph-db's buffer pool (:BUFFER-POOL-P NIL), a vertex/edge
+pre-allocator for write-heavy loads.  It costs ~130 MB and ~2 s on first use,
+and its background thread outlives CLOSE-GRAPH, so make.lisp would have to kill
+it before SAVE-LISP-AND-DIE."
+  (setf graph-db:*system-directory*
+        (namestring (ensure-directories-exist (system-directory))))
   (let ((schema-file (merge-pathnames "schema.dat" path))
         (dirty-file  (merge-pathnames ".dirty"     path)))
     (when (and (probe-file schema-file) (probe-file dirty-file))
       (delete-file dirty-file))
+    (ensure-directories-exist path)
     (if (probe-file schema-file)
-        ;; :GC-HEAP-P NIL avoids the load-time vertex iteration in OPEN-GRAPH.
-        ;; That iteration calls CHANGE-CLASS to per-vertex subclasses (e.g.
-        ;; BIBLE) which only exist after DEF-VERTEX runs — schema is registered
-        ;; before opening, but the CLOS classes themselves are also created by
-        ;; DEF-VERTEX, so heap GC must run after the class definitions.
-        (graph-db:open-graph name path :buffer-pool-p nil :gc-heap-p nil)
-        (graph-db:make-graph name path :buffer-pool-p nil))))
+        (graph-db:open-graph name path :buffer-pool-p nil)
+        (let ((graph (graph-db:make-graph name path :buffer-pool-p nil)))
+          ;; Unlike OPEN-GRAPH, MAKE-GRAPH attaches the declared vertex types
+          ;; but not the declared views.
+          (graph-db:install-views graph)
+          graph))))
 
 (defmacro with-db-transaction ((&key (context "db-op") (graph '*database*))
                                &body body)
@@ -146,81 +159,62 @@ has been a source of worker crashes during long imports."
            (format *error-output* "database: ~A failed: ~A~%" ,context ,c)
            (error ,c))))))
 
-;;; Schema: vertex classes registered in *SCHEMA-NODE-METADATA* before any
-;;; graph is opened, so OPEN-GRAPH's UPDATE-SCHEMA can attach them.
-;;;
-;;; DEF-VERTEX's expansion calls INSTANTIATE-NODE-TYPE whenever the graph is
-;;; already registered in GRAPH-DB::*GRAPHS* (i.e., on every reload after
-;;; the first load). INSTANTIATE-NODE-TYPE then calls LOOKUP-NODE-TYPE-BY-NAME
-;;; with no :GRAPH arg, so it reads GRAPH-DB:*GRAPH* — NIL at top-level on
-;;; reload — and SCHEMA(NIL) blows up. Binding *GRAPH* around DEF-VERTEX
-;;; lets the reload-time instantiate path see the right schema; on first
-;;; load LOOKUP-GRAPH returns NIL, DEF-VERTEX skips INSTANTIATE-NODE-TYPE,
-;;; and the NIL binding is harmless.
+;;; Schema: vertex types and their views are declared before any graph is
+;;; opened; OPEN-GRAPH and MAKE-GRAPH attach them to the store named in each.
+;;; Re-evaluating them while the graphs are open (a reload) reconciles them
+;;; with the open stores, and an unchanged DEF-VIEW does not rebuild its index.
 
-(let ((graph-db:*graph* (graph-db:lookup-graph :isidore-bible)))
-  (declare (ignorable graph-db:*graph*))
-  (graph-db:def-vertex bible-metadata ()
-    ((book-numbers :accessor book-numbers-of)
-     (chapter-urls :accessor chapter-urls-of)
-     (book-urls    :accessor book-urls-of))
-    :isidore-bible)
+(graph-db:def-vertex bible-metadata ()
+  ((book-numbers :accessor book-numbers-of)
+   (chapter-urls :accessor chapter-urls-of)
+   (book-urls    :accessor book-urls-of))
+  :isidore-bible)
 
-  (graph-db:def-vertex bible ()
-    ((unique-id        :accessor unique-id-of        :type fixnum)
-     (heading          :accessor heading-of          :type cons)
-     (text             :accessor text-of             :type string)
-     (cross-references :accessor cross-references-of :type (or string null))
-     (footnotes        :accessor footnotes-of        :type (or string null)))
-    :isidore-bible))
+(graph-db:def-vertex bible ()
+  ((unique-id        :accessor unique-id-of        :type fixnum)
+   (heading          :accessor heading-of          :type cons)
+   (text             :accessor text-of             :type string)
+   (cross-references :accessor cross-references-of :type (or string null))
+   (footnotes        :accessor footnotes-of        :type (or string null)))
+  :isidore-bible)
 
-(let ((graph-db:*graph* (graph-db:lookup-graph :isidore-crud)))
-  (declare (ignorable graph-db:*graph*))
-  (graph-db:def-vertex slack-subscription ()
-    ((user-id :accessor user-id-of :type string)
-     (initial :accessor initial-of :type string))
-    :isidore-crud)
+(graph-db:def-vertex slack-subscription ()
+  ((user-id :accessor user-id-of :type string)
+   (initial :accessor initial-of :type string))
+  :isidore-crud)
 
-  ;; Who a Slack account is, so "book me a van" can name them.  Deliberately
-  ;; a separate vertex from SLACK-SUBSCRIPTION: that one is the opt-in to
-  ;; reminder DMs, and /unsubscribe must not cost someone their identity.
-  (graph-db:def-vertex slack-identity ()
-    ((user-id :accessor user-id-of :type string)
-     (initial :accessor initial-of :type string))
-    :isidore-crud))
+;; Who a Slack account is, so "book me a van" can name them.  Deliberately
+;; a separate vertex from SLACK-SUBSCRIPTION: that one is the opt-in to
+;; reminder DMs, and /unsubscribe must not cost someone their identity.
+(graph-db:def-vertex slack-identity ()
+  ((user-id :accessor user-id-of :type string)
+   (initial :accessor initial-of :type string))
+  :isidore-crud)
 
-;;; graph-db cannot add a vertex type to a graph that already exists on disk,
-;;; and this is the repair.  SAVE-SCHEMA nulls the schema's CLASS-LOCKS table
-;;; before CL-STORE:STORE and restores it only in memory (graph-db schema.lisp
-;;; SAVE-SCHEMA), so schema.dat always records NIL; OPEN-GRAPH rebuilds
-;;; SCHEMA-LOCK afterwards but not CLASS-LOCKS (graph-db graph.lisp
-;;; OPEN-GRAPH).  A restored schema therefore carries CLASS-LOCKS = NIL, and
-;;; the first DEF-VERTEX of a type that is not already in schema.dat reaches
-;;; INSTANTIATE-NODE-TYPE's new-type branch, which does
-;;; (setf (gethash name (schema-class-locks ...)) (make-rw-lock)) and dies with
-;;; "The value NIL is not of type HASH-TABLE".  Existing types take the other
-;;; branch, which is why every load before SLACK-IDENTITY was added worked.
-;;;
-;;; UPDATE-SCHEMA is called from inside OPEN-GRAPH, so the table has to be back
-;;; in place before that call rather than after OPEN-OR-MAKE-GRAPH returns.
-;;; WITH-WRITE-LOCKED-CLASS and WITH-READ-LOCKED-CLASS are the only readers of
-;;; this table and graph-db never calls either, so an empty table is as good as
-;;; the original; the per-class locks are seeded anyway to match INIT-SCHEMA.
+(graph-db:def-view bible-by-uid :lessp (bible :isidore-bible)
+  (:map
+   (lambda (v)
+     (let ((uid (graph-db:node-slot-value v :unique-id)))
+       (when uid
+         (graph-db:yield uid nil))))))
 
-(defmethod graph-db::update-schema :before ((graph graph-db::graph))
-  "Give a schema restored from disk back the CLASS-LOCKS hash-table that
-SAVE-SCHEMA dropped, so a newly defined vertex type can be added to a graph
-that already exists.  A no-op for a freshly made graph, whose INIT-SCHEMA
-already built the table."
-  (let ((schema (graph-db:schema graph)))
-    (when (and schema (not (hash-table-p (graph-db:schema-class-locks schema))))
-      (setf (graph-db:schema-class-locks schema)
-            (make-hash-table :test 'eql :synchronized t))
-      (dolist (parent '(graph-db::edge graph-db::vertex))
-        (setf (gethash parent (graph-db:schema-class-locks schema))
-              (graph-db:make-rw-lock))))))
+(graph-db:def-view subscription-by-user-ci :lessp
+  (slack-subscription :isidore-crud)
+  (:map
+   (lambda (s)
+     (let ((uid (graph-db:node-slot-value s :user-id)))
+       (when uid
+         (graph-db:yield (string-downcase uid) nil))))))
 
-;;; Now open the graphs — UPDATE-SCHEMA attaches the registered metadata.
+(graph-db:def-view identity-by-user-ci :lessp
+  (slack-identity :isidore-crud)
+  (:map
+   (lambda (s)
+     (let ((uid (graph-db:node-slot-value s :user-id)))
+       (when uid
+         (graph-db:yield (string-downcase uid) nil))))))
+
+;;; Now open the graphs.
 
 (defparameter *bible-database*
   (or (graph-db:lookup-graph :isidore-bible)
@@ -239,59 +233,6 @@ that assume the graph isn't already registered.")
   "General-purpose CRUD graph-db store. Path resolved by DATABASE-PATH.
 Reload-safe: reuses the existing GRAPH-DB::*GRAPHS* entry if present.")
 
-;;; Views are installed via dedicated functions so they can be skipped on a
-;;; reopen (RESTORE-VIEWS already rebuilt them from disk) and re-run by the
-;;; test fixture against a fresh CRUD graph.
-
-(defun view-installed-p (graph class-name view-name)
-  "Like GRAPH-DB:LOOKUP-VIEW but returns NIL instead of erroring when
-the view group for CLASS-NAME has not yet been created on GRAPH."
-  (let ((group (graph-db:lookup-view-group class-name graph)))
-    (when group
-      (graph-db:lookup-view graph class-name view-name))))
-
-(defun ensure-bible-views (&optional (graph *bible-database*))
-  "Install the BIBLE-BY-UID view on GRAPH if it does not already exist.
-DEF-VIEW writes views.dat and calls REGENERATE-VIEW (a linear scan of all
-matching vertices) — expensive on the 37 199-row bible store, so guard
-against re-running when OPEN-GRAPH has already restored the view."
-  (unless (view-installed-p graph 'bible 'bible-by-uid)
-    (let ((graph-db:*graph* graph))
-      (graph-db:def-view bible-by-uid :lessp (bible :isidore-bible)
-        (:map
-         (lambda (v)
-           (let ((uid (graph-db:node-slot-value v :unique-id)))
-             (when uid
-               (graph-db:yield uid nil)))))))))
-
-(defun ensure-crud-views (&optional (graph *database*))
-  "Install the SUBSCRIPTION-BY-USER-CI and IDENTITY-BY-USER-CI views on GRAPH
-if they do not already exist. Idempotent across reopens."
-  (unless (view-installed-p graph 'slack-subscription
-                            'subscription-by-user-ci)
-    (let ((graph-db:*graph* graph))
-      (graph-db:def-view subscription-by-user-ci :lessp
-        (slack-subscription :isidore-crud)
-        (:map
-         (lambda (s)
-           (let ((uid (graph-db:node-slot-value s :user-id)))
-             (when uid
-               (graph-db:yield (string-downcase uid) nil))))))))
-  (unless (view-installed-p graph 'slack-identity
-                            'identity-by-user-ci)
-    (let ((graph-db:*graph* graph))
-      (graph-db:def-view identity-by-user-ci :lessp
-        (slack-identity :isidore-crud)
-        (:map
-         (lambda (s)
-           (let ((uid (graph-db:node-slot-value s :user-id)))
-             (when uid
-               (graph-db:yield (string-downcase uid) nil)))))))))
-
-(when *bible-database*
-  (ensure-bible-views))
-(ensure-crud-views)
-
 ;;; Bible accessors
 
 (defparameter *bible-obj-cache*
@@ -307,37 +248,25 @@ old graph's pages)."
 
 (defun bible-obj-with-id (bible-uid)
   "Return the BIBLE vertex whose UNIQUE-ID equals BIBLE-UID, or NIL.
-Eagerly hydrates the vertex's data alist so callers can use accessors
-without binding GRAPH-DB:*GRAPH* themselves; once the bytes slot is
-populated, subsequent NODE-SLOT-VALUE calls never consult *GRAPH*.
 
 Memoized via *BIBLE-OBJ-CACHE* — the vendored bible graph is read-only at
-runtime, so caching the inflated vertex object skips the view lookup,
-LOOKUP-VERTEX, and MAYBE-INIT-NODE-DATA on repeat hits (~11μs uncached
-vs ~5ns cached, measured). Mutators (migration.lisp) and REOPEN-BIBLE-DATABASE
-must call CLEAR-BIBLE-OBJ-CACHE."
+runtime, so caching the vertex object skips the view lookup and
+LOOKUP-VERTEX on repeat hits. Mutators and REOPEN-BIBLE-DATABASE must call
+CLEAR-BIBLE-OBJ-CACHE."
   (or (gethash bible-uid *bible-obj-cache*)
-      (let* ((graph-db:*graph* *bible-database*)
-             (rows (graph-db:invoke-graph-view 'bible 'bible-by-uid
-                                               :key bible-uid))
+      (let* ((rows (graph-db:invoke-graph-view 'bible 'bible-by-uid
+                                               :key bible-uid
+                                               :graph *bible-database*))
              (id   (cdr (assoc :id (first rows)))))
         (when id
-          (let ((v (graph-db:lookup-vertex id)))
-            (graph-db::maybe-init-node-data v :graph *bible-database*)
-            (setf (gethash bible-uid *bible-obj-cache*) v))))))
+          (setf (gethash bible-uid *bible-obj-cache*)
+                (graph-db:lookup-vertex id :graph *bible-database*))))))
 
 (defun ensure-bible-metadata ()
-  "Return the singleton BIBLE-METADATA vertex from the bible graph, or NIL.
-Eagerly hydrates the vertex's data alist (see BIBLE-OBJ-WITH-ID)."
-  (let ((graph-db:*graph* *bible-database*)
-        (result nil))
-    (graph-db:map-vertices
-     (lambda (v) (setf result v))
-     *bible-database*
-     :vertex-type 'bible-metadata)
-    (when result
-      (graph-db::maybe-init-node-data result :graph *bible-database*))
-    result))
+  "Return the singleton BIBLE-METADATA vertex from the bible graph, or NIL."
+  (first (graph-db:map-vertices #'identity *bible-database*
+                                :vertex-type 'bible-metadata
+                                :collect-p t)))
 
 ;;; The tables below are read from *BIBLE-DATABASE* by LOAD-BIBLE-TABLES, at
 ;;; load time when the store is present and again on every
@@ -364,8 +293,7 @@ Eagerly hydrates the vertex's data alist (see BIBLE-OBJ-WITH-ID)."
 (defun load-bible-tables ()
   "Set *BIBLE-METADATA* and the +BIBLE-...+ lookup tables from
 *BIBLE-DATABASE*, in one pass over its BIBLE vertices."
-  (let ((graph-db:*graph* *bible-database*)
-        (heading-to-uid (make-hash-table :test 'equalp :size 40000))
+  (let ((heading-to-uid (make-hash-table :test 'equalp :size 40000))
         (uid-to-heading (make-hash-table :test 'eql :size 40000))
         (metadata (ensure-bible-metadata)))
     (graph-db:map-vertices
@@ -393,7 +321,6 @@ Eagerly hydrates the vertex's data alist (see BIBLE-OBJ-WITH-ID)."
   (clear-bible-obj-cache)
   (setf *bible-database*
         (open-or-make-graph :isidore-bible (bible-graph-path)))
-  (ensure-bible-views *bible-database*)
   (load-bible-tables))
 
 (defun reopen-database ()
@@ -401,37 +328,37 @@ Eagerly hydrates the vertex's data alist (see BIBLE-OBJ-WITH-ID)."
 Re-resolves DATABASE-PATH so PROJECT_ISIDORE_DATA takes effect even when
 the binary was built against a different path."
   (setf *database*
-        (open-or-make-graph :isidore-crud (database-path)))
-  (ensure-crud-views *database*)
-  *database*)
+        (open-or-make-graph :isidore-crud (database-path))))
+
+(defun close-databases ()
+  "Close both stores before the image is saved.  graph-db keeps an image-wide
+table of open stores by store id, and the ids are minted per system directory:
+a store the build left open would hold the id that REOPEN-BIBLE-DATABASE's
+store is given at startup, and that open would fail."
+  (dolist (graph (list *bible-database* *database*))
+    (when graph
+      (graph-db:close-graph graph :snapshot-p nil))))
+
+(uiop:register-image-dump-hook 'close-databases)
 
 ;;; CRUD: slack subscriptions
 
 (defun find-slack-subscription (user-id)
   "Return the persistent SLACK-SUBSCRIPTION vertex for USER-ID, or NIL.
-Lookup is case-insensitive on USER-ID. Eagerly hydrates the vertex's
-data alist (see BIBLE-OBJ-WITH-ID).  Binds GRAPH-DB:*GRAPH* to *DATABASE*
-itself: MAP-VIEW looks each matching row up through *GRAPH* rather than
-the :GRAPH argument, so without the binding a call made outside
-WITH-DB-TRANSACTION fails with VERTEX-TABLE (NIL) once a row exists."
-  (let* ((graph-db:*graph* *database*)
-         (rows (graph-db:invoke-graph-view 'slack-subscription
+Lookup is case-insensitive on USER-ID."
+  (let* ((rows (graph-db:invoke-graph-view 'slack-subscription
                                            'subscription-by-user-ci
                                            :key (string-downcase user-id)
                                            :graph *database*))
          (id (cdr (assoc :id (first rows)))))
     (when id
-      (let ((v (graph-db:lookup-vertex id :graph *database*)))
-        (graph-db::maybe-init-node-data v :graph *database*)
-        v))))
+      (graph-db:lookup-vertex id :graph *database*))))
 
 (defun all-slack-subscriptions ()
   "Return an alist of (user-id . initial) for every persisted subscription."
-  (let ((acc '())
-        (graph-db:*graph* *database*))
+  (let ((acc '()))
     (graph-db:map-vertices
      (lambda (v)
-       (graph-db::maybe-init-node-data v :graph *database*)
        (push (cons (user-id-of v) (initial-of v)) acc))
      *database*
      :vertex-type 'slack-subscription)
@@ -463,27 +390,20 @@ WITH-DB-TRANSACTION fails with VERTEX-TABLE (NIL) once a row exists."
 
 (defun find-slack-identity (user-id)
   "Return the persistent SLACK-IDENTITY vertex for USER-ID, or NIL.
-Lookup is case-insensitive on USER-ID.  FIND-SLACK-SUBSCRIPTION documents
-why GRAPH-DB:*GRAPH* is bound and why the vertex is hydrated eagerly; the
-same reasoning applies here."
-  (let* ((graph-db:*graph* *database*)
-         (rows (graph-db:invoke-graph-view 'slack-identity
+Lookup is case-insensitive on USER-ID."
+  (let* ((rows (graph-db:invoke-graph-view 'slack-identity
                                            'identity-by-user-ci
                                            :key (string-downcase user-id)
                                            :graph *database*))
          (id (cdr (assoc :id (first rows)))))
     (when id
-      (let ((v (graph-db:lookup-vertex id :graph *database*)))
-        (graph-db::maybe-init-node-data v :graph *database*)
-        v))))
+      (graph-db:lookup-vertex id :graph *database*))))
 
 (defun all-slack-identities ()
   "Return an alist of (user-id . initial) for every registered identity."
-  (let ((acc '())
-        (graph-db:*graph* *database*))
+  (let ((acc '()))
     (graph-db:map-vertices
      (lambda (v)
-       (graph-db::maybe-init-node-data v :graph *database*)
        (push (cons (user-id-of v) (initial-of v)) acc))
      *database*
      :vertex-type 'slack-identity)

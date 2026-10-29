@@ -27,11 +27,11 @@
       (const #t)))
 
 (define-public sbcl-graph-db
-  (let ((commit "0859c364caf27007a0afc10a8f35a5eaa46b682d")
+  (let ((commit "4d6bf30a9318fdc5a0c14a0cb5af6f192aa3dea7") ; v4.0.1
         (revision "0"))
     (package
       (name "sbcl-graph-db")
-      (version (git-version "1.0" revision commit))
+      (version (git-version "4.0.1" revision commit))
       (source
        (origin
          (method git-fetch)
@@ -40,33 +40,33 @@
                (commit commit)))
          (file-name (git-file-name "cl-graph-db" version))
          (sha256
-          (base32 "0jkvklh70x12ia7zbrr2pv29lf0hx2r32wrd0ndj1fpfmvy0s28d"))))
+          (base32 "0qvbwmrhn1x4kcj03djnb70c5dl3iisn18khz9dpbnps2mqm3yfi"))))
       (build-system asdf-build-system/sbcl)
       (arguments
-       (list #:asd-systems ''("graph-db")
-             #:tests? #f))                ; graph-db.asd defines no test-op
+       ;; The engine and its replication transport only.  The full
+       ;; "graph-db" system adds the HTTP API (rest.lisp: ningle on a
+       ;; Clack server of its own), which Project Isidore does not serve.
+       (list #:asd-systems ''("graph-db/core" "graph-db/replication")
+             ;; The test systems need FiveAM, Drakma and the full system.
+             #:tests? #f))
       (inputs
        (list sbcl-alexandria
              sbcl-bordeaux-threads
              sbcl-cffi
+             sbcl-cl-fad
              sbcl-cl-json
              sbcl-cl-ppcre
              sbcl-cl-store
-             sbcl-clack
-             sbcl-hunchentoot
              sbcl-ieee-floats
              sbcl-iterate
              sbcl-local-time
              sbcl-log4cl
              sbcl-md5
-             sbcl-ningle
-             sbcl-osicat
              sbcl-split-sequence
-             sbcl-trivial-shell
              sbcl-usocket
              sbcl-uuid))
       (home-page "https://github.com/kraison/vivace-graph")
-      (synopsis "Graph database in Common Lisp (VivaceGraph v3)")
+      (synopsis "Graph database in Common Lisp (VivaceGraph)")
       (description
        "VivaceGraph is an ACID-compliant object graph database written in
 Common Lisp, with user-defined indexes, map-reduce views, replication and a

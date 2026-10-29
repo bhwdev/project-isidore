@@ -4,8 +4,8 @@
 # On every push to master: build the container image of Project Isidore from
 # guix.scm on a GitHub-hosted arm64 runner (production is aarch64), push it to
 # ghcr.io/bhwdev/project-isidore, and have the production host run it.  The
-# deploy key is confined on the host to deploy/project-isidore-deploy, which
-# can only pull an image of this repository by digest and restart the unit.
+# deploy key is confined on the host to its deploy hook, which can only pull
+# an image of this repository by digest and restart the service.
 # README.org, section "Deployment", has the one-time setup.  A push to master
 # is a deploy.
 
@@ -77,7 +77,7 @@ jobs:
       # guix.scm's build runs make.lisp and with it the offline test suites.
       # Guix's OpenSSL and glibc look for CA certificates and zoneinfo in
       # their own store directories, so the profile's are linked to the fixed
-      # paths deploy/project-isidore.container gives in SSL_CERT_* and TZDIR.
+      # paths production gives in SSL_CERT_* and TZDIR (README.org, step 5).
       - name: Build the image
         id: pack
         run: |

@@ -3,16 +3,6 @@
 
 #-asdf3.3 (error "Project Isidore requires ASDF 3.3 or later. Please upgrade your ASDF. See commit bf210b8.")
 
-;; graph-db's package.lisp emits a SBCL package-at-variance warning when
-;; recompiled against an image that already has the full GRAPH-DB package
-;; (later files add exports). ASDF promotes that warning to a fatal
-;; COMPILE-FILE-ERROR, breaking (asdf:test-system :project-isidore). Treat it
-;; as uninteresting so the build proceeds.
-#+sbcl
-(let ((variance (find-symbol "PACKAGE-AT-VARIANCE" :sb-kernel)))
-  (when variance
-    (pushnew variance uiop/lisp-build:*uninteresting-conditions*)))
-
 ;; cl-stdutils (a dependency of langutils, used by project-isidore/nlp) bundles
 ;; an ancient copy of split-sequence whose DEFPACKAGE also exports PARTITION,
 ;; PARTITION-IF and PARTITION-IF-NOT.  Exporting them from SPLIT-SEQUENCE
@@ -99,6 +89,9 @@
   :entry-point "project-isidore/webserver:application-toplevel")
 
 (register-system-packages "clog" '(:clog-connection :clog-web))
+;; The engine and its replication transport, without the HTTP API that the
+;; full "graph-db" system adds (guix.scm builds only these two).
+(register-system-packages "graph-db/replication" '(:graph-db))
 
 (asdf:defsystem "project-isidore/tests"
   :class :package-inferred-system

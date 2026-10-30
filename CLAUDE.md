@@ -10,7 +10,7 @@ systems under `src/`:
 - `bible/` -- the Douay-Rheims reader: its graph-db store (`database`), text,
   links and Montezuma search (`text`), pages (`reader`).
 - `slack-bot/` -- the van-booking bot: its graph-db store (`database`),
-  `nlp` / `booking-nlp` / `booking-llm`, the schedule spreadsheet
+  `nlp` / `booking-nlp`, the schedule spreadsheet
   (`van-booking`, through the Apps Script in `van-booking.gs`), and the Slack
   endpoints and reminder scheduler (`bot`).
 

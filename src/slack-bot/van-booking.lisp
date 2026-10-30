@@ -12,7 +12,7 @@
                 #:hour-of #:minute-of #:year-of #:month-of #:day-of)
   (:import-from #:local-time)
   (:import-from #:project-isidore/slack-bot/booking-nlp
-                #:parse-booking
+                #:parse-booking #:possible-initials
                 #:booking-request-destination #:booking-request-day
                 #:booking-request-passengers #:booking-request-dep-time
                 #:booking-request-ret-time #:booking-request-vehicle
@@ -588,6 +588,17 @@ would work."
    (remove-if-not #'non-blank-p (mapcar #'trip-destination trips))
    :test #'string-equal :from-end t))
 
+(defun known-initials (trips)
+  "Return the distinct initials of everyone on TRIPS, out or back, upcased.
+Used by BOOK-NATURAL so a request can name them in lowercase."
+  (remove-duplicates
+   (loop for trip in trips
+         append (loop for cell in (append (trip-dep-passengers trip)
+                                          (trip-ret-passengers trip))
+                      when (cl-ppcre:scan "^[A-Za-z]{2,3}$" cell)
+                        collect (string-upcase cell)))
+   :test #'string= :from-end t))
+
 (defun book (day destination passengers &key dep-time ret-time vehicle week trips)
   "Book PASSENGERS for a trip on DAY to DESTINATION.
    If an existing trip matches, adds passengers to it (no times needed).
@@ -636,7 +647,7 @@ would work."
   "Extract uppercase 2-3 character initials from TEXT."
   (cl-ppcre:all-matches-as-strings "[A-Z]{2,3}" text))
 
-(defun book-natural (text &key week)
+(defun book-natural (text &key week registered-initials)
   "Book from free-form English TEXT, e.g.
 
   (book-natural \"book a van for swimming next Tuesday for CG and BW at 7 pm to 9 pm\")
@@ -645,21 +656,38 @@ would work."
 
 TEXT is parsed by project-isidore/slack-bot/BOOKING-NLP:PARSE-BOOKING.  Destination, day
 and passengers are required; if any is missing, BOOKING-INCOMPLETE is signalled
-before the sheet is read, and its report tells the user what was understood and
-how to phrase the missing pieces.  Times are optional when an existing trip
-matches; otherwise BOOK signals BOOKING-INCOMPLETE for the absent time(s).
+and its report tells the user what was understood and how to phrase the
+missing pieces.  That happens before the sheet is read, unless TEXT has a
+lowercase word that may be someone's initials (POSSIBLE-INITIALS): then the
+sheet is read first, so the report does not ask for passengers it was given.
+Times are optional when an existing trip matches; otherwise BOOK signals
+BOOKING-INCOMPLETE for the absent time(s).
 The sheet's own destination spellings are used as a gazetteer so \"the SHMS
-trip\" joins the existing SHMS trip.  WEEK restricts the search to one sheet."
-  (let* ((first-pass (parse-booking text))
-         (missing (remove-if-not (lambda (slot) (member slot '(:destination :day :passengers)))
-                                 (booking-request-missing first-pass))))
-    (when missing
-      (error 'booking-incomplete
-             :missing missing
-             :understood (booking-request-understood first-pass)
-             :text text))
-    (let* ((trips (fetch-all-trips :week week))
-           (req (parse-booking text :known-destinations (known-destinations trips))))
+trip\" joins the existing SHMS trip, and the initials on it, together with
+REGISTERED-INITIALS (the bot's `/iam` and `/subscribe` registrations), let
+TEXT name passengers in lowercase: \"bw and mm\".  WEEK restricts the search
+to one sheet."
+  (let ((req (parse-booking text :known-initials registered-initials))
+        (trips nil))
+    (flet ((incomplete ()
+             (remove-if-not (lambda (slot) (member slot '(:destination :day :passengers)))
+                            (booking-request-missing req)))
+           (read-sheet-and-reparse ()
+             (setf trips (fetch-all-trips :week week)
+                   req (parse-booking text
+                                      :known-destinations (known-destinations trips)
+                                      :known-initials (union registered-initials
+                                                             (known-initials trips)
+                                                             :test #'string=)))))
+      (when (and (incomplete) (possible-initials text))
+        (read-sheet-and-reparse))
+      (when (incomplete)
+        (error 'booking-incomplete
+               :missing (incomplete)
+               :understood (booking-request-understood req)
+               :text text))
+      (unless trips
+        (read-sheet-and-reparse))
       (book (booking-request-day req)
             (booking-request-destination req)
             (booking-request-passengers req)
@@ -1186,9 +1214,8 @@ a code block.  Times such as \"12:00 pm\" fit the Dep and Ret caps.")
 period (\"today\", \"the weekend\", \"Sept 12\") or two of them joined the way
 SPLIT-RANGE-PHRASE splits them (\"Sept 19 to Sept 22\").  A phrase chronicity
 cannot read, or that signals while being read, gives NIL rather than an
-error, so a caller can screen a range that came from somewhere less
-trustworthy than the user (the booking-llm fallback) before VIEW-SCHEDULE
-would error on it."
+error, so `/view` can answer a phrase it cannot read with examples rather
+than with VIEW-SCHEDULE's error."
   (and (stringp phrase)
        (plusp (length (string-trim " " phrase)))
        (ignore-errors

@@ -15,22 +15,12 @@
   (:import-from #:quri)
   (:import-from #:project-isidore/slack-bot/booking-nlp
                 #:booking-incomplete
-                #:booking-incomplete-missing
-                #:schedule-question-range
                 #:self-reference-p
                 #:resolve-self-reference)
-  (:import-from #:project-isidore/slack-bot/booking-llm
-                #:load-llm-config
-                #:warm-up-llm
-                #:llm-enabled-p
-                #:llm-normalize
-                #:render-intent)
   (:import-from #:project-isidore/slack-bot/van-booking
                 #:book-natural
                 #:view-schedule
                 #:date-range-phrase-p
-                #:fetch-all-trips
-                #:known-destinations
                 #:remind-driver
                 #:trips-for-driver-today
                 #:trip-departure-universal-time
@@ -44,6 +34,7 @@
                 #:add-slack-subscription
                 #:remove-slack-subscription
                 #:find-slack-identity
+                #:all-slack-identities
                 #:add-slack-identity
                 #:remove-slack-identity
                 #:initial-of)
@@ -56,33 +47,24 @@
 
 Provides a Lack middleware that serves two endpoints:
 
-  POST /slack/events   — Events API (DMs / @mentions) dispatched to
-                         book-natural, original behaviour.  A message whose
-                         text begins with a slash command runs that command
-                         instead, for clients that deliver \"/view\" as plain
-                         text rather than expanding it.
-  POST /slack/commands — Slash commands /book, /view, /subscribe,
+  POST /slack/commands — Slash commands /book, /view, /iam, /subscribe,
                          /unsubscribe, /help.
+  POST /slack/events   — Events API (DMs / @mentions).  Only a message whose
+                         text begins with one of those commands is acted on,
+                         for clients that deliver \"/view\" as plain text
+                         rather than expanding it; any other message is
+                         answered with +COMMANDS-ONLY-REPLY+.
 
-Booking requests are free-form English (see project-isidore/slack-bot/booking-nlp).
-When a required piece is missing, the BOOKING-INCOMPLETE report is posted
-back: it lists what was understood and asks the user to re-send the request
-with the missing piece.  A question about a trip's timing that names no
-passengers (\"when is my ride home this coming Tuesday?\") is not a booking
-at all: it is answered as `/view` of that day, by the rule parser, before
-anything else is tried.
-
-When the rule parser cannot find the destination, day or passengers, and a
-local model server is configured (VAN_LLM_URL, see
-project-isidore/slack-bot/booking-llm), the message is first shown to the model, which
-reads it into a `/book` sentence or a `/view` range.  The bot posts that
-interpretation and then runs the ordinary handler on it, so the model never
-does more than rephrase; without a server the report is posted as before.
+`/book` takes the request in free-form English (see
+project-isidore/slack-bot/booking-nlp).  When a required piece is missing,
+the BOOKING-INCOMPLETE report is posted back: it lists what was understood
+and asks the user to re-send the request with the missing piece.  `/view`
+takes a day or a range of days.
 
 A persistent /subscribe registry (graph-db-backed via
 project-isidore/slack-bot/database)
-plus an in-process scheduler thread DMs subscribed drivers 5 minutes before
-each leg they drive: the departure when they are its first passenger, the
+plus an in-process scheduler thread DMs subscribed drivers
+*REMINDER-LEAD-MINUTES* before each leg they drive: the departure when they are its first passenger, the
 return when they are the first listed for the return.
 
 A second registry records which initials each Slack account goes by, so a
@@ -90,11 +72,11 @@ message can say \"me\", \"my\" or \"I\" instead of spelling them out: /iam sets
 it, /subscribe sets it as a side effect, and /unsubscribe leaves it alone.
 For someone who has registered neither, the initials are guessed from their
 Slack profile name (users.info), and the reply says so every time, because a
-guess is never persisted.
+guess is never persisted.  The initials in both registries, with those on
+the schedule sheet, are the ones a `/book` may write in lowercase.
 
 Setup: set SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET and VAN_SCHEDULE_SECRET (the
-van schedule web app's, see van-booking.gs) environment variables, and
-optionally VAN_LLM_URL.  The bot token needs the `users:read` scope for
+van schedule web app's, see van-booking.gs) environment variables.  The bot token needs the `users:read` scope for
 the profile guess; without it users.info answers \"missing_scope\", which is
 handled like any other failure -- everyone simply has to run /iam once.  See
 the project plan for Slack app configuration details."))
@@ -115,9 +97,7 @@ Must be called at runtime (from the application entry point), not at
 build time — a tree-shaken executable has no load-time at startup, so
 values read inside EVAL-WHEN would be baked in from the build host."
   (setf *slack-bot-token* (uiop:getenv "SLACK_BOT_TOKEN"))
-  (setf *slack-signing-secret* (uiop:getenv "SLACK_SIGNING_SECRET"))
-  (load-llm-config)
-  (warm-up-llm))
+  (setf *slack-signing-secret* (uiop:getenv "SLACK_SIGNING_SECRET")))
 
 (defvar *slash-commands* ()
   "Dispatch alist: slash command name -> handler symbol.
@@ -172,38 +152,41 @@ If CHANNEL evaluates to NIL, error reports are suppressed (only logged)."
              (report-error ,c)))))))
 
 (defparameter +help-text+
-  "*Van Steward Bot* — I book the house vans on the weekly schedule sheet and show you what is booked.
+  "*Van Steward Bot* — I book the house vans on the weekly schedule sheet and show you what is booked. Every request starts with a command: `/book`, `/view`, `/iam`, `/subscribe`, `/unsubscribe` or `/help`.
 
-*To book a trip*, tell me about it in your own words: send me a direct message, @mention me in a channel, or type `/book` followed by the request. Say:
+*To book a trip*, type `/book` followed by the trip in your own words. Say:
   • *destination* — `for swimming`, `to the dentist`, `the SHMS trip`
   • *day* — `tomorrow`, `next Tuesday`, `April 22`
-  • *passengers* — initials in CAPITALS, driver first: `for CG and BW`, `with MM, DM & CG`. Say `me` for yourself once you have run `/iam` (see below).
+  • *passengers* — initials, driver first: `for CG and BW`, `with MM, DM & CG`. Lowercase (`for cg and bw`) works for anyone already on the schedule; use capitals for someone new. Say `me` for yourself once you have run `/iam` (see below).
   • *times* out and back — `at 7 pm to 9 pm`, `leaving at 8:30 and back around 11`
   • *vehicle* (optional) — `take the DGH`, `in the LGH`, `use the Chevy`, `the personal car`. If you don't say, I take the first van that is free (DGH, then LGH, then the Chevy).
 The order and the wording don't matter. For example:
-  • `book a van for swimming next Tuesday for CG and BW at 7 pm to 9 pm`
-  • `Can BW and MM take the DGH to the dentist tomorrow, leaving at 8:30 and back around 11?`
+  • `/book a van for swimming next Tuesday for CG and BW at 7 pm to 9 pm`
+  • `/book Can BW and MM take the DGH to the dentist tomorrow, leaving at 8:30 and back around 11?`
 
 I never book over a clash: if the van you asked for is already out at that time, or if somebody on your list is already on another trip that overlaps, I say which trip is in the way and book nothing.
 
 *To join a trip already on the sheet*, name the trip and who is coming; no times needed:
-  • `add GG to the SHMS trip on Thursday`
+  • `/book add GG to the SHMS trip on Thursday`
 
-If something is missing, I reply with what I understood and ask you to re-send the whole request with the missing piece added. If I can't follow the wording at all, I first show how I read it as a `/book` or `/view` line, then act on that reading.
+If something is missing, I reply with what I understood and ask you to re-send the whole `/book` request with the missing piece added.
 
 *To see the schedule*, type `/view` for today, or add a day or a range:
   `/view tomorrow`   `/view the rest of the week`   `/view the weekend`   `/view Apr 20 to Apr 26`   `/view Sept 19-22`
-Or just ask about a trip's timing — `when is my ride home this coming Tuesday?`, `what time does the van leave tomorrow?` — and I show that day.
 
-*Who you are*: type `/iam` and your initials, e.g. `/iam DMM`, and I'll read `me`, `my` and `I` as you from then on — `book me a van to the dentist tomorrow 9 to 11`, `can I get a van for the pool Saturday 8-10`, `me and CG to swimming Tuesday 7-9pm`. Type `/iam` on its own to see who I have you down as. I remember it across restarts and through `/unsubscribe`.
+*Who you are*: type `/iam` and your initials, e.g. `/iam DMM`, and I'll read `me`, `my` and `I` as you from then on — `/book me a van to the dentist tomorrow 9 to 11`, `/book can I get a van for the pool Saturday 8-10`, `/book me and CG to swimming Tuesday 7-9pm`. Type `/iam` on its own to see who I have you down as. I remember it across restarts and through `/unsubscribe`.
 
 *Reminders*: type `/subscribe` and your initials, e.g. `/subscribe BW`, and I'll message you 30 minutes before each trip you are driving, out or back, with the vehicle you are taking (the first name listed drives). `/unsubscribe` turns them off.
 
-*This message*: `/help`, or send me `help` or `?`."
+*This message*: `/help`."
   "The help page: what the bot is and how to use every command, for people
-who are not programmers.  Posted for /help and for `help`/`?` messages.
-Slack mrkdwn: *bold*, `code`.  Keep it well under Slack's 4000-character
-message limit.")
+who are not programmers.  Posted for /help.  Slack mrkdwn: *bold*, `code`.
+Keep it well under Slack's 4000-character message limit.")
+
+(defparameter +commands-only-reply+
+  "I only act on commands, which start with `/`: `/book` and the trip to book one, e.g. `/book BW to the pool tomorrow 7-9pm`; `/view` and a day to see the schedule; `/iam`, `/subscribe` and `/unsubscribe`; and `/help` for how to use them all."
+  "The reply to a message that does not begin with a command.  Nothing in such
+a message is read as a request: a booking needs `/book`.")
 
 ;;; Signature Verification
 
@@ -267,11 +250,20 @@ fail silently."
   "Strip leading Slack bot mention (<@U...>) from TEXT."
   (string-trim '(#\Space) (cl-ppcre:regex-replace "^<@[A-Z0-9]+>\\s*" text "")))
 
+(defun registered-initials ()
+  "The initials registered with `/iam` or `/subscribe`, which a booking may
+write in lowercase like those on the sheet (BOOK-NATURAL), or NIL when the
+store cannot be read."
+  (ignore-errors
+   (remove-duplicates (mapcar #'cdr (append (all-slack-identities)
+                                            (all-slack-subscriptions)))
+                      :test #'string=)))
+
 (defun book-natural-reply (text)
   "Run BOOK-NATURAL on TEXT and return what it printed as the reply, or a
 placeholder when it printed nothing.  Conditions propagate."
   (let ((output (with-output-to-string (*standard-output*)
-                  (book-natural text))))
+                  (book-natural text :registered-initials (registered-initials)))))
     (if (plusp (length (string-trim '(#\Space #\Newline) output)))
         output
         "Booking processed (no output).")))
@@ -280,66 +272,10 @@ placeholder when it printed nothing.  Conditions propagate."
   "Run BOOK-NATURAL on TEXT and return the reply to post.  The captured output
 is the reply; a BOOKING-INCOMPLETE condition becomes its own report, which
 asks the user to re-send the request with the missing pieces.  Other errors
-propagate to the caller.  This is the rule parser alone; RUN-REQUEST adds
-the model fallback around it."
+propagate to the caller."
   (handler-case (book-natural-reply text)
     (booking-incomplete (c)
       (princ-to-string c))))
-
-(defun first-pass-incomplete-p (condition)
-  "True when the BOOKING-INCOMPLETE CONDITION is about the destination, day
-or passengers -- what BOOK-NATURAL's first pass needs before it reads the
-sheet -- rather than only about the times, which BOOK asks for when no
-existing trip matches."
-  (and (intersection '(:destination :day :passengers)
-                     (booking-incomplete-missing condition))
-       t))
-
-(defun llm-known-destinations ()
-  "The sheet's destinations, for the model's prompt and as the parser's
-gazetteer, or NIL when the sheet cannot be read.  A function of its own so
-tests can stub it."
-  (ignore-errors (known-destinations (fetch-all-trips))))
-
-(defun llm-interpretation (text &key (allow-view t))
-  "Ask the model (project-isidore/slack-bot/BOOKING-LLM) what TEXT means and turn its
-answer into a command: (values \"/book\" sentence) or (values \"/view\"
-range), or NIL when no model is configured, it did not answer, or its answer
-did not survive validation.  ALLOW-VIEW NIL keeps an explicit `/book` from
-turning into a view."
-  (when (llm-enabled-p)
-    (let* ((known (llm-known-destinations))
-           (intent (llm-normalize text :known-destinations known)))
-      (when intent
-        (render-intent intent text :known-destinations known :allow-view allow-view)))))
-
-(defun interpretation-line (command args)
-  "The message posted before a request that was read as COMMAND ARGS -- by
-SCHEDULE-QUESTION-INTERPRETATION or by the model -- is run, so the user sees
-how it was understood and can correct it."
-  (format nil "Interpreted as: `~a ~a` — if that is wrong, re-send with the details spelled out (`/help` shows how)."
-          command args))
-
-(defun run-interpretation (command args)
-  "The reply for a request that was read as COMMAND ARGS rather than run
-verbatim: the interpretation line, then what the ordinary handler says about
-ARGS -- CMD-VIEW for `/view`, RUN-BOOKING for `/book`, so a rewritten booking
-that is still incomplete gets the report and nothing further is tried."
-  (cons (interpretation-line command args)
-        (if (string= command "/view")
-            (ensure-list (cmd-view (plist-hash-table (list "text" args) :test #'equal)))
-            (list (run-booking args)))))
-
-(defun schedule-question-interpretation (text)
-  "(values \"/view\" range) when TEXT asks about a trip's timing rather than
-for a trip -- \"when is my ride home this coming Tuesday?\", \"what time does
-the van leave tomorrow?\" -- and names no passengers (see
-BOOKING-NLP:SCHEDULE-QUESTION-RANGE); NIL otherwise, or when the schedule
-cannot read the day it names, in which case the message is treated as a
-booking like any other."
-  (let ((range (schedule-question-range text)))
-    (when (and range (date-range-phrase-p range))
-      (values "/view" range))))
 
 (defun slack-user-names (user-id)
   "Return the names Slack holds for USER-ID as (values display-name real-name),
@@ -445,7 +381,7 @@ Registration always wins, so one `/iam` corrects a wrong guess for good."
 (defparameter +unknown-sender-reply+
   "I don't know your initials yet, so I can't tell who \"me\" is.
 
-Tell me once with `/iam` and your initials in CAPITALS — e.g. `/iam DMM` — then re-send your request. After that I'll read \"me\", \"my\" and \"I\" as you in every message."
+Tell me once with `/iam` and your initials — e.g. `/iam DMM` — then re-send your `/book` request. After that I'll read \"me\", \"my\" and \"I\" as you in every message."
   "What to say to someone who wrote \"me\" but cannot be identified.")
 
 (defun derived-initials-notice (initial name)
@@ -477,50 +413,19 @@ database read nor a Slack API call."
                    (derived-initials-notice initial name)))
           (t (values (resolve-self-reference text initial) nil))))))
 
-(defun run-request (text &key (allow-view t) user-id)
-  "Run TEXT as a request from USER-ID.  When ALLOW-VIEW, a question about a
-trip's timing that names no passengers (\"when is my ride home this coming
-Tuesday?\", see SCHEDULE-QUESTION-INTERPRETATION) is answered as a `/view` of
-that day, with no model involved.
-
-Anything else is a booking.  First-person references in it are rewritten to
-the sender's initials (RESOLVE-SENDER) so \"book me a van\" names somebody;
-that happens after the timing-question check, which must keep seeing the
-original \"my\" -- SCHEDULE-QUESTION-RANGE answers only for a question that
-names no passengers, and a rewritten \"when is DMM ride home Tuesday?\" names
-one.  A sender who writes \"me\" but cannot be identified is asked for `/iam`
-and nothing is booked.  When the initials were guessed from a Slack profile
-rather than registered, the reply carries a notice saying so.
-
-The booking itself runs with the model as a fallback reader: the rule parser
-goes first (BOOK-NATURAL); when it cannot find the destination, day or
-passengers and a model is configured, LLM-INTERPRETATION rewrites the text as
-a `/book` sentence or, when ALLOW-VIEW, a `/view` range.  Either way a request
-that was read rather than run verbatim gets a list as its reply: the
-interpretation line, then what the ordinary handler said about the reading
-(RUN-INTERPRETATION).  Otherwise the reply is the BOOKING-INCOMPLETE report,
-exactly as RUN-BOOKING gives it.  A rewritten booking goes through
-RUN-BOOKING, so a sentence that is still incomplete gets the report and never
-a second consultation.  Other errors propagate to the caller."
-  (multiple-value-bind (command args)
-      (and allow-view (schedule-question-interpretation text))
-    (if command
-        (run-interpretation command args)
-        (multiple-value-bind (resolved notice) (resolve-sender text user-id)
-          (if (null resolved)
-              +unknown-sender-reply+
-              (let ((reply
-                      (handler-case (book-natural-reply resolved)
-                        (booking-incomplete (c)
-                          (or (when (first-pass-incomplete-p c)
-                                (multiple-value-bind (command args)
-                                    (llm-interpretation resolved :allow-view allow-view)
-                                  (when command
-                                    (run-interpretation command args))))
-                              (princ-to-string c))))))
-                (if notice
-                    (cons notice (ensure-list reply))
-                    reply)))))))
+(defun run-request (text &key user-id)
+  "Run TEXT, the argument of a `/book`, as a booking from USER-ID.
+First-person references in it are rewritten to the sender's initials
+\(RESOLVE-SENDER) so \"book me a van\" names somebody.  A sender who writes
+\"me\" but cannot be identified is asked for `/iam` and nothing is booked.
+When the initials were guessed from a Slack profile rather than registered,
+the reply is a list: a notice saying so, then RUN-BOOKING's reply; otherwise
+it is RUN-BOOKING's reply alone.  Errors other than BOOKING-INCOMPLETE
+propagate to the caller."
+  (multiple-value-bind (resolved notice) (resolve-sender text user-id)
+    (cond ((null resolved) +unknown-sender-reply+)
+          (notice (cons notice (ensure-list (run-booking resolved))))
+          (t (run-booking resolved)))))
 
 (defun post-command-reply (reply-to reply)
   "Post a command handler's REPLY to REPLY-TO.
@@ -556,20 +461,14 @@ that carried COMMAND as plain text, with ARGS as the argument line."
 
 (defun handle-message-event (event)
   "Process a Slack message event and post the result back.
-Ignores bot messages to prevent loops. Recognizes `help`/`/help`/`?` as a
-request for usage docs. Text that begins with a slash command (`/view`,
-`/book ...`) runs that command's handler rather than the booking parser —
-Slack expands its own slash commands into a /slack/commands POST, but a
-client that does not (a bridged room, an uninstalled command) delivers the
-line here as ordinary text. Anything else goes to RUN-REQUEST: a question
-about a trip's timing that names no passengers (\"when is my ride home
-Tuesday?\") is shown as a `/view` of that day; the rest is a booking, whose
-BOOKING-INCOMPLETE condition is posted as-is (it asks the user to re-send
-the request with the missing pieces), unless a model is configured and can
-read the message, in which case its reading is posted and then run; any
-other failure is reported with the condition class as an error code and a
-pointer to `/help`. Returns the
-worker thread, or NIL when the event was answered synchronously or ignored."
+Ignores bot messages to prevent loops.  Text that begins with a slash
+command (`/view`, `/book ...`) runs that command's handler -- Slack expands
+its own slash commands into a /slack/commands POST, but a client that does
+not (a bridged room, an uninstalled command) delivers the line here as
+ordinary text.  Any other text is answered with +COMMANDS-ONLY-REPLY+ and
+not read at all: every request starts with a command.  Returns the worker
+thread a command runs in, or NIL when the event was answered synchronously
+or ignored."
   (let ((text (gethash "text" event))
         (channel (gethash "channel" event))
         (bot-id (gethash "bot_id" event))
@@ -579,29 +478,25 @@ worker thread, or NIL when the event was answered synchronously or ignored."
     (let ((clean-text (strip-mention text)))
       (when (zerop (length (string-trim '(#\Space) clean-text)))
         (return-from handle-message-event nil))
-      (when (member clean-text '("help" "/help" "?")
-                    :test #'string-equal)
-        (post-slack-message channel +help-text+)
-        (return-from handle-message-event nil))
       (multiple-value-bind (command args) (parse-slash-text clean-text)
-        (if command
-            (let ((handler (cdr (assoc command *slash-commands* :test #'string-equal))))
-              (unless handler
-                (post-slack-message
-                 channel
-                 (format nil "Unknown command: ~A. Type `/help` to see what I can do." command))
-                (return-from handle-message-event nil))
-              (with-slack-error-reply (channel
-                                       :context (format nil "Command ~A" command)
-                                       :thread-name (format nil "slack-cmd-~A" command))
-                (post-command-reply channel
-                                    (funcall handler
-                                             (message-command-params event command args)))))
-            (with-slack-error-reply (channel :context "Booking"
-                                             :thread-name "slack-booking")
-              (post-command-reply
-               channel
-               (run-request clean-text :user-id (gethash "user" event)))))))))
+        (let ((handler (and command
+                            (cdr (assoc command *slash-commands* :test #'string-equal)))))
+          (cond
+            ((null command)
+             (post-slack-message channel +commands-only-reply+)
+             nil)
+            ((null handler)
+             (post-slack-message
+              channel
+              (format nil "Unknown command: ~A. Type `/help` to see what I can do." command))
+             nil)
+            (t
+             (with-slack-error-reply (channel
+                                      :context (format nil "Command ~A" command)
+                                      :thread-name (format nil "slack-cmd-~A" command))
+               (post-command-reply channel
+                                   (funcall handler
+                                            (message-command-params event command args)))))))))))
 
 ;;; Lack Middleware
 
@@ -747,8 +642,7 @@ re-send the request including it."
     (when (or (null text) (zerop (length (string-trim '(#\Space) text))))
       (return-from cmd-book
         "Usage: type `/book` followed by the trip in your own words, e.g. `/book take the DGH to the dentist tomorrow for BW, leaving at 8:30 and back by 11`. Type `/help` for more."))
-    (handler-case (run-request text :allow-view nil
-                                    :user-id (gethash "user_id" params))
+    (handler-case (run-request text :user-id (gethash "user_id" params))
       (error (c)
         (format nil "Booking failed [~A]: ~A~%Type `/help` to see how to phrase a request."
                 (type-of c) c)))))
@@ -764,15 +658,13 @@ Examples:
   /view the weekend
   /view Apr 20 to Apr 26
   /view Sept 19-22
-  /view when is my ride home Tuesday?
-A question about a trip's timing shows the day it asks about."
+A range it cannot read gets examples of ones it can."
   (let* ((text (string-trim '(#\Space) (or (gethash "text" params) "")))
-         (range (cond ((zerop (length text)) "today")
-                      ((date-range-phrase-p text) text)
-                      ;; "/view when is my ride home Tuesday?": the day the
-                      ;; question asks about (SCHEDULE-QUESTION-RANGE)
-                      ((schedule-question-range text))
-                      (t text))))
+         (range (if (zerop (length text)) "today" text)))
+    (unless (date-range-phrase-p range)
+      (return-from cmd-view
+        (format nil "I can't read \"~A\" as a day or a range of days. Try `/view` on its own for today, or `/view tomorrow`, `/view Friday`, `/view the weekend`, `/view next week` or `/view Apr 20 to Apr 26`."
+                text)))
     (handler-case
         (let ((out (with-output-to-string (*standard-output*)
                      (view-schedule range))))
@@ -808,9 +700,9 @@ currently registered, so it doubles as `/whoami`."
            ((eq source :derived)
             (format nil "You are not registered yet. I would read \"me\" as *~A*~@[, from your Slack name \"~A\"~]. Send `/iam ~A` to confirm it, or `/iam` with the right initials."
                     current name current))
-           (t "You are not registered, and I can't guess your initials from your Slack profile. Send `/iam` followed by your initials in CAPITALS, e.g. `/iam DMM`."))))
+           (t "You are not registered, and I can't guess your initials from your Slack profile. Send `/iam` followed by your initials, e.g. `/iam DMM`."))))
       ((null initial)
-       "Usage: type `/iam` followed by your initials in CAPITALS, e.g. `/iam DMM`. Two or three letters, exactly as they appear on the schedule sheet.")
+       "Usage: type `/iam` followed by your initials, e.g. `/iam DMM`. Two or three letters, exactly as they appear on the schedule sheet.")
       (t
        (add-slack-identity user-id initial)
        (format nil "Got it — you are *~A*. I'll read \"me\", \"my\" and \"I\" as ~:*~A in your booking requests."
@@ -834,7 +726,7 @@ Persists across restarts. Use /unsubscribe to stop."
          (initial (parse-initial-argument text)))
     (cond
       ((null user-id) "Could not identify Slack user.")
-      ((null initial) "Usage: type `/subscribe` followed by your initials in CAPITALS, e.g. `/subscribe BW`.")
+      ((null initial) "Usage: type `/subscribe` followed by your initials, e.g. `/subscribe BW`. Two or three letters, exactly as they appear on the schedule sheet.")
       (t
        (add-slack-subscription user-id (string-upcase initial))
        ;; Subscribing also says who you are, so nobody has to register twice

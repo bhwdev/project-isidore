@@ -10,7 +10,7 @@
                 #:year-of #:month-of #:day-of)
   (:export
    ;; parsing
-   #:parse-booking #:schedule-question-range
+   #:parse-booking #:possible-initials
    #:self-reference-p #:resolve-self-reference
    #:*self-words* #:*self-contractions*
    #:booking-request #:booking-request-p #:make-booking-request
@@ -168,10 +168,9 @@ are missing; its report is ready to post to Slack."))
                       (mapcar #'car *weekday-abbrevs*)))))
     :test #'string=)
    #'string<)
-  "Uppercase words MAKE-BOOKING-RULER never reads as passenger initials.
-BOOKING-LLM validates the model's answer against this same list, so both
-readers agree on what an initial is.  Anyone whose real initials collide with
-an entry here has to be added to a trip by someone else naming them, the same
+  "Uppercase words MAKE-BOOKING-RULER never reads as passenger initials, nor
+KNOWN-INITIAL-SPANS in any case.  Anyone whose real initials collide with an
+entry here has to be added to a trip by someone else naming them, the same
 trade-off DGH and LGH have always carried.")
 
 ;;; ---------------------------------------------------------------------------
@@ -319,7 +318,7 @@ plist of the filled ones (plus :VEHICLE) for echoing back to the user."
 (defparameter *missing-piece-hints*
   '((:destination . "e.g. \"for swimming\" or \"to the dentist\"")
     (:day . "e.g. \"tomorrow\", \"next Tuesday\" or \"April 22\"")
-    (:passengers . "uppercase initials, e.g. \"for CG and BW\"")
+    (:passengers . "initials, e.g. \"for CG and BW\"; lowercase works for anyone already on the schedule, capitals for anyone new")
     (:dep-time . "e.g. \"leaving at 8 am\"")
     (:ret-time . "e.g. \"back by 10 am\"")))
 
@@ -365,7 +364,7 @@ Slack-ready message asking the user to re-send the request.")
                       when value collect (cons slot value))))
     (when (booking-incomplete-preamble condition)
       (format stream "~a~%" (booking-incomplete-preamble condition)))
-    (format stream "I couldn't complete that booking — I still need ~a.~%" needed)
+    (format stream "Nothing is booked yet — I still need ~a.~%" needed)
     (when known
       (format stream "~%What I understood:~%")
       (dolist (kv known)
@@ -374,7 +373,7 @@ Slack-ready message asking the user to re-send the request.")
     (format stream "~%How to phrase the missing pieces:~%")
     (dolist (slot missing)
       (format stream "  • ~a — ~a~%" (slot-label slot) (missing-piece-hint slot)))
-    (format stream "~%Please re-send your request including ~a." needed)))
+    (format stream "~%Please re-send the whole `/book` request with ~a added." needed)))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Slot filling
@@ -673,14 +672,52 @@ candidate is only accepted when some other slot was filled."
              (nlp:make-phrase-matcher known-destinations :label :destination)
              doc))))
 
-(defun parse-booking (text &key known-destinations)
+(defun initial-shaped-p (token)
+  "True when TOKEN could be someone's initials written without capitals: two
+or three letters, not all uppercase (the ruler reads those itself), and not
+one of the words *NOT-INITIALS* lists."
+  (let ((text (nlp:token-text token)))
+    (and (<= 2 (length text) 3)
+         (nlp:token-flag-p token :is-alpha)
+         (not (nlp:token-flag-p token :is-upper))
+         (not (member (string-upcase text) *not-initials* :test #'string=)))))
+
+(defun known-initial-spans (doc known-initials)
+  "Passenger spans for the words of DOC that are KNOWN-INITIALS (uppercase
+strings) written in lowercase or mixed case: \"bw and mm\", \"Dmm\".  A
+lowercase word is read as initials only when somebody goes by them, so
+\"gym\" or \"zoo\" stays a destination."
+  (when known-initials
+    (loop for token across (nlp:doc-tokens doc)
+          for i from 0
+          when (and (initial-shaped-p token)
+                    (member (string-upcase (nlp:token-text token)) known-initials
+                            :test #'string=))
+            collect (nlp:make-span :doc doc :start i :end (1+ i) :label :passenger
+                                   :data (list :priority 40)))))
+
+(defun possible-initials (text)
+  "The words of TEXT that would be read as passengers if somebody went by
+them (INITIAL-SHAPED-P): \"bw\" and \"mm\" in \"bw and mm to the pool\".
+BOOK-NATURAL reads the sheet's initials before reporting a request
+incomplete only when there are some."
+  (loop for token across (nlp:doc-tokens (nlp:make-doc text))
+        when (initial-shaped-p token)
+          collect (nlp:token-text token)))
+
+(defun parse-booking (text &key known-destinations known-initials)
   "Parse free-form booking TEXT into a BOOKING-REQUEST.  KNOWN-DESTINATIONS
 is an optional list of destination strings already on the sheet; when one
-appears in TEXT it is used verbatim so the booking joins the existing trip."
+appears in TEXT it is used verbatim so the booking joins the existing trip.
+KNOWN-INITIALS is an optional list of the initials people go by, in
+uppercase; any of them is read as a passenger in lowercase too (see
+KNOWN-INITIAL-SPANS).  Without it, initials have to be in capitals."
   (let* ((doc (nlp:make-doc text))
          (ents (progn
                  (nlp:apply-entity-ruler *booking-ruler* doc
-                                         :extra-spans (gazetteer-spans doc known-destinations))
+                                         :extra-spans (append
+                                                       (gazetteer-spans doc known-destinations)
+                                                       (known-initial-spans doc known-initials)))
                  (promote-range-starts doc)))
          (cues (nlp:run-matcher *cue-matcher* doc))
          (passengers (remove-duplicates
@@ -715,12 +752,6 @@ appears in TEXT it is used verbatim so the booking joins the existing trip."
              :dep-phrase dep-phrase :ret-phrase ret-phrase
              :dep-time dep-time :ret-time ret-time
              :vehicle vehicle :missing missing :understood understood)))))))
-
-(defparameter *timing-question-regex*
-  "(?i)(?<![a-z])(?:when(?:'s|s)?|what\\s+time(?:'s|s)?|how\\s+(?:late|early|long))(?![a-z])"
-  "How a message asks about the time of a trip instead of asking for one:
-\"when is my ride home\", \"what time does the van leave\", \"when's the DGH
-back\", \"how late is the van out\".")
 
 (defparameter *self-contractions*
   '(("i'm"   . "~a is")
@@ -777,12 +808,9 @@ about who is speaking:
   -> \"DMM would like a van for the pool sat 8-10\"
 
 The rewrite is textual, and happens before parsing rather than injecting a
-passenger afterwards, for two reasons: one code path serves both the rule
-parser and the model, and the rewritten sentence is what the reply's
-`Interpreted as:` line shows, so a wrong identity is visible in Slack rather
-than only on the sheet.  Grammar is not preserved -- \"my ride\" becomes
-\"DMM ride\" -- because PARSE-BOOKING reads initials positionally and does
-not inflect."
+passenger afterwards, so PARSE-BOOKING reads the sender's initials like any
+others.  Grammar is not preserved -- \"my ride\" becomes \"DMM ride\" --
+because PARSE-BOOKING reads initials positionally and does not inflect."
   (if (or (not (stringp text)) (not (stringp initial)))
       text
       (cl-ppcre:regex-replace-all
@@ -794,23 +822,3 @@ not inflect."
                (format nil expansion initial)
                initial)))
        :simple-calls t)))
-
-(defun schedule-question-range (text)
-  "The `/view` range TEXT asks about, when TEXT is a question about a trip's
-timing rather than a request for one (*TIMING-QUESTION-REGEX*); NIL otherwise.
-
-  \"when is my ride home this coming Tuesday?\"  -> \"this coming Tuesday\"
-  \"what time does the van leave tomorrow?\"    -> \"tomorrow\"
-  \"when's the DGH back?\"                       -> \"today\"
-
-The day comes back in the message's own words -- the text of the :DATE span
-PARSE-BOOKING reads -- or as \"today\" when none is named, the default `/view`
-has.  A question that names passengers (\"when can BW and MM have the van for
-the dentist tomorrow?\") is a booking phrased as a question and gets NIL, as
-does one whose day chronicity cannot read."
-  (when (cl-ppcre:scan *timing-question-regex* text)
-    (let ((req (parse-booking text)))
-      (unless (booking-request-passengers req)
-        (if (ents-with-label (booking-request-doc req) :date)
-            (booking-request-day-phrase req)
-            "today")))))

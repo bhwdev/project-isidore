@@ -1138,6 +1138,14 @@ by date, so they neither depend on the live spreadsheet's tabs nor fetch them.")
   (ok (equal '() (vb::parse-passenger-initials "no initials here"))))
 
 (deftest trips-and-destinations
+  (testing "known-initials-from-both-legs"
+    (ok (equal '("MM" "DM" "CG")
+               (vb::known-initials
+                (list (make-trip :dep-passengers '("MM" "DM") :ret-passengers '("MM" "cg"))
+                      ;; a note in a passenger cell is not initials
+                      (make-trip :dep-passengers '("DM" "back late"))))))
+    (ok (equal '() (vb::known-initials '()))))
+
   (testing "known-destinations-are-deduplicated"
     (ok (equal '("SHMS" "Shrine")
                (vb::known-destinations
@@ -1551,9 +1559,9 @@ rows too high."
          (day-str (bn:format-booking-day (chronicity:parse (format nil "April 9 ~d" year)))))
     (format nil "~a           ~a" day-str day-str)))
 
-(defun run-book-natural (text sheet)
-  "Run BOOK-NATURAL on TEXT with the sheet reads returning SHEET, writes
-recorded and only one week configured.
+(defun run-book-natural (text sheet &key registered-initials)
+  "Run BOOK-NATURAL on TEXT (and REGISTERED-INITIALS) with the sheet reads
+returning SHEET, writes recorded and only one week configured.
 Returns (values WRITES OUTPUT READS CONDITION): WRITES is a list of
 (range values sheet-name), READS the number of sheet reads, CONDITION the
 BOOKING-INCOMPLETE signalled, if any."
@@ -1566,7 +1574,8 @@ BOOKING-INCOMPLETE signalled, if any."
                               (vb::write-range (lambda (range values &key sheet-name)
                                                  (push (list range values sheet-name) writes))))
         (setf out (with-output-to-string (*standard-output*)
-                    (handler-case (vb:book-natural text)
+                    (handler-case (vb:book-natural
+                                   text :registered-initials registered-initials)
                       (bn:booking-incomplete (c) (setf condition c)))))))
     (values (nreverse writes) out reads condition)))
 
@@ -1650,6 +1659,64 @@ BOOKING-INCOMPLETE signalled, if any."
       (ok (= 0 reads))
       (ok (equal '(:destination :passengers) (bn:booking-incomplete-missing condition)))))
 
+  (testing "lowercase-initials-on-the-sheet"
+    ;; BW and GG are on the sheet already (the SHMS trip), so "bw and gg" in
+    ;; lowercase names them; the times do not overlap, so the LGH takes them.
+    (multiple-value-bind (writes out reads condition)
+        (run-book-natural "bw and gg to the pool on April 9 from 2 pm to 4 pm"
+                          (make-test-sheet
+                           (make-block (fixture-header) '(:dgh "SHMS")
+                                       '(:dgh ("8:35 am" "10:30 am"))
+                                       '(:dgh (("BW" "GG") ("BW" "GG"))))))
+      (ng condition)
+      (ok (search "Created LGH booking" out))
+      (ok (= 2 reads))
+      (ok (member '("I7:I8" (("BW") ("GG")) "Apr 6-12") writes :test #'equal))))
+
+  (testing "lowercase-initials-registered-with-the-bot"
+    ;; nobody but MM is on the sheet; BW is known from /iam
+    (multiple-value-bind (writes out reads condition)
+        (run-book-natural "add bw to the SHMS trip on April 9"
+                          (make-test-sheet
+                           (make-block (fixture-header) '(:dgh "SHMS")
+                                       '(:dgh ("8:35 am" "10:30 am"))
+                                       '(:dgh (("MM") ("MM")))))
+                          :registered-initials '("BW"))
+      (declare (ignore reads))
+      (ng condition)
+      (ok (search "Found 1 existing trip" out))
+      (ok (equal '(("F8:F8" (("BW")) "Apr 6-12")
+                   ("G8:G8" (("BW")) "Apr 6-12"))
+                 writes))))
+
+  (testing "lowercase-initials-in-the-report"
+    ;; the day is missing, but "bw" is on the sheet: the sheet is read once
+    ;; so the report does not ask for passengers it was given
+    (multiple-value-bind (writes out reads condition)
+        (run-book-natural "bw to the pool at 2 pm to 4 pm"
+                          (make-test-sheet
+                           (make-block (fixture-header) '(:dgh "SHMS")
+                                       '(:dgh ("8:35 am" "10:30 am"))
+                                       '(:dgh (("BW") ("BW"))))))
+      (declare (ignore out))
+      (ok (= 1 reads))
+      (ok (equal '() writes))
+      (ok (equal '(:day) (bn:booking-incomplete-missing condition)))
+      (ok (equal '("BW") (getf (bn:booking-incomplete-understood condition) :passengers)))))
+
+  (testing "unknown-lowercase-initials-are-missing-passengers"
+    (multiple-value-bind (writes out reads condition)
+        (run-book-natural "zz to the pool on April 9 at 2 pm to 4 pm"
+                          (make-test-sheet
+                           (make-block (fixture-header) '(:dgh "SHMS")
+                                       '(:dgh ("8:35 am" "10:30 am"))
+                                       '(:dgh (("BW") ("BW"))))))
+      (declare (ignore out))
+      (ok (= 1 reads))
+      (ok (equal '() writes))
+      (ok (equal '(:passengers) (bn:booking-incomplete-missing condition)))
+      (ok (search "capitals for anyone new" (princ-to-string condition)))))
+
   (testing "no-trip-and-no-times-asks-for-times"
     (multiple-value-bind (writes out reads condition)
         (run-book-natural "add BW to the pool trip on April 9"
@@ -1675,14 +1742,15 @@ BOOKING-INCOMPLETE signalled, if any."
     ;; pre-fetched trips passed through.
     (let ((book-args nil))
       (with-mocked-functions ((vb::fetch-all-trips (lambda (&key week) (declare (ignore week))
-                                                     (list (make-trip :destination "Pool"))))
+                                                     (list (make-trip :destination "Pool"
+                                                                      :dep-passengers '("CG")))))
                               (vb::book (lambda (day dest pax &key dep-time ret-time vehicle week trips)
                                           (setf book-args (list :day day :dest dest :pax pax
                                                                 :dep dep-time :ret ret-time
                                                                 :vehicle vehicle :week week
                                                                 :trips trips)))))
         (vb:book-natural
-         "I want to book the DGH for the pool next week Tuesday for CG and BW at seven PM to nine PM"
+         "I want to book the DGH for the pool next week Tuesday for cg and BW at seven PM to nine PM"
          :week "Apr 6-12")
         (ok (string= "Pool" (getf book-args :dest)))
         (ok (equal '("CG" "BW") (getf book-args :pax)))

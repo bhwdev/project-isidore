@@ -438,32 +438,41 @@ new parser's terms (no articles in destinations, no default day).")
     (ok (= 4 (and dt (chronicity:month-of dt))))
     (ok (= 22 (and dt (chronicity:day-of dt))))))
 
-(deftest schedule-questions
-  ;; a question about a trip's timing that names no passengers is a view of
-  ;; the day it names, in the message's own words, or of today
-  (ok (string= "this coming tuesday"
-               (bn:schedule-question-range "when is my ride home this coming tuesday")))
-  (ok (string= "this tuesday" (bn:schedule-question-range "when is my van home this tuesday")))
-  (ok (string= "monday" (bn:schedule-question-range "when is my van home on monday")))
-  (ok (string= "tomorrow" (bn:schedule-question-range "what time does the van leave tomorrow?")))
-  (ok (string= "thursday" (bn:schedule-question-range "How late is the van out on thursday?")))
-  (ok (string= "Saturday September 12"
-               (bn:schedule-question-range "what time is the SHMS trip back on Saturday September 12?")))
-  (ok (string= "today" (bn:schedule-question-range "when's the DGH back?")))
-  (ok (string= "today" (bn:schedule-question-range "What time's the van leaving")))
-  ;; passengers make it a booking phrased as a question
-  (ng (bn:schedule-question-range "when can BW and MM have the van for the dentist tomorrow?"))
-  ;; no timing cue: not a question, or not one about timing
-  (ng (bn:schedule-question-range "book a van for the pool tomorrow for MM"))
-  (ng (bn:schedule-question-range "whenever works, book the van for the pool tomorrow"))
-  (ng (bn:schedule-question-range "who has the DGH tomorrow?"))
-  (ng (bn:schedule-question-range "what's on the van this week?"))
+(deftest coming-weekday-is-one-date-span
   ;; "this coming Tuesday" is one date span, so "coming" is not left over
   ;; as a destination, and it resolves to a Tuesday
   (let ((req (bn:parse-booking "when is my ride home this coming tuesday")))
     (ng (bn:booking-request-destination req))
     (ok (string= "this coming tuesday" (bn:booking-request-day-phrase req)))
     (ok (search "Tuesday" (bn:booking-request-day req)))))
+
+(deftest lowercase-initials
+  (flet ((passengers (text &optional known)
+           (bn:booking-request-passengers (bn:parse-booking text :known-initials known))))
+    ;; without a list of who exists, initials need capitals
+    (ng (passengers "bw and mm to the pool thurs 7-9pm"))
+    ;; with one, the lowercase ones are read, upcased, in order
+    (ok (equal '("BW" "MM") (passengers "bw and mm to the pool thurs 7-9pm" '("MM" "BW"))))
+    (ok (equal '("DMM" "CG") (passengers "dmm and cg want the van to the pool thurs 7-9pm"
+                                         '("CG" "DMM"))))
+    ;; mixed with capitals, and in mixed case
+    (ok (equal '("BW" "MM") (passengers "BW and mm to the pool tomorrow 7-9pm" '("MM"))))
+    (ok (equal '("DMM") (passengers "Dmm to the pool tomorrow 7-9pm" '("DMM"))))
+    ;; a lowercase word nobody goes by is not a passenger
+    (ng (passengers "zz to the pool tomorrow 7-9pm" '("BW")))
+    ;; nor is a word the sentence needs, even if somebody's initials spell it
+    (ok (equal '("BW") (passengers "bw to the pool on sat 7-9pm" '("BW" "TO" "SAT")))))
+  ;; a short destination stays the destination
+  (let ((req (bn:parse-booking "take bw to the gym tomorrow 7-9pm" :known-initials '("BW"))))
+    (ok (equal '("BW") (bn:booking-request-passengers req)))
+    (ok (string= "gym" (bn:booking-request-destination req)))
+    (ng (bn:booking-request-missing req)))
+  ;; the words that could be somebody's initials, so BOOK-NATURAL knows
+  ;; whether reading the sheet's might help
+  (ok (equal '("bw" "mm") (bn:possible-initials "bw and mm to the pool thurs 7-9pm")))
+  (ok (equal '("gym") (bn:possible-initials "take the van to the gym on sat")))
+  (ng (bn:possible-initials "for the pool for MM 8 am to 10 am"))
+  (ng (bn:possible-initials "tomorrow at 8 am")))
 
 (deftest time-roles
   (flet ((times (text)
@@ -582,7 +591,11 @@ new parser's terms (no articles in destinations, no default day).")
     (ok (search (bn:missing-piece-hint :day) report))
     (ok (search (bn:missing-piece-hint :passengers) report))
     (ng (search (bn:missing-piece-hint :destination) report))
-    (ok (search "Please re-send" report)))
+    ;; it says plainly that nothing was written, and that the retry is a
+    ;; whole new /book, not just the missing words
+    (ok (= 0 (search "Nothing is booked yet — I still need the day and the passengers." report)))
+    (ok (search "Please re-send the whole `/book` request with the day and the passengers added."
+                report)))
   ;; preamble first, three missing pieces, nothing understood
   (let ((report (princ-to-string
                  (make-condition 'bn:booking-incomplete

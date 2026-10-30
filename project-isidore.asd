@@ -34,7 +34,6 @@ Bible reader and a Slack bot that books vans, served by one process."
                "project-isidore/tests/bible"
                "project-isidore/tests/slack-bot/nlp"
                "project-isidore/tests/slack-bot/booking-nlp"
-               "project-isidore/tests/slack-bot/booking-llm"
                "project-isidore/tests/slack-bot/van-booking"
                "project-isidore/tests/slack-bot/bot")
   ;; Run the suite of each test package above by name: ROVE:RUN finds a

@@ -22,7 +22,7 @@ package-inferred systems under =src/=:
 - =bible/= -- the Douay-Rheims reader: its graph-db store (=database=), the
   text and its search (=text=), and its pages (=reader=).
 - =slack-bot/= -- the van-booking bot: its graph-db store (=database=), the
-  language layers (=nlp=, =booking-nlp=, =booking-llm=), the schedule
+  language layers (=nlp=, =booking-nlp=), the schedule
   spreadsheet (=van-booking=, with the Apps Script it talks to in
   =van-booking.gs=), and the Slack endpoints and reminders (=bot=).
 
@@ -83,7 +83,7 @@ graph-db plumbing the two databases share. The tests mirror this tree under
    build it with CI's Guix, as production's image is.
 
    Production runs it as below: host networking (Hunchentoot on 127.0.0.1:8080,
-   Slynk on 4005, llama-server reached on 8081), catatonit as PID 1, the bible
+   Slynk on 4005), catatonit as PID 1, the bible
    store and the data directory (the bot's store and graph-db's system
    directory) mounted from the host, secrets from an environment file. The image has no =/etc/passwd=, so =HOME= is set for UIOP.
 
@@ -92,7 +92,6 @@ graph-db plumbing the two databases share. The tests mirror this tree under
          --volume=/var/local/project-isidore:/var/local/project-isidore \
          --volume=/root/.local/share/project-isidore:/var/lib/project-isidore \
          --env=HOME=/root --env=PROJECT_ISIDORE_DATA=/var/lib/project-isidore/ \
-         --env=VAN_LLM_URL=http://127.0.0.1:8081/v1/chat/completions \
          --env=SSL_CERT_DIR=/etc/ssl/certs \
          --env=SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
          --env=TZDIR=/usr/share/zoneinfo --env=TZ=America/Toronto \
@@ -107,8 +106,8 @@ pack= on a GitHub-hosted arm64 runner (production is aarch64), pushes it to
 that can do nothing there but run its deploy hook: pull that image by digest,
 tag it =localhost/project-isidore:latest= and restart the service that runs it.
 The host runs Guix System, and the hook, that service (root Podman, the host's
-network, the data directories as volumes, the secrets as an env file), Caddy
-and llama-server are its system configuration, kept outside this repository.
+network, the data directories as volumes, the secrets as an env file) and
+Caddy are its system configuration, kept outside this repository.
 The workflow runs =ssh root@HOST IMAGE@DIGEST=; sshd hands =IMAGE@DIGEST= to the
 hook in =SSH_ORIGINAL_COMMAND=, and the hook refuses (exit 64) anything but
 =ghcr.io/bhwdev/project-isidore@sha256:= and 64 hex digits. One-time setup:

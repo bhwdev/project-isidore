@@ -172,7 +172,8 @@ On the default port a Slynk server on localhost:4005 allows a remote REPL."
                 (if env (parse-integer env) 8080))))
     (when (= 8080 port)
       (slynk:create-server :port 4005 :dont-close t)
-      (setf slynk:*use-dedicated-output-stream* nil))
+      ;; A Slynk contrib defines this, so it is not known when this compiles.
+      (setf (symbol-value 'slynk:*use-dedicated-output-stream*) nil))
     (initialize-application :port port)
     (format t "~% Close this window or press Control+C to exit the program...~%")
     (handler-case (loop (sleep 1))

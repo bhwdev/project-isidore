@@ -7,6 +7,16 @@
   (:local-nicknames (#:store #:project-isidore/store)
                     (#:bible-db #:project-isidore/bible/database)
                     (#:bot-db #:project-isidore/slack-bot/database))
+  ;; The old stores' text records (the type registry, the schema manifest)
+  ;; name these with one colon, as the old package exported them, and are
+  ;; read back with the Lisp reader: they must stay external.
+  (:export #:bible-metadata #:make-bible-metadata
+           #:book-numbers-of #:chapter-urls-of #:book-urls-of
+           #:bible #:make-bible
+           #:unique-id-of #:heading-of #:text-of #:cross-references-of #:footnotes-of
+           #:slack-subscription #:make-slack-subscription
+           #:slack-identity #:make-slack-identity
+           #:user-id-of #:initial-of)
   (:export #:*bible-store-path*
            #:migrate-stores)
   (:documentation

@@ -67,6 +67,28 @@ MAKE-OLD-STORES, with the bible's old and new paths under it too."
        (make-old-stores)
        ,@body)))
 
+(deftest old-records-read-back
+  ;; Production's graph-db-system/type-registry.log and schema-manifest.dat,
+  ;; as they spell the old symbols.  They are read back with the Lisp reader,
+  ;; so every one written with a single colon must be external in
+  ;; PROJECT-ISIDORE/DATABASE, or the old stores cannot be opened (the
+  ;; 2026-10-29 deploy failed on exactly this).
+  (dolist (record '("(:SYMBOL PROJECT-ISIDORE/DATABASE:BIBLE :PARENT :VERTEX :ID 1)"
+                    "(:SYMBOL PROJECT-ISIDORE/DATABASE:BIBLE-METADATA :PARENT :VERTEX :ID 2)"
+                    "(:SYMBOL PROJECT-ISIDORE/DATABASE:SLACK-IDENTITY :PARENT :VERTEX :ID 3)"
+                    "(:SYMBOL PROJECT-ISIDORE/DATABASE:SLACK-SUBSCRIPTION :PARENT :VERTEX :ID 4)"
+                    "(PROJECT-ISIDORE/DATABASE::BOOK-NUMBERS :ACCESSOR PROJECT-ISIDORE/DATABASE:BOOK-NUMBERS-OF)"
+                    "(PROJECT-ISIDORE/DATABASE::CHAPTER-URLS :ACCESSOR PROJECT-ISIDORE/DATABASE:CHAPTER-URLS-OF)"
+                    "(PROJECT-ISIDORE/DATABASE::BOOK-URLS :ACCESSOR PROJECT-ISIDORE/DATABASE:BOOK-URLS-OF)"
+                    "(PROJECT-ISIDORE/DATABASE::UNIQUE-ID :ACCESSOR PROJECT-ISIDORE/DATABASE:UNIQUE-ID-OF)"
+                    "(PROJECT-ISIDORE/DATABASE::HEADING :ACCESSOR PROJECT-ISIDORE/DATABASE:HEADING-OF)"
+                    "(PROJECT-ISIDORE/DATABASE::TEXT :ACCESSOR PROJECT-ISIDORE/DATABASE:TEXT-OF)"
+                    "(PROJECT-ISIDORE/DATABASE::CROSS-REFERENCES :ACCESSOR PROJECT-ISIDORE/DATABASE:CROSS-REFERENCES-OF)"
+                    "(PROJECT-ISIDORE/DATABASE::FOOTNOTES :ACCESSOR PROJECT-ISIDORE/DATABASE:FOOTNOTES-OF)"
+                    "(PROJECT-ISIDORE/DATABASE::USER-ID :ACCESSOR PROJECT-ISIDORE/DATABASE:USER-ID-OF)"
+                    "(PROJECT-ISIDORE/DATABASE::INITIAL :ACCESSOR PROJECT-ISIDORE/DATABASE:INITIAL-OF)"))
+    (ok (consp (ignore-errors (read-from-string record))) record)))
+
 (deftest migrate-stores-copies-everything
   (with-old-stores (root)
     (legacy:migrate-stores)

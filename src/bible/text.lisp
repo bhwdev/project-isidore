@@ -333,7 +333,10 @@ there (Montezuma would create an empty one)."
           (make-instance 'montezuma:index
                          :path *search-index-path*
                          :default-field "*"
-                         :fields '("b" "c" "v" "t" "h")))))
+                         ;; A query without a field searches all of these:
+                         ;; book, chapter, verse, text, footnotes and
+                         ;; cross-references (see the reader's syntax help).
+                         :fields '("b" "c" "v" "t" "f" "x")))))
 
 (defun close-search-index ()
   "Close the index if it is open."

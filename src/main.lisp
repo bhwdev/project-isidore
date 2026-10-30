@@ -37,13 +37,21 @@ entry point."))
 (defvar *server* nil
   "Non-NIL when the CLOG web server is running.")
 
-;; Override CLOG-CONNECTION::RANDOM-HEX-STRING.  Upstream's POSIX path uses
-;; cl-isaac's RAND32, which unconditionally DECFs an (UNSIGNED-BYTE 32)
-;; struct slot before checking for zero.  The slot writer signals a
-;; TYPE-ERROR on the underflow, wedging the PRNG -- every subsequent call
-;; retraps, so CLOG can no longer mint connection IDs and fresh browser
-;; sessions never receive the bootstrap frame.  CLOG's own Windows branch
-;; already uses ironclad; we extend that to all platforms.
+;; Override CLOG-CONNECTION::RANDOM-HEX-STRING to draw from ironclad on
+;; every platform, as upstream already does on Windows; remove it once
+;; Guix's CLOG includes rabbibotton/clog#458.  Elsewhere upstream draws
+;; from a shared cl-isaac context, which fails three ways.  From cl-isaac
+;; 1.0.8 on, RAND64 (RAND32 off x86-64) underflows its typed RANDCNT slot
+;; at the end of each 256-word block and signals a TYPE-ERROR before
+;; reaching its reset branch, so the PRNG stays wedged: CLOG can no
+;; longer mint connection IDs, and fresh browser sessions never receive
+;; the bootstrap frame.  Lack patched cl-isaac's RAND32 and RAND64 until
+;; fukamachi/lack@f3302ce, which dropped cl-isaac.  The context has no
+;; lock, though connections arrive on separate threads.  And it is
+;; seeded at load time, so a saved image such as bin/project-isidore
+;; restores the same state on every start and issues the same connection
+;; IDs -- the handles a reconnecting browser presents to resume its
+;; session.
 (defun conn::random-hex-string ()
   "Generate a cryptographic 128-bit random hex string for connection IDs."
   (ironclad:byte-array-to-hex-string (ironclad:random-data 16)))

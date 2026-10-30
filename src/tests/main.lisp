@@ -12,8 +12,8 @@
 (in-package #:project-isidore/tests/main)
 
 ;; The application starts and stops cleanly, under a data root of its own.
-;; Port 3510, as 8080 is the production server's.
+;; Port 8293, as 8080 is the production server's.
 (deftest can-app-init-and-exit
-  (with-temp-data-root ()
-    (ok (main:initialize-application :port 3510))
-    (ok (main:terminate-application))))
+    (with-temp-data-root ()
+      (ok (main:initialize-application :port 8293))
+      (ok (main:terminate-application))))

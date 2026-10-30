@@ -1205,9 +1205,10 @@ would error on it."
     (error "The van schedule's Apps Script could not ~a: ~a" what (gethash "error" json)))
   json)
 
-(defun apps-script-get (action &rest parameters)
-  "The parsed reply of the web app's doGet to ACTION, with PARAMETERS, a list
-of alternating query parameter names and values."
+(defun apps-script-get (what action &rest parameters)
+  "The parsed reply about WHAT (as for APPS-SCRIPT-REPLY) of the web app's
+doGet to ACTION, with PARAMETERS, a list of alternating query parameter names
+and values."
   (let ((query (list* (cons "action" action)
                       (cons "spreadsheetId" *spreadsheet-id*)
                       (loop for (name value) on parameters by #'cddr
@@ -1215,11 +1216,11 @@ of alternating query parameter names and values."
     (apps-script-reply
      (com.inuoe.jzon:parse
       (dex:get (format nil "~a?~a" *apps-script-url* (quri:url-encode-params query))))
-     (format nil "~(~a~) the spreadsheet" action))))
+     what)))
 
 (defun sheet-tabs ()
   "Return the names of the spreadsheet's tabs, in tab order."
-  (coerce (apps-script-get "tabs") 'list))
+  (coerce (apps-script-get "list the spreadsheet's tabs" "tabs") 'list))
 
 (defun read-sheet (sheet-name)
   "Return every row of the tab SHEET-NAME as a list of cell strings, as the
@@ -1227,7 +1228,8 @@ sheet displays them.  Empty rows are kept, so the Nth row returned is row N
 of the sheet; PARSE-SCHEDULE relies on that to know which rows a booking is
 written to."
   (map 'list (lambda (row) (coerce row 'list))
-       (apps-script-get "values" "sheet" sheet-name)))
+       (apps-script-get (format nil "read the tab ~a" sheet-name)
+                        "values" "sheet" sheet-name)))
 
 (defun write-range (range values &key sheet-name)
   "Write VALUES, a list of rows, to RANGE (of the tab SHEET-NAME when given)

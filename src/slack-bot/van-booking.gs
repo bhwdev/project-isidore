@@ -15,18 +15,42 @@
 //         "body": {"values": [["BW"], ["CG"]]}}
 //        -> the Sheets API's UpdateValuesResponse
 //
-// Any failure answers {"error": "message"}.
+// Any failure answers {"error": "message"}.  ID must be SPREADSHEET_ID.
 //
-// Deploying: in the spreadsheet's Apps Script project, replace the code with
-// this file and make sure the Google Sheets API advanced service is enabled
-// (Services, "Sheets").  Then Deploy > Manage deployments, edit the existing
-// web app deployment and pick "New version": the deployment keeps its /exec
-// URL, which van-booking.lisp has in *APPS-SCRIPT-URL*.  It executes as its
-// owner and is accessible to anyone, like the deployment it replaces.
+// Deploying: in an Apps Script project of the account the web app is to run
+// as, replace the code with this file.  The project's manifest (Project
+// Settings, "Show appsscript.json") must enable the Google Sheets API advanced
+// service and declare the one scope this file needs:
+//
+//   "dependencies": {"enabledAdvancedServices": [
+//     {"userSymbol": "Sheets", "version": "v4", "serviceId": "sheets"}]},
+//   "oauthScopes": ["https://www.googleapis.com/auth/spreadsheets"],
+//
+// The web app cannot ask for consent itself, so run any function in the
+// editor and grant every permission the consent screen asks for; without it,
+// every request fails with "You do not have permission to call
+// SpreadsheetApp.openById".  The first deployment (Deploy > New deployment, a
+// web app executing as "Me", accessible to anyone) gives the /exec URL that
+// van-booking.lisp has in *APPS-SCRIPT-URL*.  Later versions go to the same
+// deployment (Deploy > Manage deployments, edit, "New version"), which keeps
+// that URL.
+
+// The only spreadsheet the web app serves, van-booking.lisp's
+// *SPREADSHEET-ID*.  Anyone can call the web app, whose URL is in a public
+// repository, and it runs with its deployer's access to every spreadsheet.
+var SPREADSHEET_ID = '1qxx5mDsrqAqGBrwLeSs0V6R_70FSNm1-ruFWxvHVgu8';
+
+// SPREADSHEET_ID, when it is the spreadsheet the request E names.
+function spreadsheetId(e) {
+  if (e.parameter.spreadsheetId !== SPREADSHEET_ID) {
+    throw new Error('This web app serves only the van schedule');
+  }
+  return SPREADSHEET_ID;
+}
 
 function doGet(e) {
   return reply(function () {
-    var spreadsheet = SpreadsheetApp.openById(e.parameter.spreadsheetId);
+    var spreadsheet = SpreadsheetApp.openById(spreadsheetId(e));
     switch (e.parameter.action) {
       case 'tabs':
         return spreadsheet.getSheets().map(function (sheet) {
@@ -49,7 +73,7 @@ function doPost(e) {
     var request = JSON.parse(e.postData.contents);
     return Sheets.Spreadsheets.Values.update(
       request.body,
-      e.parameter.spreadsheetId,
+      spreadsheetId(e),
       request.arguments.range,
       {valueInputOption: request.arguments.valueInputOption});
   });

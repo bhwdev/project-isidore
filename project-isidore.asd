@@ -5,7 +5,7 @@
 
 (asdf:defsystem "project-isidore"
   :name "Project Isidore"
-  :version "1.2.2"
+  :version "2.0.0"
   :author " Ben H. W.<foss@bhw.name>"
   :maintainer " Ben H. W.<foss@bhw.name>"
   :description "Personal Web Application"
@@ -42,12 +42,12 @@ Bible reader and a Slack bot that books vans, served by one process."
   ;; guix.scm build.  And unlike ROVE:RUN, fail the operation when a test
   ;; fails, so that the build stops there.
   :perform (asdf:test-op (op c)
-             (let ((failed
-                     (loop :for name :in (asdf:system-depends-on c)
-                           :when (and (uiop:string-prefix-p "project-isidore/tests/" name)
-                                      (not (uiop:symbol-call
-                                            :rove :run-suite
-                                            (intern (string-upcase name) :keyword))))
-                             :collect name)))
-               (when failed
-                 (error "Failed tests: ~{~A~^, ~}" failed)))))
+                         (let ((failed
+                                 (loop :for name :in (asdf:system-depends-on c)
+                                       :when (and (uiop:string-prefix-p "project-isidore/tests/" name)
+                                                  (not (uiop:symbol-call
+                                                        :rove :run-suite
+                                                        (intern (string-upcase name) :keyword))))
+                                         :collect name)))
+                           (when failed
+                             (error "Failed tests: ~{~A~^, ~}" failed)))))

@@ -12,7 +12,6 @@
   (:import-from #:slynk)
   (:import-from #:usocket)
   (:local-nicknames (#:conn #:clog-connection)
-                    (#:legacy #:project-isidore/database)
                     (#:pages #:project-isidore/site/pages)
                     (#:bible-db #:project-isidore/bible/database)
                     (#:bible #:project-isidore/bible/text)
@@ -90,9 +89,6 @@ immediately follows the thread's creation."
   "Open the databases, start the Slack bot's reminder scheduler and serve the
 site, the bible reader and the bot's endpoints on PORT, on localhost."
   (terminate-application)
-  ;; One-time: copies the pre-split stores, then never runs again.  Remove
-  ;; with src/database.lisp.
-  (legacy:migrate-stores)
   (bible-db:open-database)
   (bible:open-search-index)
   (bot-db:open-database)

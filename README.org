@@ -27,8 +27,7 @@ package-inferred systems under =src/=:
   =van-booking.gs=), and the Slack endpoints and reminders (=bot=).
 
 =main.lisp= starts them all (=initialize-application=); =store.lisp= is the
-graph-db plumbing the two databases share. =database.lisp= only migrates the
-stores from before the split, once. The tests mirror this tree under
+graph-db plumbing the two databases share. The tests mirror this tree under
 =src/tests/= and use [[https://github.com/fukamachi/rove][Rove]].
 
 1. Clone the repository and enter the development environment,

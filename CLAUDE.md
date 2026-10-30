@@ -17,9 +17,7 @@ systems under `src/`:
 `main.lisp` is the composition root: `initialize-application` opens the
 stores, starts the scheduler and CLOG, and has each part register its routes.
 Loading the system opens and starts nothing. `store.lisp` is the graph-db
-plumbing the stores share (one system directory per process). `database.lisp`
-only migrates the pre-split stores, once; delete it, its call in `main.lisp`
-and `tests/migration.lisp` after production has migrated.
+plumbing the stores share (one system directory per process).
 
 Packages `:use` only `common-lisp`; everything else comes in through
 `:import-from` or `:local-nicknames`. Tests are Rove, under `src/tests/`

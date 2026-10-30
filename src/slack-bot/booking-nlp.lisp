@@ -1,9 +1,9 @@
 ;;;; SPDX-FileCopyrightText: 2026  Ben H. W.<foss@bhw.name>
 ;;;; SPDX-License-Identifier: AGPL-3.0-or-later
 
-(uiop:define-package #:project-isidore/booking-nlp
+(uiop:define-package #:project-isidore/slack-bot/booking-nlp
   (:use #:common-lisp)
-  (:local-nicknames (#:nlp #:project-isidore/nlp))
+  (:local-nicknames (#:nlp #:project-isidore/slack-bot/nlp))
   (:import-from #:cl-ppcre)
   (:import-from #:chronicity
                 #:hour-of #:minute-of #:dow-of #:dow-name
@@ -37,7 +37,7 @@ PARSE-BOOKING turns free-form English such as
   \"Can BW and MM take the DGH to the dentist tomorrow morning, leaving at
    8:30 and back around 11?\"
 
-into a BOOKING-REQUEST.  It runs the PROJECT-ISIDORE/NLP pipeline, then a
+into a BOOKING-REQUEST.  It runs the project-isidore/slack-bot/NLP pipeline, then a
 spaCy-style entity ruler for VEHICLE, TIME, DATE and PASSENGER entities, a cue
 matcher for departure/return/destination cue words, and a slot filler that
 decides which time is the departure and which the return, picks the
@@ -48,7 +48,7 @@ BOOKING-REQUEST-MISSING so the caller can ask the user to re-send the request.
 BOOKING-INCOMPLETE is the condition used to tell the user exactly which pieces
 are missing; its report is ready to post to Slack."))
 
-(in-package #:project-isidore/booking-nlp)
+(in-package #:project-isidore/slack-bot/booking-nlp)
 
 ;;; ---------------------------------------------------------------------------
 ;;; Formatting helpers (shared with van-booking)
@@ -139,9 +139,6 @@ are missing; its report is ready to post to Slack."))
     "morning" "afternoon" "evening" "night" "tonight" "today" "tomorrow"
     "am" "pm" "o'clock")
   "Words that end a destination candidate run.")
-
-(defparameter *excluded-run-pos* '(:prp :prp$ :md :wdt :wp :wp$ :ex :uh :cc)
-  "POS tags whose tokens end a destination candidate run.")
 
 (defparameter *not-initials*
   (sort
@@ -593,8 +590,7 @@ too, so a day means the same thing in a booking and in a view."
   (and (not (covered-p index ents))
        (not (covered-p index cues))
        (not (nlp:token-flag-p token :is-punct))
-       (not (member (nlp:token-lower token) *run-breakers* :test #'string=))
-       (not (member (nlp:token-pos token) *excluded-run-pos*))))
+       (not (member (nlp:token-lower token) *run-breakers* :test #'string=))))
 
 (defun candidate-runs (doc ents cues)
   "Return maximal (START . END) token ranges available as destination text."
@@ -634,23 +630,15 @@ too, so a day means the same thing in a booking and in a view."
     (find-if (lambda (c) (and (eq (nlp:span-label c) :dest-cue) (= (nlp:span-end c) i)))
              cues)))
 
-(defun score-run (doc run stripped cues)
-  (let* ((tokens (loop for i from (car stripped) below (cdr stripped)
-                       collect (nlp:doc-token doc i)))
-         (cue (dest-cue-before doc (car run) cues))
-         (score 0))
-    (when cue
-      (incf score (if (string-equal (nlp:span-text cue) "at") 2 3)))
-    (when (some (lambda (chunk) (and (< (nlp:span-start chunk) (cdr stripped))
-                                     (< (car stripped) (nlp:span-end chunk))))
-                (nlp:doc-chunks doc))
-      (incf score 1))
-    (when (some (lambda (tk) (member (nlp:token-pos tk) '(:vbg :nnp :nnps :nn :nns))) tokens)
-      (incf score 1))
-    (when (and (= (length tokens) 1)
-               (member (nlp:token-pos (first tokens)) '(:vb :vbp :vbd :vbz)))
-      (decf score 2))
-    (values score (and cue t))))
+(defun score-run (doc run cues)
+  "Score the candidate RUN by the destination cue right before it: 3 after one
+such as \"to\" or \"visiting\", 2 after \"at\" (which also introduces
+times), 0 when uncued.  Returns (values SCORE CUED-P)."
+  (let ((cue (dest-cue-before doc (car run) cues)))
+    (values (cond ((null cue) 0)
+                  ((string-equal (nlp:span-text cue) "at") 2)
+                  (t 3))
+            (and cue t))))
 
 (defun select-destination (doc ents cues other-slots-filled-p)
   "Pick the destination text from DOC.  A gazetteer :DESTINATION entity wins
@@ -666,7 +654,7 @@ candidate is only accepted when some other slot was filled."
         (when (and stripped
                    (notevery (lambda (i) (nlp:token-flag-p (nlp:doc-token doc i) :like-num))
                              (loop for i from (car stripped) below (cdr stripped) collect i)))
-          (multiple-value-bind (score cued) (score-run doc run stripped cues)
+          (multiple-value-bind (score cued) (score-run doc run cues)
             (when (or (null best-score) (> score best-score))
               (setf best stripped best-score score best-cued cued))))))
     (when (and best (or best-cued other-slots-filled-p))
@@ -689,7 +677,7 @@ candidate is only accepted when some other slot was filled."
   "Parse free-form booking TEXT into a BOOKING-REQUEST.  KNOWN-DESTINATIONS
 is an optional list of destination strings already on the sheet; when one
 appears in TEXT it is used verbatim so the booking joins the existing trip."
-  (let* ((doc (nlp:analyze text))
+  (let* ((doc (nlp:make-doc text))
          (ents (progn
                  (nlp:apply-entity-ruler *booking-ruler* doc
                                          :extra-spans (gazetteer-spans doc known-destinations))

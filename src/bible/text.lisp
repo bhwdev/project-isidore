@@ -1,43 +1,40 @@
 ;;;; SPDX-FileCopyrightText: 2021  Ben H. W.<foss@bhw.name>
 ;;;; SPDX-License-Identifier: AGPL-3.0-or-later
 
-(uiop/package:define-package
-    #:project-isidore/bible
-    (:use #:common-lisp #:series
-          #:project-isidore/database)
-  (:local-nicknames (#:search-engine #:montezuma))
-  (:export :bible :unique-id-of :heading-of :text-of
-           :cross-references-of :footnotes-of
-           #:get-bible-uid #:bible-obj-with-id
-           #:clear-bible-obj-cache
-           #:valid-bible-uid-p #:get-bible-text
-           #:get-heading-text #:get-footnotes-text
-           #:get-cross-references-text
+(uiop:define-package #:project-isidore/bible/text
+  (:use #:common-lisp)
+  (:import-from #:cl-ppcre)
+  (:import-from #:montezuma)
+  (:import-from #:project-isidore/bible/database
+                #:bible-obj-with-id
+                #:heading-of #:text-of #:cross-references-of #:footnotes-of
+                #:+bible-book-numbers-alist+
+                #:+bible-chapter-url-alist+
+                #:+bible-heading-to-uid+
+                #:+bible-uid-to-heading+)
+  (:export #:get-bible-uid
+           #:valid-bible-uid-p
+           #:bible-book-convert-dwim
+           #:get-bible-text
            #:get-bible-verse-data
+           #:get-heading-text
+           #:get-footnotes-text
+           #:get-cross-references-text
            #:get-footnotes-text-with-links
            #:get-cross-references-text-with-links
            #:encode-cross-references-to-html-links
-           #:bible-book-convert-dwim
+           #:*reference-regex*
            #:make-bible-chapter-url-list
-           #:+bible-book-numbers-alist+
-           #:+bible-chapter-url-alist+
-           #:+bible-book-url-alist+ #:+bible-heading-to-uid+
-           #:+bible-uid-to-heading+ #:search-bible
-   :*reference-regex* #:reopen-fd-streams)
-  (:documentation "Project Isidore Object Schema.
+           #:*search-index-path*
+           #:open-search-index
+           #:close-search-index
+           #:search-bible)
+  (:documentation
+   "The text of the bible: verses by book, chapter and verse, their headings,
+footnotes and cross-references (as HTML links), and full-text search over
+them with a Montezuma index."))
 
-Data serialization & interchange.
-How to represent tree structure? XML, JSON or SEXP?
-https://unthought.net/2016/08/16-xml-json-trees-and-lisp/
-https://eli.thegreenplace.net/2012/03/04/some-thoughts-on-json-vs-s-expressions
-
-Microsoft Word uses compressed XML. Web browsers render (X)HTML. Jupyter
-notebooks use JSON. I see no benefits to inserting an extra layer. CLOS Object >
-JSON > (X)HTML.
-
-"))
-
-(in-package #:project-isidore/bible)
+(in-package #:project-isidore/bible/text)
 
 (defun get-bible-uid (book chapter verse)
   "Return a unique identifier assigned to each instance of class `bible'.
@@ -185,7 +182,7 @@ Example:
                          (write-to-string verse))))))))))
 
 (defparameter *reference-regex*
-  (ppcre:create-scanner "([1-4]?\\s?[a-zA-Z]{1,15}\\s[0-9]{1,3}\\:[0-9]{1,3})")
+  (cl-ppcre:create-scanner "([1-4]?\\s?[a-zA-Z]{1,15}\\s[0-9]{1,3}\\:[0-9]{1,3})")
   "Regex explanation.
 [1-4]? 4 K. is the highest for 4 Kings. ? signifies the number may or may not be
 there.
@@ -217,7 +214,7 @@ Joel 2:11</a>.;<a href=\"/bible/41-1-15\"> Sophonias 1:15</a>.\", T "
              (if (not url)
                  (format nil "~a" match)
                  (format nil "<a href=\"~a\">~a</a>" url y)))))
-    (ppcre:regex-replace-all *reference-regex* string #'convert :simple-calls t)))
+    (cl-ppcre:regex-replace-all *reference-regex* string #'convert :simple-calls t)))
 
 (defun get-footnotes-text-with-links (bible-uid)
   "Unlike `get-footnotes-text', the 'with-links' variation will take the cross
@@ -320,41 +317,37 @@ Example:
                  +bible-chapter-url-alist+)
                 +bible-chapter-url-alist+))))))))
 
-(defparameter *search-index*
-  ;; Montezuma creates a missing index directory, which a sandboxed build
-  ;; cannot do under /var/local/ (see BIBLE-STORE-PRESENT-P).
-  (when (uiop:directory-exists-p (index-path))
-    (make-instance 'search-engine:index
-                   :path (index-path)
-                   :default-field "*"
-                   :fields '("b" "c" "v" "t" "f" "x")))
-  "Used in `search-bible' to query Bible data. Since `sb-ext:save-lisp-and-die'
-  closes all open streams, this parameter is set during
-  `initialize-application'.")
+;;; Search
+
+(defvar *search-index-path* #p"/var/local/project-isidore/montezuma/"
+  "The directory of the Montezuma index over the bible, shipped with it.")
+
+(defvar *search-index* nil
+  "The open Montezuma index, or NIL before OPEN-SEARCH-INDEX or without one.")
+
+(defun open-search-index ()
+  "Open the index at *SEARCH-INDEX-PATH*, or return NIL when there is none
+there (Montezuma would create an empty one)."
+  (setf *search-index*
+        (when (uiop:directory-exists-p *search-index-path*)
+          (make-instance 'montezuma:index
+                         :path *search-index-path*
+                         :default-field "*"
+                         :fields '("b" "c" "v" "t" "h")))))
+
+(defun close-search-index ()
+  "Close the index if it is open."
+  (when *search-index*
+    (montezuma:close *search-index*))
+  (setf *search-index* nil))
 
 (defun search-bible (query &optional options)
   "Searches the Bible and Haydock's commentary. Returns an association list of
 Bible unique ID's and a relevance score "
   (let ((results '()))
-    (search-engine:search-each *search-index* query
-                               #'(lambda (doc score)
-                                   (declare (optimize)
-                                            (fixnum doc))
-                                   (push (cons doc score) results))
-                               options)
+    (montezuma:search-each *search-index* query
+                           (lambda (doc score)
+                             (declare (fixnum doc))
+                             (push (cons doc score) results))
+                           options)
     (nreverse results)))
-
-
-
-(defun reopen-fd-streams ()
-  " To create an executable binary, MAKE.LISP calls
-`sb-ext:save-lisp-and-die', which closes all open file streams. We open
-`*search-index*', `*bible-database*', and `*database*' again upon application
-start. `reopen-database' re-resolves PROJECT_ISIDORE_DATA so a binary built
-locally can run against /var/local/project-isidore/ on production."
-  (setf *search-index* (make-instance 'search-engine:index
-                                      :path (index-path)
-                                      :default-field "*"
-                                      :fields '("b" "c" "v" "t" "h")))
-  (reopen-bible-database)
-  (reopen-database))

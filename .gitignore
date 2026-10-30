@@ -5,7 +5,7 @@
 /bin/
 
 # Ignore the ocicl-fetched systems directory of earlier checkouts; Guix
-# (manifest.scm, guix.scm) provides the dependencies now.
+# (guix.scm) provides the dependencies now.
 /ocicl/
 
 # Ignore claude files.

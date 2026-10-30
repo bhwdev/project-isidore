@@ -11,70 +11,82 @@ otherwise noted.
 ** Development Quick Start
 
 Prerequisite(s): [[https://guix.gnu.org/][GNU Guix]], which provides [[http://www.sbcl.org/][SBCL]] and every Common Lisp dependency.
-=guix.scm= defines the package, including the dependencies Guix lacks;
-=manifest.scm= is the development environment made of its inputs;
-=channels.scm= pins the Guix revision CI builds with.
+=guix.scm= defines the package, including the dependencies Guix lacks, and
+its inputs are the development environment. CI builds with the Guix release
+that =GUIX_VERSION= in =.github/workflows/deploy.yml= names.
+
+The code is three parts served by one process, each a group of
+package-inferred systems under =src/=:
+
+- =site/= -- the personal website's pages, and the layout every page shares.
+- =bible/= -- the Douay-Rheims reader: its graph-db store (=database=), the
+  text and its search (=text=), and its pages (=reader=).
+- =slack-bot/= -- the van-booking bot: its graph-db store (=database=), the
+  language layers (=nlp=, =booking-nlp=, =booking-llm=), the schedule
+  spreadsheet (=van-booking=, with the Apps Script it talks to in
+  =van-booking.gs=), and the Slack endpoints and reminders (=bot=).
+
+=main.lisp= starts them all (=initialize-application=); =store.lisp= is the
+graph-db plumbing the two databases share. =database.lisp= only migrates the
+stores from before the split, once. The tests mirror this tree under
+=src/tests/= and use [[https://github.com/fukamachi/rove][Rove]].
 
 1. Clone the repository and enter the development environment,
 
    #+begin_src bash
    $ git clone https://github.com/bhwdev/project-isidore.git && cd project-isidore
-   $ guix shell -m manifest.scm
-   # Or, with exactly the Guix revision CI uses,
-   $ guix time-machine -C channels.scm -- shell -m manifest.scm
+   $ guix shell -D -f guix.scm
    #+end_src
 
-   =guix shell= caches the environment and rebuilds it only when =manifest.scm=
-   changes, not =guix.scm=, which it loads: after changing =guix.scm=, add
-   =--rebuild-cache=.
+   =guix shell= caches the environment and rebuilds it when =guix.scm=
+   changes.
 
 2. Within [[https://www.gnu.org/software/emacs/][Emacs]] started from that shell, start a Common Lisp IDE ([[https://github.com/joaotavora/sly][SLY]]) REPL
    buffer with =M-x sly=. ASDF finds the dependencies through =XDG_CONFIG_DIRS=,
    which the shell sets.
 
-   Claude Code started from the =guix shell= (not the =time-machine= one, whose
-   SBCL is older than cl-mcp's) works through [[https://github.com/cl-ai-project/cl-mcp][cl-mcp]], a REPL-backed MCP
-   server, where that costs fewer tokens than reading files; =CLAUDE.md= says
-   when.
+   Claude Code works through [[https://github.com/cl-ai-project/cl-mcp][cl-mcp]], a REPL-backed MCP server, where that
+   costs fewer tokens than reading files; =CLAUDE.md= says when and how it is
+   set up.
 
-3. Load Project Isidore & start local development server. The bible pages and
-   search need the bible graph-db and Montezuma index under
-   =/var/local/project-isidore/=, which are not in the repository.
+3. Load Project Isidore, run its tests & start a local development server.
+   Loading opens nothing; =initialize-application= opens the databases. The
+   bible pages and search need the bible store and Montezuma index under
+   =/var/local/project-isidore/=, which are not in the repository, so the
+   bible tests skip without them.
 
    #+begin_src lisp
-     CL-USER> (asdf:load-system "project-isidore/tests")
      CL-USER> (asdf:test-system "project-isidore")
      ;; Starts web server at http://localhost:8080.
-     CL-USER> (project-isidore/webserver:initialize-application)
-     CL-USER> (project-isidore/webserver:terminate-application)
+     CL-USER> (project-isidore/main:initialize-application)
+     CL-USER> (project-isidore/main:terminate-application)
    #+end_src
 
-4. To build a standalone executable binary locally, which runs every test
-   suite first (=PROJECT_ISIDORE_OFFLINE=1= skips the one needing the bible store
-   and the network),
+4. To build the executable, which compiles the system, runs the tests and
+   then saves the program from a fresh image that loaded only the system,
 
    #+begin_src bash
-     $ guix shell -m manifest.scm -- sbcl --dynamic-space-size 8Gb \
-         --control-stack-size 16Mb --script make.lisp
-     $ bin/ProjectIsidore
-     # Or as Guix builds it, in a sandbox and with the offline suites only:
      $ guix build -f guix.scm
+     $ /gnu/store/...-project-isidore-1.2.2/bin/project-isidore
    #+end_src
 
 5. To build the container image that production runs,
 
    #+begin_src bash
-     $ guix time-machine -C channels.scm -- pack -f docker \
-         --image-tag=project-isidore --entry-point=bin/ProjectIsidore \
+     $ guix pack -f docker \
+         --image-tag=project-isidore --entry-point=bin/project-isidore \
          --symlink=/etc/ssl=etc/ssl --symlink=/usr/share/zoneinfo=share/zoneinfo \
          --file=guix.scm nss-certs tzdata
      $ podman load --input /gnu/store/...-docker-pack.tar.gz
    #+end_src
 
+   Prefix =guix time-machine --commit=vGUIX_VERSION --= to =guix pack= to
+   build it with CI's Guix, as production's image is.
+
    Production runs it as below: host networking (Hunchentoot on 127.0.0.1:8080,
    Slynk on 4005, llama-server reached on 8081), catatonit as PID 1, the bible
-   store and the CRUD graph-db mounted from the host, secrets from an
-   environment file. The image has no =/etc/passwd=, so =HOME= is set for UIOP.
+   store and the data directory (the bot's store and graph-db's system
+   directory) mounted from the host, secrets from an environment file. The image has no =/etc/passwd=, so =HOME= is set for UIOP.
 
    #+begin_src bash
      $ podman run --rm --init --network=host \
@@ -120,6 +132,10 @@ hook in =SSH_ORIGINAL_COMMAND=, and the hook refuses (exit 64) anything but
    =ghcr.io/bhwdev/project-isidore= does, from an earlier repository) refuses
    the push with =permission_denied: write_package= until the package's settings
    grant this repository the Write role under "Manage Actions access".
+
+The Slack bot reads and writes the van schedule through a Google Apps Script
+web app, =src/slack-bot/van-booking.gs=, which is deployed by hand: its header
+says how. Deploy a change to it before the Lisp that relies on it.
 
 Please visit https://www.bhw.name/assets/blog/project-isidore-doc.html for
 online documentation.

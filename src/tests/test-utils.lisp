@@ -3,7 +3,8 @@
 
 (uiop:define-package #:project-isidore/tests/test-utils
   (:use #:common-lisp)
-  (:export #:with-mocked-functions)
+  (:export #:with-mocked-functions
+           #:with-temp-data-root)
   (:documentation
    "Helpers shared by the Project Isidore test packages."))
 
@@ -33,3 +34,19 @@ calls (READ-RANGE, WRITE-RANGE, POST-SLACK-MESSAGE, ...) in tests.
          ,@(loop for (name nil) in bindings
                  for var in saved
                  collect `(setf (symbol-function ',name) ,var))))))
+
+(defmacro with-temp-data-root ((&optional (root (gensym "ROOT"))) &body body)
+  "Run BODY with PROJECT_ISIDORE_DATA pointing at a fresh temporary directory,
+bound to ROOT, and delete that directory afterwards.  Stores BODY opens there
+must be closed by the time it returns."
+  (let ((saved (gensym "SAVED")))
+    `(let ((,root (uiop:subpathname (uiop:temporary-directory)
+                                    (format nil "project-isidore-test-~36R/"
+                                            (random (expt 36 8) (make-random-state t)))))
+           (,saved (uiop:getenv "PROJECT_ISIDORE_DATA")))
+       (unwind-protect
+            (progn
+              (setf (uiop:getenv "PROJECT_ISIDORE_DATA") (namestring ,root))
+              ,@body)
+         (setf (uiop:getenv "PROJECT_ISIDORE_DATA") (or ,saved ""))
+         (uiop:delete-directory-tree ,root :validate t :if-does-not-exist :ignore)))))

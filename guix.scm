@@ -4,12 +4,12 @@
 ;;; Guix package of Project Isidore, and of the dependencies Guix lacks or
 ;;; ships too old.  This file evaluates to the package:
 ;;;
-;;;   guix build -f guix.scm       builds bin/ProjectIsidore (make.lisp)
-;;;   guix shell -m manifest.scm   development environment of its inputs
+;;;   guix build -f guix.scm       compiles, tests, and saves bin/project-isidore
+;;;   guix shell -D -f guix.scm    development environment: SBCL and the inputs
 ;;;
-;;; .github/workflows/deploy.yml packs it into the container image.  Prefix any of these
-;;; with `guix time-machine -C channels.scm --' to use the Guix revision the
-;;; definitions are pinned to.
+;;; .github/workflows/deploy.yml packs it into the container image, with the
+;;; Guix release its GUIX_VERSION names.  Prefix any of these with
+;;; `guix time-machine --commit=vGUIX_VERSION --' to use that Guix.
 
 (use-modules (guix packages)
              (guix gexp)
@@ -74,44 +74,42 @@ Prolog-like query language.")
       (license license:expat))))
 
 ;; Guix's sbcl-clog is 1.2, whose INITIALIZE has no :LACK-MIDDLEWARE-LIST
-;; (webserver.lisp mounts the Slack endpoints with it).  This is the commit
-;; ocicl pinned before the move to Guix.
+;; (src/main.lisp mounts the Slack endpoints with it).  This is the v2.4
+;; release, whose clog.asd still says 2.2.
 (define-public sbcl-clog-2
-  (let ((commit "6ab1e21f40c30b9ab1acea0b62564044355c2edf")
-        (revision "0"))
-    (package
-      (inherit sbcl-clog)
-      (version (git-version "2.2" revision commit))
-      (source
-       (origin
-         (method git-fetch)
-         (uri (git-reference
-               (url "https://github.com/rabbibotton/clog")
-               (commit commit)))
-         (file-name (git-file-name "cl-clog" version))
-         (sha256
-          (base32 "13l6v4xxqhlkb7zlzf089s6c6cr0kcn49vn213cd9rcdr0nkq3k4"))))
-      (arguments
-       (list #:asd-systems ''("clog")))
-      (inputs
-       (list sbcl-alexandria
-             sbcl-atomics
-             sbcl-bordeaux-threads
-             sbcl-cl-isaac
-             sbcl-cl-pass
-             sbcl-cl-ppcre
-             sbcl-cl-sqlite
-             sbcl-cl-template
-             sbcl-clack
-             sbcl-closer-mop
-             sbcl-dbi
-             sbcl-hunchentoot
-             sbcl-lack
-             sbcl-mgl-pax
-             sbcl-parse-float
-             sbcl-quri
-             sbcl-trivial-gray-streams
-             sbcl-websocket-driver)))))
+  (package
+    (inherit sbcl-clog)
+    (version "2.4")
+    (source
+     (origin
+       (method git-fetch)
+       (uri (git-reference
+             (url "https://github.com/rabbibotton/clog")
+             (commit (string-append "v" version))))
+       (file-name (git-file-name "cl-clog" version))
+       (sha256
+        (base32 "1z91j1yb156m12pxk7xiwr4fqgf58xi5fm23rxzv8p6w6x9snvcm"))))
+    (arguments
+     (list #:asd-systems ''("clog")))
+    (inputs
+     (list sbcl-alexandria
+           sbcl-atomics
+           sbcl-bordeaux-threads
+           sbcl-cl-isaac
+           sbcl-cl-pass
+           sbcl-cl-ppcre
+           sbcl-cl-sqlite
+           sbcl-cl-template
+           sbcl-clack
+           sbcl-closer-mop
+           sbcl-dbi
+           sbcl-hunchentoot
+           sbcl-lack
+           sbcl-mgl-pax
+           sbcl-parse-float
+           sbcl-quri
+           sbcl-trivial-gray-streams
+           sbcl-websocket-driver))))
 
 (define-public project-isidore
   (package
@@ -126,60 +124,45 @@ Prolog-like query language.")
       #:asd-systems ''("project-isidore")
       #:phases
       #~(modify-phases %standard-phases
-          ;; make.lisp compiles, tests and dumps the program in one image, as
-          ;; it does outside Guix.  It runs from the copy of the source in
-          ;; the output, so that the ASDF system the program is dumped with
-          ;; (and serves assets/ from) lives in the store.
-          (replace 'build
-            (lambda _
-              (let ((source (string-append
-                             #$output "/share/common-lisp/sbcl/project-isidore"))
-                    (bin (string-append #$output "/bin")))
-                ;; ASDF's fasl cache and the CRUD graph-db the test suites
-                ;; open; neither is part of the output.
-                (setenv "HOME" (getcwd))
-                (setenv "PROJECT_ISIDORE_DATA" (string-append (getcwd) "/data/"))
-                ;; The sandbox has no network and no bible store.
-                (setenv "PROJECT_ISIDORE_OFFLINE" "1")
-                (invoke "sbcl"
-                        "--dynamic-space-size" "8Gb"
-                        "--control-stack-size" "16Mb"
-                        "--script" (string-append source "/make.lisp"))
-                (mkdir-p bin)
-                (rename-file (string-append source "/bin/ProjectIsidore")
-                             (string-append bin "/ProjectIsidore"))
-                (delete-file-recursively (string-append source "/bin")))))
-          ;; make.lisp ran the test suites before dumping.
-          (delete 'check))))
+          ;; 'build compiled the system and 'check ran its tests, each in a
+          ;; process of its own; this one loads the system alone and saves
+          ;; the executable.  Loading it starts nothing and opens nothing:
+          ;; INITIALIZE-APPLICATION does that when the program runs.  (The
+          ;; name must be lower case: BUILD-PROGRAM names an ASDF system
+          ;; after it.)
+          (add-after 'create-asdf-configuration 'build-program
+            (lambda* (#:key outputs #:allow-other-keys)
+              (build-program
+               (string-append #$output "/bin/project-isidore")
+               outputs
+               #:dependencies '("project-isidore")
+               #:entry-program '((project-isidore/main:application-toplevel))))))))
+    (native-inputs
+     (list sbcl-rove))
     (inputs
      (list sbcl-alexandria
            sbcl-bordeaux-threads
            sbcl-cffi
            sbcl-chronicity
            sbcl-cl+ssl
-           sbcl-cl-csv
            sbcl-cl-ppcre
            sbcl-clog-2
            sbcl-dexador
            sbcl-flexi-streams
            sbcl-graph-db
-           sbcl-hunchentoot
            sbcl-ironclad
            sbcl-jzon
-           sbcl-langutils
            sbcl-local-time
            sbcl-montezuma
-           ;; The test systems are loaded into the dumped image too.
-           sbcl-parachute
            sbcl-quri
-           sbcl-serapeum
-           sbcl-series
-           sbcl-slynk))
+           sbcl-slynk
+           sbcl-usocket))
     (home-page "https://www.bhw.name/blog/project-isidore-doc.html")
     (synopsis "Personal web application")
     (description
      "Project Isidore is a personal web application: a website, a Douay-Rheims
-Bible reader with search, and a Slack bot that books vans.")
+Bible reader with search, and a Slack bot that books vans, served by one
+process.")
     (license license:agpl3+)))
 
 project-isidore

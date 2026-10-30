@@ -1,22 +1,22 @@
 ;;;; SPDX-FileCopyrightText: 2026  Ben H. W.<foss@bhw.name>
 ;;;; SPDX-License-Identifier: AGPL-3.0-or-later
 
-(uiop:define-package #:project-isidore/tests/booking-llm-eval
+(uiop:define-package #:project-isidore/tests/slack-bot/booking-llm-eval
   (:use #:common-lisp)
-  (:local-nicknames (#:llm #:project-isidore/booking-llm)
-                    (#:bn #:project-isidore/booking-nlp)
-                    (#:vb #:project-isidore/van-booking)
-                    (#:bnt #:project-isidore/tests/booking-nlp-tests))
+  (:local-nicknames (#:llm #:project-isidore/slack-bot/booking-llm)
+                    (#:bn #:project-isidore/slack-bot/booking-nlp)
+                    (#:vb #:project-isidore/slack-bot/van-booking)
+                    (#:bnt #:project-isidore/tests/slack-bot/booking-nlp))
   (:export #:run-eval #:*view-corpus* #:*paraphrase-corpus*)
   (:documentation
    "Measure a model behind llama-server against the booking corpus.
 
 Not part of project-isidore/tests: it needs a live server.  Load it and call
 
-  (project-isidore/tests/booking-llm-eval:run-eval
+  (project-isidore/tests/slack-bot/booking-llm-eval:run-eval
    :url \"http://127.0.0.1:8081/v1/chat/completions\")
 
-Every sentence of BOOKING-NLP-TESTS::*BOOKING-CORPUS*, plus *VIEW-CORPUS*
+Every sentence of the booking-nlp tests' *BOOKING-CORPUS*, plus *VIEW-CORPUS*
 and *PARAPHRASE-CORPUS*, is sent to the model.  A booking reply is rendered
 with RENDER-BOOK-REQUEST and re-read by the rule parser, then held to the
 corpus entry's expectations, exactly as production would use it; a view
@@ -24,7 +24,7 @@ reply must name the same days as the expected range.  The report lists every
 mismatch, hallucinated initials (not in the message), and latency
 percentiles, and RUN-EVAL returns a summary plist for scripts."))
 
-(in-package #:project-isidore/tests/booking-llm-eval)
+(in-package #:project-isidore/tests/slack-bot/booking-llm-eval)
 
 (defparameter *view-corpus*
   '(("what's on the van this week?" :intent :view :range "this week")

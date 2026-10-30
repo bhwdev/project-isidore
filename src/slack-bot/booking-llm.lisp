@@ -1,10 +1,10 @@
 ;;;; SPDX-FileCopyrightText: 2026  Ben H. W.<foss@bhw.name>
 ;;;; SPDX-License-Identifier: AGPL-3.0-or-later
 
-(uiop:define-package #:project-isidore/booking-llm
+(uiop:define-package #:project-isidore/slack-bot/booking-llm
   (:use #:common-lisp)
-  (:local-nicknames (#:nlp #:project-isidore/nlp)
-                    (#:bn #:project-isidore/booking-nlp))
+  (:local-nicknames (#:nlp #:project-isidore/slack-bot/nlp)
+                    (#:bn #:project-isidore/slack-bot/booking-nlp))
   (:import-from #:alexandria
                 #:plist-hash-table)
   (:import-from #:bordeaux-threads)
@@ -12,7 +12,7 @@
   (:import-from #:com.inuoe.jzon)
   (:import-from #:dexador)
   (:import-from #:chronicity)
-  (:import-from #:project-isidore/van-booking
+  (:import-from #:project-isidore/slack-bot/van-booking
                 #:date-range-phrase-p)
   (:export
    ;; configuration
@@ -29,7 +29,7 @@
   (:documentation
    "A small local language model as a fallback reader for van-booking messages.
 
-The rule parser in PROJECT-ISIDORE/BOOKING-NLP handles every phrasing in its
+The rule parser in project-isidore/slack-bot/BOOKING-NLP handles every phrasing in its
 corpus, deterministically and in-process.  When it cannot find the
 destination, day or passengers in a message -- a paraphrase outside its cue
 lists, or a question such as \"what's on the van this week?\" -- the Slack
@@ -46,7 +46,7 @@ running the ordinary handler on it.  With VAN_LLM_URL unset, or the server
 unreachable or slow, every function here returns NIL and the bot behaves
 exactly as it did without this file."))
 
-(in-package #:project-isidore/booking-llm)
+(in-package #:project-isidore/slack-bot/booking-llm)
 
 ;;; ---------------------------------------------------------------------------
 ;;; Configuration
@@ -69,7 +69,7 @@ disabled.  Set from VAN_LLM_URL by LOAD-LLM-CONFIG.")
 (defun load-llm-config ()
   "Read VAN_LLM_URL into *LLM-URL*; blank or unset disables the fallback.
 Must be called at runtime, not at build time, for the same reason as
-PROJECT-ISIDORE/SLACK-BOT:LOAD-CONFIG."
+project-isidore/slack-bot/bot:LOAD-CONFIG."
   (let ((url (uiop:getenv "VAN_LLM_URL")))
     (setf *llm-url* (and url
                          (plusp (length (string-trim '(#\Space #\Tab) url)))

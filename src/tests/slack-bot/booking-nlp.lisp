@@ -1,19 +1,20 @@
 ;;;; SPDX-FileCopyrightText: 2026  Ben H. W.<foss@bhw.name>
 ;;;; SPDX-License-Identifier: AGPL-3.0-or-later
 
-(uiop:define-package #:project-isidore/tests/booking-nlp-tests
-  (:use #:common-lisp #:parachute)
-  (:local-nicknames (#:bn #:project-isidore/booking-nlp)
-                    (#:nlp #:project-isidore/nlp))
+(uiop:define-package #:project-isidore/tests/slack-bot/booking-nlp
+  (:use #:common-lisp)
+  (:import-from #:rove #:deftest #:ok #:ng)
+  (:local-nicknames (#:bn #:project-isidore/slack-bot/booking-nlp)
+                    (#:nlp #:project-isidore/slack-bot/nlp))
   (:import-from #:chronicity)
   (:documentation
-   "Parachute tests for project-isidore/booking-nlp.
+   "Tests for project-isidore/slack-bot/booking-nlp.
 
 *BOOKING-CORPUS* is the regression corpus: every phrasing the old regex
 parser was tested with, plus free-form sentences the new pipeline must
 handle.  Add a line there whenever a user's message is misread."))
 
-(in-package #:project-isidore/tests/booking-nlp-tests)
+(in-package #:project-isidore/tests/slack-bot/booking-nlp)
 
 ;;; --- Helpers ---
 
@@ -38,27 +39,25 @@ PHRASE such as \"tomorrow\", computed at check time."
   (loop for (key value) on expected by #'cddr
         do (ecase key
              (:destination
-              (is equal value (bn:booking-request-destination req) "~s: destination" text))
+              (ok (equal value (bn:booking-request-destination req)) (format nil "~s: destination" text)))
              (:day-like
-              (is equal (day-string value) (request-day req) "~s: day" text))
+              (ok (equal (day-string value) (request-day req)) (format nil "~s: day" text)))
              (:day-md
-              (is equal (month-day-string value) (request-day req) "~s: day" text))
+              (ok (equal (month-day-string value) (request-day req)) (format nil "~s: day" text)))
              (:day-contains
-              (true (and (request-day req) (search value (request-day req)))
-                    "~s: day ~s contains ~s" text (request-day req) value))
+              (ok (and (request-day req) (search value (request-day req))) (format nil "~s: day ~s contains ~s" text (request-day req) value)))
              (:passengers
-              (is equal value (bn:booking-request-passengers req) "~s: passengers" text))
+              (ok (equal value (bn:booking-request-passengers req)) (format nil "~s: passengers" text)))
              (:dep-time
-              (is equal value (bn:booking-request-dep-time req) "~s: departure" text))
+              (ok (equal value (bn:booking-request-dep-time req)) (format nil "~s: departure" text)))
              (:ret-time
-              (is equal value (bn:booking-request-ret-time req) "~s: return" text))
+              (ok (equal value (bn:booking-request-ret-time req)) (format nil "~s: return" text)))
              (:vehicle
-              (is eq value (bn:booking-request-vehicle req) "~s: vehicle" text))
+              (ok (eq value (bn:booking-request-vehicle req)) (format nil "~s: vehicle" text)))
              (:missing
-              (is equal value (bn:booking-request-missing req) "~s: missing" text))
+              (ok (equal value (bn:booking-request-missing req)) (format nil "~s: missing" text)))
              (:missing-includes
-              (true (subsetp value (bn:booking-request-missing req))
-                    "~s: missing ~s includes ~s" text (bn:booking-request-missing req) value)))))
+              (ok (subsetp value (bn:booking-request-missing req)) (format nil "~s: missing ~s includes ~s" text (bn:booking-request-missing req) value))))))
 
 ;;; --- Regression corpus ---
 
@@ -363,256 +362,256 @@ new parser's terms (no articles in destinations, no default day).")
 
 (defparameter *booking-corpus* (append *legacy-corpus* *free-form-corpus*))
 
-(define-test booking-corpus
+(deftest booking-corpus
   (dolist (entry *booking-corpus*)
     (destructuring-bind (text &rest expected) entry
       (check-request text (bn:parse-booking text) expected))))
 
 ;;; --- Focused unit tests ---
 
-(define-test gazetteer
-  (is string= "SHMS"
-      (bn:booking-request-destination
-       (bn:parse-booking "add GG to the SHMS trip on Thursday"
-                         :known-destinations '("SHMS" "Shrine"))))
+(deftest gazetteer
+  (ok (string= "SHMS"
+               (bn:booking-request-destination
+                (bn:parse-booking "add GG to the SHMS trip on Thursday"
+                                  :known-destinations '("SHMS" "Shrine")))))
   ;; the sheet's spelling is used, not the user's
-  (is string= "Saint Marys Church"
-      (bn:booking-request-destination
-       (bn:parse-booking "going to saint marys church for MM tomorrow 9am to noon"
-                         :known-destinations '("Saint Marys Church"))))
-  (is string= "Pool"
-      (bn:booking-request-destination
-       (bn:parse-booking "for GG going to the pool tomorrow" :known-destinations '("Pool"))))
+  (ok (string= "Saint Marys Church"
+               (bn:booking-request-destination
+                (bn:parse-booking "going to saint marys church for MM tomorrow 9am to noon"
+                                  :known-destinations '("Saint Marys Church")))))
+  (ok (string= "Pool"
+               (bn:booking-request-destination
+                (bn:parse-booking "for GG going to the pool tomorrow" :known-destinations '("Pool")))))
   ;; a known destination that looks like initials is not taken as a passenger
   (let ((req (bn:parse-booking "BW to SJU tomorrow 9am to noon" :known-destinations '("SJU"))))
-    (is string= "SJU" (bn:booking-request-destination req))
-    (is equal '("BW") (bn:booking-request-passengers req)))
+    (ok (string= "SJU" (bn:booking-request-destination req)))
+    (ok (equal '("BW") (bn:booking-request-passengers req))))
   ;; ... but without the gazetteer it is (documented limitation)
   (let ((req (bn:parse-booking "BW to SJU tomorrow 9am to noon")))
-    (is equal '("BW" "SJU") (bn:booking-request-passengers req))
-    (true (member :destination (bn:booking-request-missing req))))
+    (ok (equal '("BW" "SJU") (bn:booking-request-passengers req)))
+    (ok (member :destination (bn:booking-request-missing req))))
   ;; unknown destinations are unaffected by the gazetteer
-  (is string= "dentist"
-      (bn:booking-request-destination
-       (bn:parse-booking "to the dentist for MM tomorrow 9am to noon"
-                         :known-destinations '("SHMS" "Pool")))))
+  (ok (string= "dentist"
+               (bn:booking-request-destination
+                (bn:parse-booking "to the dentist for MM tomorrow 9am to noon"
+                                  :known-destinations '("SHMS" "Pool"))))))
 
-(define-test day-phrase-normalisation
-  (is string= "tuesday" (bn::normalize-day-phrase "Tues"))
-  (is string= "Thursday" (bn::normalize-day-phrase "Thursday's"))
-  (is string= (format nil "April 22 ~d" (current-year)) (bn::normalize-day-phrase "4/22"))
-  (is string= "April 22 2026" (bn::normalize-day-phrase "4/22/26"))
-  (is string= "April 22 2026" (bn::normalize-day-phrase "4/22/2026"))
-  (is string= (format nil "April 11th ~d" (current-year)) (bn::normalize-day-phrase "April 11th"))
-  (is string= (format nil "Apr 11 ~d" (current-year)) (bn::normalize-day-phrase "Apr. 11"))
+(deftest day-phrase-normalisation
+  (ok (string= "tuesday" (bn::normalize-day-phrase "Tues")))
+  (ok (string= "Thursday" (bn::normalize-day-phrase "Thursday's")))
+  (ok (string= (format nil "April 22 ~d" (current-year)) (bn::normalize-day-phrase "4/22")))
+  (ok (string= "April 22 2026" (bn::normalize-day-phrase "4/22/26")))
+  (ok (string= "April 22 2026" (bn::normalize-day-phrase "4/22/2026")))
+  (ok (string= (format nil "April 11th ~d" (current-year)) (bn::normalize-day-phrase "April 11th")))
+  (ok (string= (format nil "Apr 11 ~d" (current-year)) (bn::normalize-day-phrase "Apr. 11")))
   ;; a day-first month-day is turned round: chronicity reads "April 11th",
   ;; not "11th of April"
-  (is string= (format nil "April 11th ~d" (current-year)) (bn::normalize-day-phrase "11th of April"))
-  (is string= (format nil "April 22nd ~d" (current-year))
-      (bn::normalize-day-phrase "the 22nd of April"))
-  (is string= "tomorrow" (bn::normalize-day-phrase "tomorrow morning"))
-  (is string= "next week Tuesday" (bn::normalize-day-phrase "Tuesday next week"))
-  (is string= "2026-09-08" (bn::normalize-day-phrase "2026-09-08"))
+  (ok (string= (format nil "April 11th ~d" (current-year)) (bn::normalize-day-phrase "11th of April")))
+  (ok (string= (format nil "April 22nd ~d" (current-year))
+               (bn::normalize-day-phrase "the 22nd of April")))
+  (ok (string= "tomorrow" (bn::normalize-day-phrase "tomorrow morning")))
+  (ok (string= "next week Tuesday" (bn::normalize-day-phrase "Tuesday next week")))
+  (ok (string= "2026-09-08" (bn::normalize-day-phrase "2026-09-08")))
   ;; a weekday next to a month-day is dropped: chronicity would otherwise read
   ;; "Saturday September 12" as the coming Saturday
-  (is string= (format nil "September 12 ~d" (current-year))
-      (bn::normalize-day-phrase "Saturday September 12"))
-  (is string= (format nil "September 12 ~d" (current-year))
-      (bn::normalize-day-phrase "Saturday, September 12"))
-  (is string= (format nil "Sep 12 ~d" (current-year))
-      (bn::normalize-day-phrase "Sat Sep 12"))
-  (is string= (format nil "September 12th ~d" (current-year))
-      (bn::normalize-day-phrase "next Saturday the 12th of September"))
-  (is string= "saturday" (bn::normalize-day-phrase "Sat"))
+  (ok (string= (format nil "September 12 ~d" (current-year))
+               (bn::normalize-day-phrase "Saturday September 12")))
+  (ok (string= (format nil "September 12 ~d" (current-year))
+               (bn::normalize-day-phrase "Saturday, September 12")))
+  (ok (string= (format nil "Sep 12 ~d" (current-year))
+               (bn::normalize-day-phrase "Sat Sep 12")))
+  (ok (string= (format nil "September 12th ~d" (current-year))
+               (bn::normalize-day-phrase "next Saturday the 12th of September")))
+  (ok (string= "saturday" (bn::normalize-day-phrase "Sat")))
   ;; "coming" and "upcoming" are filler, as is a "the" then left before the weekday
-  (is string= "this tuesday" (bn::normalize-day-phrase "this coming Tues"))
-  (is string= "Tuesday" (bn::normalize-day-phrase "the coming Tuesday"))
-  (is string= "Tuesday" (bn::normalize-day-phrase "upcoming Tuesday"))
-  (is string= "day after tomorrow" (bn::normalize-day-phrase "the day after tomorrow"))
+  (ok (string= "this tuesday" (bn::normalize-day-phrase "this coming Tues")))
+  (ok (string= "Tuesday" (bn::normalize-day-phrase "the coming Tuesday")))
+  (ok (string= "Tuesday" (bn::normalize-day-phrase "upcoming Tuesday")))
+  (ok (string= "day after tomorrow" (bn::normalize-day-phrase "the day after tomorrow")))
   ;; month-day phrases resolve to the current year even when that date has passed
   (let ((req (bn:parse-booking "for pool for MM on January 2 at 8 am to 9 am")))
-    (is = (current-year) (chronicity:year-of (bn:booking-request-day-datetime req))))
+    (ok (= (current-year) (chronicity:year-of (bn:booking-request-day-datetime req)))))
   ;; ... and a day-first one resolves at all
   (let ((dt (bn:booking-request-day-datetime
              (bn:parse-booking "MM to the pool on the 22nd of April, 9 am to noon"))))
-    (true dt)
-    (is = 4 (and dt (chronicity:month-of dt)))
-    (is = 22 (and dt (chronicity:day-of dt)))))
+    (ok dt)
+    (ok (= 4 (and dt (chronicity:month-of dt))))
+    (ok (= 22 (and dt (chronicity:day-of dt))))))
 
-(define-test schedule-questions
+(deftest schedule-questions
   ;; a question about a trip's timing that names no passengers is a view of
   ;; the day it names, in the message's own words, or of today
-  (is string= "this coming tuesday"
-      (bn:schedule-question-range "when is my ride home this coming tuesday"))
-  (is string= "this tuesday" (bn:schedule-question-range "when is my van home this tuesday"))
-  (is string= "monday" (bn:schedule-question-range "when is my van home on monday"))
-  (is string= "tomorrow" (bn:schedule-question-range "what time does the van leave tomorrow?"))
-  (is string= "thursday" (bn:schedule-question-range "How late is the van out on thursday?"))
-  (is string= "Saturday September 12"
-      (bn:schedule-question-range "what time is the SHMS trip back on Saturday September 12?"))
-  (is string= "today" (bn:schedule-question-range "when's the DGH back?"))
-  (is string= "today" (bn:schedule-question-range "What time's the van leaving"))
+  (ok (string= "this coming tuesday"
+               (bn:schedule-question-range "when is my ride home this coming tuesday")))
+  (ok (string= "this tuesday" (bn:schedule-question-range "when is my van home this tuesday")))
+  (ok (string= "monday" (bn:schedule-question-range "when is my van home on monday")))
+  (ok (string= "tomorrow" (bn:schedule-question-range "what time does the van leave tomorrow?")))
+  (ok (string= "thursday" (bn:schedule-question-range "How late is the van out on thursday?")))
+  (ok (string= "Saturday September 12"
+               (bn:schedule-question-range "what time is the SHMS trip back on Saturday September 12?")))
+  (ok (string= "today" (bn:schedule-question-range "when's the DGH back?")))
+  (ok (string= "today" (bn:schedule-question-range "What time's the van leaving")))
   ;; passengers make it a booking phrased as a question
-  (false (bn:schedule-question-range "when can BW and MM have the van for the dentist tomorrow?"))
+  (ng (bn:schedule-question-range "when can BW and MM have the van for the dentist tomorrow?"))
   ;; no timing cue: not a question, or not one about timing
-  (false (bn:schedule-question-range "book a van for the pool tomorrow for MM"))
-  (false (bn:schedule-question-range "whenever works, book the van for the pool tomorrow"))
-  (false (bn:schedule-question-range "who has the DGH tomorrow?"))
-  (false (bn:schedule-question-range "what's on the van this week?"))
+  (ng (bn:schedule-question-range "book a van for the pool tomorrow for MM"))
+  (ng (bn:schedule-question-range "whenever works, book the van for the pool tomorrow"))
+  (ng (bn:schedule-question-range "who has the DGH tomorrow?"))
+  (ng (bn:schedule-question-range "what's on the van this week?"))
   ;; "this coming Tuesday" is one date span, so "coming" is not left over
   ;; as a destination, and it resolves to a Tuesday
   (let ((req (bn:parse-booking "when is my ride home this coming tuesday")))
-    (false (bn:booking-request-destination req))
-    (is string= "this coming tuesday" (bn:booking-request-day-phrase req))
-    (true (search "Tuesday" (bn:booking-request-day req)))))
+    (ng (bn:booking-request-destination req))
+    (ok (string= "this coming tuesday" (bn:booking-request-day-phrase req)))
+    (ok (search "Tuesday" (bn:booking-request-day req)))))
 
-(define-test time-roles
+(deftest time-roles
   (flet ((times (text)
            (let ((r (bn:parse-booking text)))
              (list (bn:booking-request-dep-time r) (bn:booking-request-ret-time r)))))
-    (is equal '("8:00 am" "10:00 am") (times "at 8 am to 10 am"))
-    (is equal '(nil "10:00 am") (times "back by 10 am"))
-    (is equal '("8:00 am" nil) (times "leaving at 8 am"))
-    (is equal '("8:00 am" nil) (times "at 8 am"))
-    (is equal '("8:30 am" "11:00 am") (times "leaving at 8:30 and back around 11"))
-    (is equal '("7:00 pm" "9:00 pm") (times "7-9pm"))
-    (is equal '("7:00 pm" "9:00 pm") (times "7 to 9 pm"))
-    (is equal '("8:30 am" "10:00 am") (times "from 8:30 to 10"))
-    (is equal '("2:00 pm" "5:00 pm") (times "leaving at 2 back by 5"))
-    (is equal '("9:00 am" "12:00 pm") (times "out at 9 and home by noon"))
-    (is equal '("6:00 am" "12:00 am") (times "departing 6am, back by midnight"))
-    (is equal '("12:00 pm" "2:00 pm") (times "12 pm to 2 pm"))
-    (is equal '("9:30 am" "11:30 am") (times "9:30 a.m. until 11:30 a.m."))
+    (ok (equal '("8:00 am" "10:00 am") (times "at 8 am to 10 am")))
+    (ok (equal '(nil "10:00 am") (times "back by 10 am")))
+    (ok (equal '("8:00 am" nil) (times "leaving at 8 am")))
+    (ok (equal '("8:00 am" nil) (times "at 8 am")))
+    (ok (equal '("8:30 am" "11:00 am") (times "leaving at 8:30 and back around 11")))
+    (ok (equal '("7:00 pm" "9:00 pm") (times "7-9pm")))
+    (ok (equal '("7:00 pm" "9:00 pm") (times "7 to 9 pm")))
+    (ok (equal '("8:30 am" "10:00 am") (times "from 8:30 to 10")))
+    (ok (equal '("2:00 pm" "5:00 pm") (times "leaving at 2 back by 5")))
+    (ok (equal '("9:00 am" "12:00 pm") (times "out at 9 and home by noon")))
+    (ok (equal '("6:00 am" "12:00 am") (times "departing 6am, back by midnight")))
+    (ok (equal '("12:00 pm" "2:00 pm") (times "12 pm to 2 pm")))
+    (ok (equal '("9:30 am" "11:30 am") (times "9:30 a.m. until 11:30 a.m.")))
     ;; the return cue may come first
-    (is equal '("8:00 am" "10:00 am") (times "back by 10 am, leaving at 8 am"))
+    (ok (equal '("8:00 am" "10:00 am") (times "back by 10 am, leaving at 8 am")))
     ;; a return after midnight-ish inference: return earlier than departure without meridiem
-    (is equal '("10:00 am" "1:00 pm") (times "leaving at 10 am and back at 1"))
+    (ok (equal '("10:00 am" "1:00 pm") (times "leaving at 10 am and back at 1")))
     ;; the start of a range shares the end's meridiem after a cue as well
-    (is equal '("8:00 pm" "9:00 pm") (times "from 8 to 9 pm"))
-    (is equal '("8:30 pm" "10:00 pm") (times "from 8:30 to 10 pm"))
-    (is equal '("8:00 am" "9:00 pm") (times "from 8 am to 9 pm"))
+    (ok (equal '("8:00 pm" "9:00 pm") (times "from 8 to 9 pm")))
+    (ok (equal '("8:30 pm" "10:00 pm") (times "from 8:30 to 10 pm")))
+    (ok (equal '("8:00 am" "9:00 pm") (times "from 8 am to 9 pm")))
     ;; ... unless that would have the trip end before it starts
-    (is equal '("11:00 am" "1:00 pm") (times "from 11 to 1 pm"))
-    (is equal '("11:00 am" "1:00 pm") (times "11-1pm"))
-    (is equal '("9:00 am" "12:00 pm") (times "9 to 12 pm"))
+    (ok (equal '("11:00 am" "1:00 pm") (times "from 11 to 1 pm")))
+    (ok (equal '("11:00 am" "1:00 pm") (times "11-1pm")))
+    (ok (equal '("9:00 am" "12:00 pm") (times "9 to 12 pm")))
     ;; "o'clock" may stand between the hour and its meridiem, or alone
-    (is equal '("8:00 pm" "9:00 pm") (times "from 8 to 9 o'clock p.m."))
-    (is equal '("8:00 pm" "9:00 pm") (times "from 8 o'clock to 9 o'clock pm"))
-    (is equal '("9:00 pm" nil) (times "at nine o'clock pm"))
-    (is equal '("9:00 am" nil) (times "at 9 o'clock"))
-    (is equal '("8:00 am" "10:00 am") (times "leaving at eight o'clock and back by ten o'clock"))
-    (is equal '(nil nil) (times "no times at all"))))
+    (ok (equal '("8:00 pm" "9:00 pm") (times "from 8 to 9 o'clock p.m.")))
+    (ok (equal '("8:00 pm" "9:00 pm") (times "from 8 o'clock to 9 o'clock pm")))
+    (ok (equal '("9:00 pm" nil) (times "at nine o'clock pm")))
+    (ok (equal '("9:00 am" nil) (times "at 9 o'clock")))
+    (ok (equal '("8:00 am" "10:00 am") (times "leaving at eight o'clock and back by ten o'clock")))
+    (ok (equal '(nil nil) (times "no times at all")))))
 
-(define-test destination-selection
+(deftest destination-selection
   (flet ((dest (text &rest keys)
            (bn:booking-request-destination (apply #'bn:parse-booking text keys))))
-    (is string= "haircut" (dest "for a haircut for GG at 1 pm to 2 pm"))
-    (is string= "SHMS" (dest "add GG to the SHMS trip on Thursday"))
-    (is string= "SHMS" (dest "add BW to Thursday's SHMS trip"))
-    (is string= "dentist" (dest "take the DGH to the dentist tomorrow for BW at 8 am to 9 am"))
-    (is string= "Saint Marys church"
-        (dest "going to Saint Marys church for the ordination with MM tomorrow out at 9 and home by noon"))
-    (is string= "swimming" (dest "swimming tomorrow for CG 7pm-9pm"))
-    (is string= "House of Prayer" (dest "to the House of Prayer for MM tomorrow 9 am to 10 am"))
-    (is string= "seminary ordination" (dest "for BW tomorrow 9 am to 10 am for seminary ordination"))
+    (ok (string= "haircut" (dest "for a haircut for GG at 1 pm to 2 pm")))
+    (ok (string= "SHMS" (dest "add GG to the SHMS trip on Thursday")))
+    (ok (string= "SHMS" (dest "add BW to Thursday's SHMS trip")))
+    (ok (string= "dentist" (dest "take the DGH to the dentist tomorrow for BW at 8 am to 9 am")))
+    (ok (string= "Saint Marys church"
+                 (dest "going to Saint Marys church for the ordination with MM tomorrow out at 9 and home by noon")))
+    (ok (string= "swimming" (dest "swimming tomorrow for CG 7pm-9pm")))
+    (ok (string= "House of Prayer" (dest "to the House of Prayer for MM tomorrow 9 am to 10 am")))
+    (ok (string= "seminary ordination" (dest "for BW tomorrow 9 am to 10 am for seminary ordination")))
     ;; the vehicle noun is never the destination
-    (is string= "pool" (dest "book the van for the pool tomorrow for MM 8 am to 10 am"))
+    (ok (string= "pool" (dest "book the van for the pool tomorrow for MM 8 am to 10 am")))
     ;; nothing but request words
-    (false (dest "no structure here"))
-    (false (dest "book the van for MM"))
-    (false (dest "tomorrow at 8 am to 10 am for MM"))
-    (false (dest "hello there"))))
+    (ng (dest "no structure here"))
+    (ng (dest "book the van for MM"))
+    (ng (dest "tomorrow at 8 am to 10 am for MM"))
+    (ng (dest "hello there"))))
 
-(define-test vehicles
+(deftest vehicles
   (flet ((veh (text) (bn:booking-request-vehicle (bn:parse-booking text))))
-    (is eq :dgh (veh "take the DGH to the pool"))
-    (is eq :lgh (veh "in the LGH"))
-    (is eq :chevy (veh "use Chevy"))
-    (is eq :chevy (veh "the chevrolet"))
-    (is eq :personal (veh "take the personal car"))
-    (is eq :personal (veh "my personal vehicle"))
-    (is eq :dgh (veh "DGH to the pool for MM"))
-    (false (veh "the van to the pool"))
-    (false (veh "a personal matter"))
-    (false (veh "for the pool for MM"))))
+    (ok (eq :dgh (veh "take the DGH to the pool")))
+    (ok (eq :lgh (veh "in the LGH")))
+    (ok (eq :chevy (veh "use Chevy")))
+    (ok (eq :chevy (veh "the chevrolet")))
+    (ok (eq :personal (veh "take the personal car")))
+    (ok (eq :personal (veh "my personal vehicle")))
+    (ok (eq :dgh (veh "DGH to the pool for MM")))
+    (ng (veh "the van to the pool"))
+    (ng (veh "a personal matter"))
+    (ng (veh "for the pool for MM"))))
 
-(define-test passengers
+(deftest passengers
   (flet ((pax (text) (bn:booking-request-passengers (bn:parse-booking text))))
-    (is equal '("CG" "BW") (pax "for CG and BW"))
-    (is equal '("MM" "DM" "CG") (pax "with MM DM and CG"))
-    (is equal '("MM" "DM" "CG") (pax "MM, DM & CG"))
-    (is equal '("CG") (pax "CG and CG"))
-    (is equal '("CGB") (pax "for CGB"))
-    (is equal '() (pax "for SHMS at 9 AM to 10 PM"))
-    (is equal '() (pax "the DGH and LGH"))
-    (is equal '() (pax "OK FYI"))
-    (is equal '() (pax "cg and bw"))))
+    (ok (equal '("CG" "BW") (pax "for CG and BW")))
+    (ok (equal '("MM" "DM" "CG") (pax "with MM DM and CG")))
+    (ok (equal '("MM" "DM" "CG") (pax "MM, DM & CG")))
+    (ok (equal '("CG") (pax "CG and CG")))
+    (ok (equal '("CGB") (pax "for CGB")))
+    (ok (equal '() (pax "for SHMS at 9 AM to 10 PM")))
+    (ok (equal '() (pax "the DGH and LGH")))
+    (ok (equal '() (pax "OK FYI")))
+    (ok (equal '() (pax "cg and bw")))))
 
-(define-test request-structure
+(deftest request-structure
   (let ((req (bn:parse-booking "Can BW and MM take the DGH to the dentist tomorrow morning, leaving at 8:30 and back around 11?")))
-    (true (bn:booking-request-p req))
-    (true (nlp:doc-p (bn:booking-request-doc req)))
-    (is string= "tomorrow morning" (bn:booking-request-day-phrase req))
-    (true (bn:booking-request-day-datetime req))
-    (is string= "8:30" (bn:booking-request-dep-phrase req))
-    (is string= "11" (bn:booking-request-ret-phrase req))
-    (is equal '() (bn:booking-request-missing req))
-    (is equal '(:destination :day :passengers :dep-time :ret-time :vehicle)
-        (loop for (k nil) on (bn:booking-request-understood req) by #'cddr collect k))
-    (is string= "dentist" (getf (bn:booking-request-understood req) :destination)))
+    (ok (bn:booking-request-p req))
+    (ok (nlp:doc-p (bn:booking-request-doc req)))
+    (ok (string= "tomorrow morning" (bn:booking-request-day-phrase req)))
+    (ok (bn:booking-request-day-datetime req))
+    (ok (string= "8:30" (bn:booking-request-dep-phrase req)))
+    (ok (string= "11" (bn:booking-request-ret-phrase req)))
+    (ok (equal '() (bn:booking-request-missing req)))
+    (ok (equal '(:destination :day :passengers :dep-time :ret-time :vehicle)
+               (loop for (k nil) on (bn:booking-request-understood req) by #'cddr collect k)))
+    (ok (string= "dentist" (getf (bn:booking-request-understood req) :destination))))
   (let ((req (bn:parse-booking "hello there")))
-    (is equal '() (bn:booking-request-understood req))
-    (is equal bn:*booking-slots* (bn:booking-request-missing req))))
+    (ok (equal '() (bn:booking-request-understood req)))
+    (ok (equal bn:*booking-slots* (bn:booking-request-missing req)))))
 
-(define-test booking-incomplete-report
+(deftest booking-incomplete-report
   (let* ((c (make-condition 'bn:booking-incomplete
                             :missing '(:day :passengers)
                             :understood '(:destination "swimming" :dep-time "7:00 pm"
                                           :ret-time "9:00 pm" :vehicle :dgh)
                             :text "x"))
          (report (princ-to-string c)))
-    (true (typep c 'error))
-    (is equal '(:day :passengers) (bn:booking-incomplete-missing c))
-    (is string= "x" (bn:booking-incomplete-text c))
-    (false (bn:booking-incomplete-preamble c))
-    (true (search "destination: swimming" report))
-    (true (search "departure time: 7:00 pm" report))
-    (true (search "return time: 9:00 pm" report))
-    (true (search "vehicle: DGH" report))
-    (true (search "the day and the passengers" report))
-    (true (search (bn:missing-piece-hint :day) report))
-    (true (search (bn:missing-piece-hint :passengers) report))
-    (false (search (bn:missing-piece-hint :destination) report))
-    (true (search "Please re-send" report)))
+    (ok (typep c 'error))
+    (ok (equal '(:day :passengers) (bn:booking-incomplete-missing c)))
+    (ok (string= "x" (bn:booking-incomplete-text c)))
+    (ng (bn:booking-incomplete-preamble c))
+    (ok (search "destination: swimming" report))
+    (ok (search "departure time: 7:00 pm" report))
+    (ok (search "return time: 9:00 pm" report))
+    (ok (search "vehicle: DGH" report))
+    (ok (search "the day and the passengers" report))
+    (ok (search (bn:missing-piece-hint :day) report))
+    (ok (search (bn:missing-piece-hint :passengers) report))
+    (ng (search (bn:missing-piece-hint :destination) report))
+    (ok (search "Please re-send" report)))
   ;; preamble first, three missing pieces, nothing understood
   (let ((report (princ-to-string
                  (make-condition 'bn:booking-incomplete
                                  :missing '(:destination :dep-time :ret-time)
                                  :preamble "Context line."))))
-    (is = 0 (search "Context line." report))
-    (true (search "the destination, the departure time and the return time" report))
-    (false (search "What I understood" report)))
+    (ok (= 0 (search "Context line." report)))
+    (ok (search "the destination, the departure time and the return time" report))
+    (ng (search "What I understood" report)))
   ;; a single missing piece reads naturally
   (let ((report (princ-to-string
                  (make-condition 'bn:booking-incomplete :missing '(:ret-time)))))
-    (true (search "I still need the return time." report)))
+    (ok (search "I still need the return time." report)))
   (dolist (slot bn:*booking-slots*)
-    (true (bn:missing-piece-hint slot) "hint for ~a" slot))
-  (false (bn:missing-piece-hint :vehicle))
-  (is string= "departure time" (bn:slot-label :dep-time))
-  (is string= "vehicle" (bn:slot-label :vehicle))
-  (is string= "bogus" (bn:slot-label :bogus)))
+    (ok (bn:missing-piece-hint slot) (format nil "hint for ~a" slot)))
+  (ng (bn:missing-piece-hint :vehicle))
+  (ok (string= "departure time" (bn:slot-label :dep-time)))
+  (ok (string= "vehicle" (bn:slot-label :vehicle)))
+  (ok (string= "bogus" (bn:slot-label :bogus))))
 
-(define-test formatting-helpers
-  (is string= "12:00 am" (bn:format-time-12h 0 0))
-  (is string= "12:00 pm" (bn:format-time-12h 12 0))
-  (is string= "7:00 pm"  (bn:format-time-12h 19 0))
-  (is string= "11:30 am" (bn:format-time-12h 11 30))
-  (is string= "1:05 pm"  (bn:format-time-12h 13 5))
-  (is string= "Monday April 20" (bn:format-booking-day (chronicity:parse "April 20 2026")))
-  (is string= "Thursday January 1" (bn:format-booking-day (chronicity:parse "January 1 2026")))
-  (is = 12 (length bn:*month-names*))
-  (is string= "September" (nth 8 bn:*month-names*)))
+(deftest formatting-helpers
+  (ok (string= "12:00 am" (bn:format-time-12h 0 0)))
+  (ok (string= "12:00 pm" (bn:format-time-12h 12 0)))
+  (ok (string= "7:00 pm"  (bn:format-time-12h 19 0)))
+  (ok (string= "11:30 am" (bn:format-time-12h 11 30)))
+  (ok (string= "1:05 pm"  (bn:format-time-12h 13 5)))
+  (ok (string= "Monday April 20" (bn:format-booking-day (chronicity:parse "April 20 2026"))))
+  (ok (string= "Thursday January 1" (bn:format-booking-day (chronicity:parse "January 1 2026"))))
+  (ok (= 12 (length bn:*month-names*)))
+  (ok (string= "September" (nth 8 bn:*month-names*))))
 
 ;;; --- First-person resolution -------------------------------------------
 ;;;
@@ -621,13 +620,13 @@ new parser's terms (no articles in destinations, no default day).")
 ;;; These tests pin the rewrite itself; the identity lookup that supplies the
 ;;; initials is tested in SLACK-BOT-TESTS.
 
-(define-test self-reference-detection
+(deftest self-reference-detection
   ;; Every word and contraction *SELF-WORDS* / *SELF-CONTRACTIONS* cover.
   (dolist (text '("book me a van" "my ride to SHMS" "can I get a van"
                   "just myself thursday" "I'd like a van" "I'm going to SHMS"
                   "I'll take the DGH" "I've got a dentist appointment"
                   "BOOK ME A VAN" "Me and CG to the pool"))
-    (true (bn:self-reference-p text) "~s refers to its sender" text))
+    (ok (bn:self-reference-p text) (format nil "~s refers to its sender" text)))
   ;; A word that merely contains one must not count, nor must other people's
   ;; initials -- "MM" and "DM" both live inside the sender word "DMM".
   (dolist (text '("meet CG at home before the SHMS trip"
@@ -636,12 +635,12 @@ new parser's terms (no articles in destinations, no default day).")
                   "the Chevy is in the shop"
                   "" "   ")
            )
-    (false (bn:self-reference-p text) "~s refers to nobody" text))
-  (false (bn:self-reference-p nil)))
+    (ng (bn:self-reference-p text) (format nil "~s refers to nobody" text)))
+  (ng (bn:self-reference-p nil)))
 
-(define-test resolve-self-reference-rewrites
+(deftest resolve-self-reference-rewrites
   (macrolet ((rewrites (input expected)
-               `(is string= ,expected (bn:resolve-self-reference ,input "DMM"))))
+               `(ok (string= ,expected (bn:resolve-self-reference ,input "DMM")))))
     ;; Bare words.
     (rewrites "book me a van to the dentist tomorrow 9 to 11"
               "book DMM a van to the dentist tomorrow 9 to 11")
@@ -671,13 +670,13 @@ new parser's terms (no articles in destinations, no default day).")
     (rewrites "book a van for CG and MM to the pool"
               "book a van for CG and MM to the pool"))
   ;; Non-strings pass through rather than signalling.
-  (is eq nil (bn:resolve-self-reference nil "DMM"))
-  (is string= "book me a van" (bn:resolve-self-reference "book me a van" nil)))
+  (ok (eq nil (bn:resolve-self-reference nil "DMM")))
+  (ok (string= "book me a van" (bn:resolve-self-reference "book me a van" nil))))
 
-(define-test resolved-self-reference-parses
-  :description "The whole point of rewriting before parsing: PARSE-BOOKING must read the
-result as a complete booking for the sender.  Three-letter initials are used
-throughout because DMM and FBM are the cases this was built for."
+;; The whole point of rewriting before parsing: PARSE-BOOKING must read the
+;; result as a complete booking for the sender.  Three-letter initials are used
+;; throughout because DMM and FBM are the cases this was built for.
+(deftest resolved-self-reference-parses
   (dolist (case '(("book me a van to the dentist tomorrow 9 to 11" "DMM" ("DMM") "dentist")
                   ("I'd like a van for the pool tomorrow 8 to 10 am" "DMM" ("DMM") "pool")
                   ("can I get a van to the pool tomorrow 8 to 10 am" "FBM" ("FBM") "pool")
@@ -686,18 +685,16 @@ throughout because DMM and FBM are the cases this was built for."
                    "DMM" ("CG" "DMM") "pool")))
     (destructuring-bind (text initial expected-pax expected-dest) case
       (let ((req (bn:parse-booking (bn:resolve-self-reference text initial))))
-        (is equal expected-pax (bn:booking-request-passengers req)
-            "~s resolves to ~a" text expected-pax)
-        (is string= expected-dest (bn:booking-request-destination req))
-        (false (bn:booking-request-missing req)
-               "~s is complete once resolved" text)))))
+        (ok (equal expected-pax (bn:booking-request-passengers req)) (format nil "~s resolves to ~a" text expected-pax))
+        (ok (string= expected-dest (bn:booking-request-destination req)))
+        (ng (bn:booking-request-missing req) (format nil "~s is complete once resolved" text))))))
 
-(define-test me-is-never-a-passenger
-  :description "An unresolved ME or MY -- the sender could not be identified -- must not
-become a passenger of that name, or the sheet gains a person who does not
-exist."
+;; An unresolved ME or MY -- the sender could not be identified -- must not
+;; become a passenger of that name, or the sheet gains a person who does not
+;; exist.
+(deftest me-is-never-a-passenger
   (let ((req (bn:parse-booking "BOOK ME A VAN TO THE POOL TOMORROW 8 TO 10 AM")))
-    (false (bn:booking-request-passengers req))
-    (true (member :passengers (bn:booking-request-missing req))))
+    (ng (bn:booking-request-passengers req))
+    (ok (member :passengers (bn:booking-request-missing req))))
   (let ((req (bn:parse-booking "MY RIDE TO SHMS TOMORROW 8 TO 10 AM")))
-    (false (bn:booking-request-passengers req))))
+    (ng (bn:booking-request-passengers req))))

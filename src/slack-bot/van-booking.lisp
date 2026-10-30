@@ -1,17 +1,17 @@
 ;;;; SPDX-FileCopyrightText: 2026  Ben H. W.<foss@bhw.name>
 ;;;; SPDX-License-Identifier: AGPL-3.0-or-later
 
-(uiop:define-package #:project-isidore/van-booking
-  (:use #:common-lisp #:series)
+(uiop:define-package #:project-isidore/slack-bot/van-booking
+  (:use #:common-lisp)
   (:import-from #:alexandria)
   (:import-from #:cl-ppcre)
   (:import-from #:com.inuoe.jzon)
-  (:import-from #:cl-csv)
   (:import-from #:dexador)
+  (:import-from #:quri)
   (:import-from #:chronicity
                 #:hour-of #:minute-of #:year-of #:month-of #:day-of)
   (:import-from #:local-time)
-  (:import-from #:project-isidore/booking-nlp
+  (:import-from #:project-isidore/slack-bot/booking-nlp
                 #:parse-booking
                 #:booking-request-destination #:booking-request-day
                 #:booking-request-passengers #:booking-request-dep-time
@@ -29,7 +29,7 @@
    ;; public API
    #:parse-schedule #:find-trips #:find-empty-slot
    #:add-passengers #:create-booking #:book #:print-trip
-   #:read-range #:write-range #:main
+   #:read-sheet #:write-range
    #:fetch-all-trips #:known-destinations
    #:sheet-tabs #:week-sheets
    #:book-natural
@@ -43,12 +43,14 @@
    #:trip-return-universal-time)
   (:documentation
    "
-  - parse-schedule — reads the full sheet, filters CSV artifacts, extracts 72 trip
-  structs with correct sheet row numbers
+  - parse-schedule — reads the full sheet and extracts its trip structs with
+  their sheet row numbers
   - find-trips — filters by day and/or destination (substring, case-insensitive)
-  - sheet-tabs / week-sheets — list the spreadsheet's tabs (scraped from its public
-  HTML view) and the subset whose names are week ranges such as \"Aug 31-Sep 6\";
-  the week list is cached briefly and can be pinned by binding *weeks*
+  - sheet-tabs / week-sheets — list the spreadsheet's tabs and the subset whose
+  names are week ranges such as \"Aug 31-Sep 6\"; the week list is cached
+  briefly and can be pinned by binding *weeks*
+  - read-sheet / write-range — the spreadsheet itself, through the Apps Script
+  web app in van-booking.gs: the only way this code touches it
   - fetch-all-trips — reads and parses every week sheet (or one week)
   - book — top-level entry point:
     - Existing trip found → adds passengers to both dep and ret columns
@@ -66,24 +68,20 @@
     - the slot was booked by somebody else since the schedule was read
   Times are half-open, so a van due back at 11:00 can go out again at 11:00,
   and a booked trip whose own times cannot be read blocks unconditionally
-  - book-natural — free-form English frontend to book (see project-isidore/booking-nlp).
+  - book-natural — free-form English frontend to book (see project-isidore/slack-bot/booking-nlp).
     Signals BOOKING-INCOMPLETE, whose report asks the user to re-send the request
     with the missing pieces, when destination, day or passengers cannot be found.
   - view-schedule — render a plaintext table of booked trips for a natural-language date range"))
 
-(in-package #:project-isidore/van-booking)
+(in-package #:project-isidore/slack-bot/van-booking)
 
 (defparameter *spreadsheet-id* "1qxx5mDsrqAqGBrwLeSs0V6R_70FSNm1-ruFWxvHVgu8")
 
-(defparameter *gid* "367982190")
-
 (defparameter *weeks* nil
-  "Optional fixed list of (sheet-name gid-or-nil) week sheets.  NIL, the
-default, means WEEK-SHEETS discovers the current week tabs from the
-spreadsheet itself, so the code keeps working as new weeks are added.
-Bind or set this to a fixed list (e.g. '((\"Apr 20-26\" nil))) to bypass
-discovery; the tests do that.  GID is only needed for the default CSV read
-path.")
+  "Optional fixed list of week sheet names.  NIL, the default, means
+WEEK-SHEETS discovers the current week tabs from the spreadsheet itself, so
+the code keeps working as new weeks are added.  Bind or set this to a fixed
+list (e.g. '(\"Apr 20-26\")) to bypass discovery; the tests do that.")
 
 (defparameter *week-sheets-cache-seconds* 300
   "How long, in seconds, a discovered week-sheet list is reused by WEEK-SHEETS
@@ -93,7 +91,9 @@ before the spreadsheet's tab list is fetched again.")
   "(fetched-universal-time . week-sheets) from the last discovery, or NIL.")
 
 (defparameter *apps-script-url*
-  "https://script.google.com/macros/s/AKfycbyR4Ffk5mjAUPUXOwQLIfjBiviyvm2rnNLpbBQvXAfTBNdAgEfR5KfE-45pPd2eTSz98g/exec")
+  "https://script.google.com/macros/s/AKfycbyR4Ffk5mjAUPUXOwQLIfjBiviyvm2rnNLpbBQvXAfTBNdAgEfR5KfE-45pPd2eTSz98g/exec"
+  "The web app deployment of van-booking.gs, which reads and writes the
+spreadsheet on this code's behalf.")
 
 (defparameter *vehicles*
   '((:dgh      5 6)
@@ -131,26 +131,6 @@ before the spreadsheet's tab list is fetched again.")
 (defun non-blank-p (s)
   "Return T if S is a non-empty, non-blank string."
   (and (stringp s) (plusp (length (string-trim '(#\Space #\Tab) s)))))
-
-(defun phantom-row-p (row)
-  "Return T if ROW is a CSV artifact (single empty string element)."
-  (and (= (length row) 1) (string= "" (first row))))
-
-(defun clean-rows (rows)
-  "Remove phantom CSV rows and return (values clean-rows sheet-row-map).
-   SHEET-ROW-MAP is a vector where element i = real 1-indexed sheet row for clean-rows[i]."
-  (let ((clean '())
-        (mapping '())
-        (sheet-row 0))
-    (dolist (row rows)
-      (if (phantom-row-p row)
-          nil
-          (progn
-            (incf sheet-row)
-            (push row clean)
-            (push sheet-row mapping))))
-    (values (nreverse clean)
-            (coerce (nreverse mapping) 'vector))))
 
 (defun safe-nth (n list)
   "Like NTH but returns \"\" if out of bounds."
@@ -191,97 +171,92 @@ Personal trip departing at \"Saturday\"."
 (defun collect-passengers (rows start-offset col max-rows)
   "Collect non-blank passenger initials from column COL starting at START-OFFSET in ROWS.
    Stops at empty cells, block headers, or after MAX-ROWS."
-  (collect
-      (until-if (lambda (cell) (or (not (non-blank-p cell)) (header-cell-p cell)))
-                (map-fn 'string
-                        (lambda (i) (string-trim '(#\Space #\Tab) (safe-nth col (nth i rows))))
-                        (scan-range :from start-offset
-                                    :below (min (+ start-offset max-rows) (length rows)))))))
+  (loop for i from start-offset below (min (+ start-offset max-rows) (length rows))
+        for cell = (string-trim '(#\Space #\Tab) (safe-nth col (nth i rows)))
+        until (or (not (non-blank-p cell)) (header-cell-p cell))
+        collect cell))
 
 (defun filter-new-passengers (passengers existing)
   "Return elements of PASSENGERS not already in EXISTING (string-equal comparison)."
-  (collect (choose-if (lambda (p) (not (member p existing :test #'string-equal)))
-                      (scan passengers))))
+  (remove-if (lambda (p) (member p existing :test #'string-equal)) passengers))
 
-(defun parse-schedule (raw-rows &key sheet-name)
-  "Parse spreadsheet RAW-ROWS into a list of TRIP structs.
+(defun parse-schedule (rows &key sheet-name)
+  "Parse spreadsheet ROWS into a list of TRIP structs.
    SHEET-NAME is stored on each trip for write-back.
    A block's start row is the sheet row its header (\"Chevy\" in column C) was
-   found on, so RAW-ROWS must be the whole tab with its empty rows in place,
-   which is what READ-RANGE returns.  Blocks are not assumed to sit a fixed
+   found on, so ROWS must be the whole tab with its empty rows in place,
+   which is what READ-SHEET returns.  Blocks are not assumed to sit a fixed
    number of rows apart: a row inserted by hand into one block moves every
    block below it, and a booking placed by counting blocks then landed that
    many rows too high, over the \"Dep./Ret.\" labels."
-  (multiple-value-bind (rows row-map) (clean-rows raw-rows)
-    (let ((trips '())
-          (current-day nil)
-          (i 0))
-      (loop while (< i (length rows))
-            for row = (nth i rows)
-            do (cond
-                 ((and (>= (length row) 3)
-                       (string-equal (string-trim " " (safe-nth 2 row)) "Chevy"))
-                  (let ((day (extract-day-from-header row)))
-                    (when day (setf current-day day)))
-                  (let ((sheet-row (aref row-map i)))
-                    ;; The row after the header is the destination row, unless
-                    ;; that row is missing and "Dep./Ret." follows directly.
-                    (let* ((next-row (nth (1+ i) rows))
-                           (has-dest-row (and next-row
-                                              (not (string-equal "Dep."
-                                                                 (string-trim " " (safe-nth 2 next-row))))))
-                           (dest-row (if has-dest-row next-row nil))
-                           (time-offset (if has-dest-row 3 2))
-                           (pass-offset (if has-dest-row 4 3)))
-                      (when (and current-day (< (+ i time-offset) (length rows)))
-                        (let* ((time-row (nth (+ i time-offset) rows))
-                               ;; With no times the row is blank, or, in a
-                               ;; read that has lost the block's empty rows,
-                               ;; it is the next block header, a "Dep./Ret."
-                               ;; row, or the weekday reminder in column L.
-                               ;; LABEL-ROW-P covers all four.
-                               (time-row-empty (label-row-p time-row)))
-                          (iterate ((vspec (scan *vehicles*)))
-                            (destructuring-bind (vname dep-col ret-col) vspec
-                              (let ((dest (if dest-row
-                                              (string-trim " " (safe-nth dep-col dest-row))
-                                              ""))
-                                    (dep-time (if time-row-empty ""
-                                                  (string-trim " " (safe-nth dep-col time-row))))
-                                    (ret-time (if time-row-empty ""
-                                                  (string-trim " " (safe-nth ret-col time-row)))))
-                                (push (make-trip
-                                       :day current-day
-                                       :vehicle vname
-                                       :destination dest
-                                       :departure dep-time
-                                       :return-time ret-time
-                                       :dep-passengers (collect-passengers rows (+ i pass-offset) dep-col 10)
-                                       :ret-passengers (collect-passengers rows (+ i pass-offset) ret-col 10)
-                                       :block-start-row sheet-row
-                                       :dep-col dep-col
-                                       :ret-col ret-col
-                                       :sheet-name sheet-name)
-                                      trips))))))))
-                  (incf i))
-                 (t (incf i))))
-      (nreverse trips))))
+  (let ((trips '())
+        (current-day nil)
+        (i 0))
+    (loop while (< i (length rows))
+          for row = (nth i rows)
+          do (cond
+               ((and (>= (length row) 3)
+                     (string-equal (string-trim " " (safe-nth 2 row)) "Chevy"))
+                (let ((day (extract-day-from-header row)))
+                  (when day (setf current-day day)))
+                (let ((sheet-row (1+ i)))
+                  ;; The row after the header is the destination row, unless
+                  ;; that row is missing and "Dep./Ret." follows directly.
+                  (let* ((next-row (nth (1+ i) rows))
+                         (has-dest-row (and next-row
+                                            (not (string-equal "Dep."
+                                                               (string-trim " " (safe-nth 2 next-row))))))
+                         (dest-row (if has-dest-row next-row nil))
+                         (time-offset (if has-dest-row 3 2))
+                         (pass-offset (if has-dest-row 4 3)))
+                    (when (and current-day (< (+ i time-offset) (length rows)))
+                      (let* ((time-row (nth (+ i time-offset) rows))
+                             ;; With no times the row is blank, or, in a
+                             ;; read that has lost the block's empty rows,
+                             ;; it is the next block header, a "Dep./Ret."
+                             ;; row, or the weekday reminder in column L.
+                             ;; LABEL-ROW-P covers all four.
+                             (time-row-empty (label-row-p time-row)))
+                        (dolist (vspec *vehicles*)
+                          (destructuring-bind (vname dep-col ret-col) vspec
+                            (let ((dest (if dest-row
+                                            (string-trim " " (safe-nth dep-col dest-row))
+                                            ""))
+                                  (dep-time (if time-row-empty ""
+                                                (string-trim " " (safe-nth dep-col time-row))))
+                                  (ret-time (if time-row-empty ""
+                                                (string-trim " " (safe-nth ret-col time-row)))))
+                              (push (make-trip
+                                     :day current-day
+                                     :vehicle vname
+                                     :destination dest
+                                     :departure dep-time
+                                     :return-time ret-time
+                                     :dep-passengers (collect-passengers rows (+ i pass-offset) dep-col 10)
+                                     :ret-passengers (collect-passengers rows (+ i pass-offset) ret-col 10)
+                                     :block-start-row sheet-row
+                                     :dep-col dep-col
+                                     :ret-col ret-col
+                                     :sheet-name sheet-name)
+                                    trips))))))))
+                (incf i))
+               (t (incf i))))
+    (nreverse trips)))
 
 (defun find-trips (trips &key day destination)
   "Return trips matching DAY (substring) and/or DESTINATION (case-insensitive substring).
    Both filters must match when provided. A blank DESTINATION filter matches no trips,
    so callers must use NIL (not \"\") to mean \"any destination\"."
-  (collect
-      (choose-if
-       (lambda (tr)
-         (and (or (null day)
-                  (search (string-upcase day) (string-upcase (trip-day tr))))
-              (or (null destination)
-                  (and (non-blank-p destination)
-                       (non-blank-p (trip-destination tr))
-                       (search (string-upcase destination)
-                               (string-upcase (trip-destination tr)))))))
-       (scan trips))))
+  (remove-if-not
+   (lambda (tr)
+     (and (or (null day)
+              (search (string-upcase day) (string-upcase (trip-day tr))))
+          (or (null destination)
+              (and (non-blank-p destination)
+                   (non-blank-p (trip-destination tr))
+                   (search (string-upcase destination)
+                           (string-upcase (trip-destination tr)))))))
+   trips))
 
 (defun print-trip (trip &optional (stream t))
   "Pretty-print a trip summary."
@@ -415,7 +390,7 @@ through here first, so the second request sees what the first one booked."
   (let ((sheet (trip-sheet-name trip)))
     (if (null sheet)
         (values trip nil)
-        (let ((fresh (parse-schedule (read-range nil :sheet-name sheet)
+        (let ((fresh (parse-schedule (read-sheet sheet)
                                      :sheet-name sheet)))
           (values (find-if (lambda (tr)
                              (and (eql (trip-block-start-row tr)
@@ -500,17 +475,15 @@ VERIFY NIL writes against TRIP as given, for a caller that has just read it."
         (try-order (if preferred-vehicle
                        (list preferred-vehicle)
                        *auto-vehicles*)))
-    (collect-first
-     (choose-if #'identity
-                (map-fn t (lambda (veh)
-                            (unless (and start end
-                                         (vehicle-conflicts day-trips day veh start end))
-                              (find-if (lambda (tr)
-                                         (and (eq (trip-vehicle tr) veh)
-                                              (not (non-blank-p (trip-destination tr)))
-                                              (not (non-blank-p (trip-departure tr)))))
-                                       day-trips)))
-                        (scan try-order))))))
+    (some (lambda (veh)
+            (unless (and start end
+                         (vehicle-conflicts day-trips day veh start end))
+              (find-if (lambda (tr)
+                         (and (eq (trip-vehicle tr) veh)
+                              (not (non-blank-p (trip-destination tr)))
+                              (not (non-blank-p (trip-departure tr)))))
+                       day-trips)))
+          try-order)))
 
 (defun report-no-slot (trips day vehicle start end)
   "Say why CREATE-BOOKING found nowhere to write on DAY.  A vehicle that is
@@ -605,16 +578,8 @@ would work."
   "Read and parse the schedule for every week sheet (see WEEK-SHEETS), or only
    WEEK (a sheet name such as \"Apr 20-26\") when given.  Returns a list of
    TRIP structs."
-  (let ((weeks-to-search (if week
-                             (list (list week nil))
-                             (week-sheets))))
-    (collect-append
-     (map-fn 'list
-             (lambda (w)
-               (let* ((sheet-name (first w))
-                      (rows (read-range nil :sheet-name sheet-name)))
-                 (parse-schedule rows :sheet-name sheet-name)))
-             (scan weeks-to-search)))))
+  (loop for sheet-name in (if week (list week) (week-sheets))
+        append (parse-schedule (read-sheet sheet-name) :sheet-name sheet-name)))
 
 (defun known-destinations (trips)
   "Return the distinct non-blank destinations found in TRIPS, in the sheet's
@@ -644,7 +609,7 @@ would work."
     (cond
       (matches
        (format t "Found ~d existing trip~:p to ~a on ~a:~%" (length matches) destination day)
-       (iterate ((m (scan matches))) (print-trip m))
+       (mapc #'print-trip matches)
        (let ((target (first matches)))
          (format t "Adding passengers to ~a trip (~a)...~%"
                  (trip-vehicle target) (trip-sheet-name target))
@@ -678,7 +643,7 @@ would work."
   (book-natural \"Can BW and MM take the DGH to the dentist tomorrow, leaving at 8:30 and back around 11?\")
   (book-natural \"add GG to the SHMS trip on Thursday\")
 
-TEXT is parsed by PROJECT-ISIDORE/BOOKING-NLP:PARSE-BOOKING.  Destination, day
+TEXT is parsed by project-isidore/slack-bot/BOOKING-NLP:PARSE-BOOKING.  Destination, day
 and passengers are required; if any is missing, BOOKING-INCOMPLETE is signalled
 before the sheet is read, and its report tells the user what was understood and
 how to phrase the missing pieces.  Times are optional when an existing trip
@@ -743,14 +708,13 @@ year, or (values nil nil) if the name does not match the expected shape
                 (+ (* year 10000) (* end-month 100) end-day))))))
 
 (defun discover-week-sheets ()
-  "Return the (sheet-name gid) tabs of the spreadsheet whose names parse as a
+  "Return the names of the spreadsheet's tabs that parse as a
 week range (see PARSE-WEEK-RANGE), in tab order.  Helper tabs such as
 \"Dates\" or \"Blank Temp\" are dropped so they are never read as schedules."
-  (remove-if-not (lambda (tab) (parse-week-range (first tab)))
-                 (sheet-tabs)))
+  (remove-if-not #'parse-week-range (sheet-tabs)))
 
 (defun week-sheets (&key refresh)
-  "Return the list of (sheet-name gid-or-nil) week sheets to search.
+  "Return the names of the week sheets to search.
 When *WEEKS* is non-NIL it is returned as is.  Otherwise the week tabs are
 discovered from the spreadsheet (DISCOVER-WEEK-SHEETS) and cached for
 *WEEK-SHEETS-CACHE-SECONDS*; REFRESH forces a new fetch."
@@ -768,8 +732,7 @@ discovered from the spreadsheet (DISCOVER-WEEK-SHEETS) and cached for
   "Return the sheet-name from WEEK-SHEETS whose date range covers TARGET-DT
 \(inclusive), or NIL if none match."
   (let ((target-key (current-year-date-key target-dt)))
-    (loop for entry in (week-sheets)
-          for name = (first entry)
+    (loop for name in (week-sheets)
           do (multiple-value-bind (start end) (parse-week-range name)
                (when (and start (<= start target-key end))
                  (return name))))))
@@ -795,7 +758,7 @@ listed in one string separated by spaces."
     (unless sheet
       (return-from remind-driver
         (format nil "No schedule sheet covers ~a." day-str)))
-    (let* ((rows (read-range nil :sheet-name sheet))
+    (let* ((rows (read-sheet sheet))
            (trips (parse-schedule rows :sheet-name sheet))
            (day-trips (find-trips trips :day day-str))
            (driver-trips
@@ -844,7 +807,7 @@ when no sheet covers today.  Reads the sheet afresh on every call."
          (day-str (format-booking-day day-dt))
          (sheet (find-week-sheet day-dt)))
     (when sheet
-      (find-trips (parse-schedule (read-range nil :sheet-name sheet) :sheet-name sheet)
+      (find-trips (parse-schedule (read-sheet sheet) :sheet-name sheet)
                   :day day-str))))
 
 (defun trips-for-driver-today (initial)
@@ -1054,8 +1017,7 @@ chronicity cannot read PHRASE."
 
 (defun find-week-sheets-in-range (start-key end-key)
   "Return the sheet names from WEEK-SHEETS whose date range overlaps [START-KEY, END-KEY]."
-  (loop for entry in (week-sheets)
-        for name = (first entry)
+  (loop for name in (week-sheets)
         append (multiple-value-bind (ws we) (parse-week-range name)
                  (when (and ws we (<= ws end-key) (>= we start-key))
                    (list name)))))
@@ -1190,7 +1152,7 @@ a code block.  Times such as \"12:00 pm\" fit the Dep and Ret caps.")
               (let* ((all-trips
                        (loop for sheet in sheets
                              append (parse-schedule
-                                     (read-range nil :sheet-name sheet)
+                                     (read-sheet sheet)
                                      :sheet-name sheet)))
                      (in-range
                        (remove-if-not
@@ -1235,85 +1197,41 @@ would error on it."
                (phrase-date-range end-phrase)
                t)))))
 
-(defun decode-js-string (s)
-  "Decode the escapes Google uses inside the JavaScript string literal S:
-\\xNN and \\uNNNN hex escapes and single-character escapes such as \\/ or \\\"."
-  (with-output-to-string (out)
-    (let ((i 0) (n (length s)))
-      (loop while (< i n)
-            do (let ((c (char s i)))
-                 (cond
-                   ((and (char= c #\\) (< (1+ i) n))
-                    (let ((e (char s (1+ i))))
-                      (flet ((hex-char (digits)
-                               (let ((end (+ i 2 digits)))
-                                 (when (<= end n)
-                                   (let ((code (parse-integer s :start (+ i 2) :end end
-                                                                :radix 16 :junk-allowed t)))
-                                     (when code
-                                       (write-char (code-char code) out)
-                                       (setf i end)
-                                       t))))))
-                        (cond
-                          ((and (char-equal e #\x) (hex-char 2)))
-                          ((and (char-equal e #\u) (hex-char 4)))
-                          (t (write-char e out) (incf i 2))))))
-                   (t (write-char c out) (incf i))))))))
+;;; The spreadsheet, through the Apps Script web app in van-booking.gs
+
+(defun apps-script-reply (json what)
+  "JSON, the web app's parsed reply about WHAT, unless it reports an error."
+  (when (and (hash-table-p json) (gethash "error" json))
+    (error "The van schedule's Apps Script could not ~a: ~a" what (gethash "error" json)))
+  json)
+
+(defun apps-script-get (action &rest parameters)
+  "The parsed reply of the web app's doGet to ACTION, with PARAMETERS, a list
+of alternating query parameter names and values."
+  (let ((query (list* (cons "action" action)
+                      (cons "spreadsheetId" *spreadsheet-id*)
+                      (loop for (name value) on parameters by #'cddr
+                            collect (cons name value)))))
+    (apps-script-reply
+     (com.inuoe.jzon:parse
+      (dex:get (format nil "~a?~a" *apps-script-url* (quri:url-encode-params query))))
+     (format nil "~(~a~) the spreadsheet" action))))
 
 (defun sheet-tabs ()
-  "Return the spreadsheet's tabs as a list of (sheet-name gid) strings, in
-tab order.  There is no unauthenticated API for this, so the public
-\"htmlview\" page is fetched and the tab list embedded in its script
-\(entries like {name: \"Aug 31-Sep 6\", pageUrl: ..., gid: \"1696388518\"})
-is extracted.  Signals an error if no tabs can be found, since a silently
-empty list would look like a spreadsheet with no weeks."
-  (let* ((url (format nil "https://docs.google.com/spreadsheets/d/~a/htmlview"
-                      *spreadsheet-id*))
-         (html (dex:get url))
-         (tabs '()))
-    (cl-ppcre:do-register-groups (name gid)
-        ("\\{\\s*name:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"[^{}]*?gid:\\s*\"(\\d+)\"" html)
-      (push (list (decode-js-string name) gid) tabs))
-    (when (null tabs)
-      (error "Could not find any sheet tabs in the HTML view of spreadsheet ~a; ~
-              Google may have changed the page format."
-             *spreadsheet-id*))
-    (nreverse tabs)))
+  "Return the names of the spreadsheet's tabs, in tab order."
+  (coerce (apps-script-get "tabs") 'list))
 
-(defun sheet-gid (sheet-name)
-  "Return the gid of the tab named SHEET-NAME: the one WEEK-SHEETS lists for
-it, or else the one found in the spreadsheet's own tab list (SHEET-TABS).
-Signals an error when no tab has that name, since reading some other tab in
-its place would put bookings on the wrong week."
-  (flet ((gid-in (tabs)
-           (second (find sheet-name tabs :key #'first :test #'string=))))
-    (or (gid-in (week-sheets))
-        (gid-in (sheet-tabs))
-        (error "The spreadsheet has no tab named ~s." sheet-name))))
-
-(defun read-range (range &key sheet-name)
-  "Read cells from the public Google Sheet via CSV export. Returns a list of rows.
-   If SHEET-NAME is given, the whole of that tab is returned (see SHEET-GID)
-   and RANGE is ignored.
-
-   The export keeps the tab's empty rows, so the Nth row returned is row N of
-   the sheet, and PARSE-SCHEDULE relies on that to know which rows a booking
-   is written to.  The gviz endpoint read before dropped empty rows, which
-   left the row numbers to be assumed from a fixed layout.
-
-   Google ends each record with CR LF, which makes CL-CSV emit a spurious
-   one-cell row after some empty rows; the CRs are removed first so that the
-   rows come out one per sheet row."
-  (let ((url (if sheet-name
-                 (format nil "https://docs.google.com/spreadsheets/d/~a/export?format=csv&gid=~a"
-                         *spreadsheet-id* (sheet-gid sheet-name))
-                 (format nil "https://docs.google.com/spreadsheets/d/~a/export?format=csv&range=~a&gid=~a"
-                         *spreadsheet-id* range *gid*))))
-    (cl-csv:read-csv (remove #\Return (dex:get url)))))
+(defun read-sheet (sheet-name)
+  "Return every row of the tab SHEET-NAME as a list of cell strings, as the
+sheet displays them.  Empty rows are kept, so the Nth row returned is row N
+of the sheet; PARSE-SCHEDULE relies on that to know which rows a booking is
+written to."
+  (map 'list (lambda (row) (coerce row 'list))
+       (apps-script-get "values" "sheet" sheet-name)))
 
 (defun write-range (range values &key sheet-name)
-  "Write VALUES (list of rows) to RANGE via the Apps Script doPost endpoint.
-   If SHEET-NAME is given, prepends it to the range for sheet-qualified writes."
+  "Write VALUES, a list of rows, to RANGE (of the tab SHEET-NAME when given)
+through the web app's doPost."
   (let* ((qualified-range (if sheet-name
                               (format nil "~a!~a" sheet-name range)
                               range))
@@ -1326,6 +1244,7 @@ its place would put bookings on the wrong week."
                 (list "arguments" args "body" body-obj) :test #'equal))
          (payload (com.inuoe.jzon:stringify root))
          (url (format nil "~a?spreadsheetId=~a" *apps-script-url* *spreadsheet-id*)))
+    ;; A web app answers a POST with a redirect to its reply.
     (multiple-value-bind (body status headers)
         (dex:request url
                      :method :post
@@ -1334,6 +1253,7 @@ its place would put bookings on the wrong week."
                      :max-redirects 0)
       (declare (ignore body))
       (let ((location (gethash "location" headers)))
-        (if location
-            (dex:get location)
-            (error "Expected redirect from Apps Script, got status ~a" status))))))
+        (unless location
+          (error "Expected redirect from Apps Script, got status ~a" status))
+        (apps-script-reply (com.inuoe.jzon:parse (dex:get location))
+                           (format nil "write ~a" qualified-range))))))

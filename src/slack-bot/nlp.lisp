@@ -1,24 +1,21 @@
 ;;;; SPDX-FileCopyrightText: 2026  Ben H. W.<foss@bhw.name>
 ;;;; SPDX-License-Identifier: AGPL-3.0-or-later
 
-(uiop:define-package #:project-isidore/nlp
+(uiop:define-package #:project-isidore/slack-bot/nlp
   (:use #:common-lisp)
   (:import-from #:alexandria)
   (:import-from #:cl-ppcre)
-  (:import-from #:bordeaux-threads)
-  (:import-from #:langutils)
   (:export
    ;; documents, tokens, spans
-   #:doc #:doc-p #:doc-text #:doc-tokens #:doc-chunks #:doc-ents #:doc-tags-p
+   #:doc #:doc-p #:doc-text #:doc-tokens #:doc-ents
    #:doc-token #:doc-length
-   #:token #:token-p #:token-index #:token-text #:token-lower #:token-pos
+   #:token #:token-p #:token-index #:token-text #:token-lower
    #:token-shape #:token-start #:token-end #:token-flags #:token-flag-p
    #:span #:make-span #:span-p #:span-doc #:span-start #:span-end #:span-label
    #:span-data #:span-text #:span-tokens #:span-length #:spans-overlap-p
    #:span-covers-p
    ;; pipeline
-   #:tokenize #:make-doc #:tag-doc #:analyze #:word-shape
-   #:ensure-nlp-initialized #:*nlp-lock* #:with-nlp-lock #:*max-input-length*
+   #:tokenize #:make-doc #:word-shape #:*max-input-length*
    ;; matcher
    #:matcher #:make-matcher #:add-pattern #:run-matcher #:match-tokens
    ;; entity ruler
@@ -28,13 +25,11 @@
   (:documentation
    "A small spaCy-style NLP layer.
 
-The pipeline is TOKENIZE -> TAG-DOC (part-of-speech tags and noun chunks from
-LANGUTILS) -> rule-based matching:
+The pipeline is TOKENIZE -> rule-based matching:
 
   - DOC / TOKEN / SPAN structs mirror spaCy's Doc, Token and Span.  A span's
-    END is exclusive.  Tokens carry the text, a lowercased copy, a Penn
-    Treebank POS keyword (:NNP, :VBG, ... or :UNK), a spaCy-style SHAPE
-    (\"XX\", \"dd:ddxx\", \"Xxxxx\") and boolean FLAGS.
+    END is exclusive.  Tokens carry the text, a lowercased copy, a
+    spaCy-style SHAPE (\"XX\", \"dd:ddxx\", \"Xxxxx\") and boolean FLAGS.
   - MATCHER runs token-attribute patterns (lists of plists such as
     (:lower \"back\") (:lower (\"by\" \"at\") :op \"?\")) with the operators
     \"?\", \"*\" and \"+\", returning leftmost-longest spans.
@@ -42,16 +37,9 @@ LANGUTILS) -> rule-based matching:
     non-overlapping entity spans to (DOC-ENTS doc), like spaCy's EntityRuler
     combined with filter_spans.
   - PHRASE-MATCHER matches a gazetteer of literal phrases (spaCy's
-    PhraseMatcher), used for destinations already present on the sheet.
+    PhraseMatcher), used for destinations already present on the sheet."))
 
-LANGUTILS caveats handled here: its own tokenizer is broken on current SBCL
-(a SIMPLE-BASE-STRING declaration followed by BREAK), so we tokenize ourselves
-and call VECTOR-TAG-TOKENIZED; its tagger uses shared global buffers, so every
-call into it is serialised on *NLP-LOCK*; its initialisation prints and calls
-TIME, so ENSURE-NLP-INITIALIZED silences it.  Initialisation runs at load time
-so a saved executable image carries the lexicon and never reads data files."))
-
-(in-package #:project-isidore/nlp)
+(in-package #:project-isidore/slack-bot/nlp)
 
 ;;; ---------------------------------------------------------------------------
 ;;; Tokens, documents, spans
@@ -66,16 +54,14 @@ so a saved executable image carries the lexicon and never reads data files."))
   "Word forms that count as numbers for the :LIKE-NUM token flag.")
 
 (defstruct (token (:constructor %make-token))
-  "One token of a DOC.  POS is a Penn Treebank keyword or :UNK before tagging.
-START/END are character offsets into DOC-TEXT.  FLAGS is a plist of booleans:
+  "One token of a DOC.  START/END are character offsets into DOC-TEXT.  FLAGS is a plist of booleans:
 :IS-ALPHA :IS-UPPER :IS-TITLE :IS-PUNCT :LIKE-NUM."
-  index text lower (pos :unk) shape start end flags)
+  index text lower shape start end flags)
 
 (defstruct (doc (:constructor %make-doc))
-  "A tokenized (and optionally tagged) text.  TOKENS is a simple-vector.
-CHUNKS are :NX noun-chunk spans, ENTS the entity spans assigned by an
-ENTITY-RULER, both sorted by start.  TAGS-P is T once POS tags were assigned."
-  text tokens chunks ents tags-p)
+  "A tokenized text.  TOKENS is a simple-vector.  ENTS are the entity spans
+assigned by an ENTITY-RULER, sorted by start."
+  text tokens ents)
 
 (defstruct span
   "A contiguous run of tokens [START, END) of DOC with a LABEL keyword and a
@@ -121,7 +107,7 @@ x, digits d, everything else is kept; runs longer than four are collapsed."
 
 (defun make-token (index text start end)
   (%make-token :index index :text text :lower (string-downcase text)
-               :pos :unk :shape (word-shape text) :start start :end end
+               :shape (word-shape text) :start start :end end
                :flags (compute-token-flags text)))
 
 (defun token-flag-p (token flag)
@@ -213,84 +199,9 @@ simple-vector of TOKEN structs whose offsets refer to NORMALIZED-TEXT."
     (values (coerce (nreverse tokens) 'simple-vector) norm)))
 
 (defun make-doc (text)
-  "Tokenize TEXT into a fresh, untagged DOC."
+  "Tokenize TEXT into a fresh DOC."
   (multiple-value-bind (tokens norm) (tokenize text)
-    (%make-doc :text norm :tokens tokens :chunks nil :ents nil :tags-p nil)))
-
-;;; ---------------------------------------------------------------------------
-;;; langutils bridge: initialisation, tagging, noun chunks
-;;; ---------------------------------------------------------------------------
-
-(defvar *nlp-lock* (bt:make-recursive-lock "project-isidore-nlp")
-  "Serialises every call into LANGUTILS, whose tagger uses global buffers.")
-
-(defvar *nlp-initialized* nil
-  "T once LANGUTILS has loaded its lexicon and tagger rules in this image.")
-
-(defmacro with-nlp-lock (&body body)
-  `(bt:with-recursive-lock-held (*nlp-lock*) ,@body))
-
-(defun ensure-nlp-initialized ()
-  "Load the LANGUTILS lexicon and rule sets once, silently.  Idempotent and
-safe to call from any thread."
-  (with-nlp-lock
-    (unless *nlp-initialized*
-      (let ((sink (make-broadcast-stream)))
-        (let ((*standard-output* sink)
-              (*trace-output* sink))
-          (langutils:init-langutils)))
-      (setf *nlp-initialized* t))
-    t))
-
-(defun chunks-from-vector-document (doc vdoc)
-  "Convert LANGUTILS noun-phrase chunks of VDOC into :NX spans over DOC.
-LANGUTILS phrase ends are inclusive; ours are exclusive."
-  (let ((n (doc-length doc)))
-    (sort (loop for phrase in (langutils:get-nx-chunks vdoc)
-                for start = (langutils:phrase-start phrase)
-                for end = (1+ (langutils:phrase-end phrase))
-                when (and (<= 0 start) (< start end) (<= end n))
-                  collect (make-span :doc doc :start start :end end :label :nx))
-          #'< :key #'span-start)))
-
-(defun tag-doc (doc)
-  "Assign Penn Treebank POS tags and noun chunks to DOC using LANGUTILS and
-return DOC.  On a token-count mismatch every tag becomes :UNK and
-DOC-TAGS-P stays NIL, so callers degrade gracefully instead of failing."
-  (let* ((tokens (doc-tokens doc))
-         (n (length tokens)))
-    (when (zerop n)
-      (setf (doc-tags-p doc) t)
-      (return-from tag-doc doc))
-    (ensure-nlp-initialized)
-    (with-nlp-lock
-      (let* ((joined (format nil "~{~A~^ ~}" (map 'list #'token-text tokens)))
-             (vdoc (langutils:vector-tag-tokenized joined))
-             (tags (langutils:document-tags vdoc)))
-        (cond ((= (langutils:length-of vdoc) n)
-               (loop for tok across tokens
-                     for i from 0
-                     for tag = (aref tags i)
-                     do (setf (token-pos tok)
-                              (if (keywordp tag)
-                                  tag
-                                  (intern (string tag) :keyword))))
-               (setf (doc-tags-p doc) t
-                     (doc-chunks doc) (chunks-from-vector-document doc vdoc)))
-              (t
-               (format *error-output*
-                       "nlp: tagger returned ~d tags for ~d tokens; using :UNK~%"
-                       (langutils:length-of vdoc) n)
-               (loop for tok across tokens do (setf (token-pos tok) :unk))
-               (setf (doc-tags-p doc) nil
-                     (doc-chunks doc) nil)))))
-    doc))
-
-(defun analyze (text &key (tag t))
-  "Tokenize TEXT and, when TAG is true, POS-tag and chunk it.  Returns a DOC."
-  (let ((doc (make-doc text)))
-    (when tag (tag-doc doc))
-    doc))
+    (%make-doc :text norm :tokens tokens :ents nil)))
 
 ;;; ---------------------------------------------------------------------------
 ;;; Matcher (token patterns)
@@ -322,7 +233,7 @@ attached to every resulting span.  Returns MATCHER."
 
 (defun match-tokens (spec token)
   "Return T when TOKEN satisfies every attribute constraint in SPEC.
-Supported keys: :lower/:in, :not-in, :text, :pos/:pos-in, :shape, :regex,
+Supported keys: :lower/:in, :not-in, :text, :shape, :regex,
 :is-alpha, :is-upper, :is-title, :is-punct, :like-num.  :op is ignored here."
   (loop for (key val) on spec by #'cddr
         always (case key
@@ -330,7 +241,6 @@ Supported keys: :lower/:in, :not-in, :text, :pos/:pos-in, :shape, :regex,
                  ((:lower :in) (spec-value-matches val (token-lower token)))
                  (:not-in (not (spec-value-matches val (token-lower token))))
                  (:text (spec-value-matches val (token-text token) :test #'string=))
-                 ((:pos :pos-in) (spec-value-matches val (token-pos token) :test #'eq))
                  (:shape (spec-value-matches val (token-shape token) :test #'string=))
                  (:regex (and (cl-ppcre:scan val (token-text token)) t))
                  ((:is-alpha :is-upper :is-title :is-punct :like-num)
@@ -512,10 +422,3 @@ at each position."
                      (setf i (car best)))
                    (incf i))))
     (nreverse results)))
-
-;;; ---------------------------------------------------------------------------
-;;; Load-time initialisation so the saved image carries the lexicon.
-;;; ---------------------------------------------------------------------------
-
-(eval-when (:load-toplevel :execute)
-  (ensure-nlp-initialized))

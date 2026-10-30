@@ -1,7 +1,7 @@
 ;;;; SPDX-FileCopyrightText: 2026  Ben H. W.<foss@bhw.name>
 ;;;; SPDX-License-Identifier: AGPL-3.0-or-later
 
-(uiop:define-package #:project-isidore/slack-bot
+(uiop:define-package #:project-isidore/slack-bot/bot
   (:use #:common-lisp)
   (:import-from #:alexandria
                 #:plist-hash-table
@@ -13,19 +13,19 @@
   (:import-from #:flexi-streams)
   (:import-from #:ironclad)
   (:import-from #:quri)
-  (:import-from #:project-isidore/booking-nlp
+  (:import-from #:project-isidore/slack-bot/booking-nlp
                 #:booking-incomplete
                 #:booking-incomplete-missing
                 #:schedule-question-range
                 #:self-reference-p
                 #:resolve-self-reference)
-  (:import-from #:project-isidore/booking-llm
+  (:import-from #:project-isidore/slack-bot/booking-llm
                 #:load-llm-config
                 #:warm-up-llm
                 #:llm-enabled-p
                 #:llm-normalize
                 #:render-intent)
-  (:import-from #:project-isidore/van-booking
+  (:import-from #:project-isidore/slack-bot/van-booking
                 #:book-natural
                 #:view-schedule
                 #:date-range-phrase-p
@@ -39,7 +39,7 @@
                 #:remind-return-driver
                 #:trip-vehicle
                 #:trip-block-start-row)
-  (:import-from #:project-isidore/database
+  (:import-from #:project-isidore/slack-bot/database
                 #:all-slack-subscriptions
                 #:add-slack-subscription
                 #:remove-slack-subscription
@@ -64,7 +64,7 @@ Provides a Lack middleware that serves two endpoints:
   POST /slack/commands — Slash commands /book, /view, /subscribe,
                          /unsubscribe, /help.
 
-Booking requests are free-form English (see project-isidore/booking-nlp).
+Booking requests are free-form English (see project-isidore/slack-bot/booking-nlp).
 When a required piece is missing, the BOOKING-INCOMPLETE report is posted
 back: it lists what was understood and asks the user to re-send the request
 with the missing piece.  A question about a trip's timing that names no
@@ -74,12 +74,13 @@ anything else is tried.
 
 When the rule parser cannot find the destination, day or passengers, and a
 local model server is configured (VAN_LLM_URL, see
-project-isidore/booking-llm), the message is first shown to the model, which
+project-isidore/slack-bot/booking-llm), the message is first shown to the model, which
 reads it into a `/book` sentence or a `/view` range.  The bot posts that
 interpretation and then runs the ordinary handler on it, so the model never
 does more than rephrase; without a server the report is posted as before.
 
-A persistent /subscribe registry (graph-db-backed via project-isidore/database)
+A persistent /subscribe registry (graph-db-backed via
+project-isidore/slack-bot/database)
 plus an in-process scheduler thread DMs subscribed drivers 5 minutes before
 each leg they drive: the departure when they are its first passenger, the
 return when they are the first listed for the return.
@@ -97,7 +98,7 @@ the profile guess; without it users.info answers \"missing_scope\", which is
 handled like any other failure -- everyone simply has to run /iam once.  See
 the project plan for Slack app configuration details."))
 
-(in-package #:project-isidore/slack-bot)
+(in-package #:project-isidore/slack-bot/bot)
 
 ;;; Configuration
 
@@ -300,7 +301,7 @@ tests can stub it."
   (ignore-errors (known-destinations (fetch-all-trips))))
 
 (defun llm-interpretation (text &key (allow-view t))
-  "Ask the model (PROJECT-ISIDORE/BOOKING-LLM) what TEXT means and turn its
+  "Ask the model (project-isidore/slack-bot/BOOKING-LLM) what TEXT means and turn its
 answer into a command: (values \"/book\" sentence) or (values \"/view\"
 range), or NIL when no model is configured, it did not answer, or its answer
 did not survive validation.  ALLOW-VIEW NIL keeps an explicit `/book` from

@@ -1,21 +1,23 @@
 ;;;; SPDX-FileCopyrightText: 2026  Ben H. W.<foss@bhw.name>
 ;;;; SPDX-License-Identifier: AGPL-3.0-or-later
 
-(uiop:define-package #:project-isidore/tests/slack-bot-tests
-  (:use #:common-lisp #:parachute)
-  (:local-nicknames (#:sb #:project-isidore/slack-bot)
-                    (#:db #:project-isidore/database)
-                    (#:vb #:project-isidore/van-booking)
-                    (#:bn #:project-isidore/booking-nlp)
-                    (#:llm #:project-isidore/booking-llm))
-  (:import-from #:project-isidore/tests/test-utils #:with-mocked-functions)
+(uiop:define-package #:project-isidore/tests/slack-bot/bot
+  (:use #:common-lisp)
+  (:import-from #:rove #:deftest #:ok #:ng #:fail)
+  (:local-nicknames (#:sb #:project-isidore/slack-bot/bot)
+                    (#:db #:project-isidore/slack-bot/database)
+                    (#:vb #:project-isidore/slack-bot/van-booking)
+                    (#:bn #:project-isidore/slack-bot/booking-nlp)
+                    (#:llm #:project-isidore/slack-bot/booking-llm))
+  (:import-from #:project-isidore/tests/test-utils
+                #:with-mocked-functions #:with-temp-data-root)
   (:import-from #:alexandria #:plist-hash-table)
   (:import-from #:bordeaux-threads)
   (:import-from #:com.inuoe.jzon)
   (:import-from #:flexi-streams)
   (:import-from #:ironclad)
   (:documentation
-   "Parachute tests for project-isidore/slack-bot.
+   "Tests for project-isidore/slack-bot/bot.
 
 Covers pure helpers (form decoding, initial parsing, dispatch table,
 docstring-driven help output, reminder-key determinism, date-rollover
@@ -25,252 +27,151 @@ scheduler tick, and graph-db-backed subscription CRUD.  Everything that
 would hit the Slack API or Google Sheets is mocked with
 WITH-MOCKED-FUNCTIONS."))
 
-(in-package #:project-isidore/tests/slack-bot-tests)
-
-(define-test slack-bot-suite
-  :description "Slack bot unit tests.")
+(in-package #:project-isidore/tests/slack-bot/bot)
 
 ;;; --- Pure helpers ---
 
-(define-test decode-form-body
-  :parent slack-bot-suite
+(deftest decode-form-body
   (let ((ht (sb::decode-form-body
              "command=%2Fsubscribe&text=BW&user_id=U999&channel_id=C1")))
-    (is string= "/subscribe" (gethash "command" ht))
-    (is string= "BW"         (gethash "text" ht))
-    (is string= "U999"       (gethash "user_id" ht))
-    (is string= "C1"         (gethash "channel_id" ht)))
+    (ok (string= "/subscribe" (gethash "command" ht)))
+    (ok (string= "BW"         (gethash "text" ht)))
+    (ok (string= "U999"       (gethash "user_id" ht)))
+    (ok (string= "C1"         (gethash "channel_id" ht))))
   ;; URL-encoded spaces and plus signs
   (let ((ht (sb::decode-form-body "text=book+a+van+for+swim")))
-    (is string= "book a van for swim" (gethash "text" ht)))
+    (ok (string= "book a van for swim" (gethash "text" ht))))
   ;; Empty body yields empty table
-  (is = 0 (hash-table-count (sb::decode-form-body ""))))
+  (ok (= 0 (hash-table-count (sb::decode-form-body "")))))
 
-(define-test parse-initial
-  :parent slack-bot-suite
-  (is string= "BW" (sb::parse-initial "BW"))
-  (is string= "BW" (sb::parse-initial "   bw no wait BW please"))
-  (is string= "CGH" (sb::parse-initial "CGH"))
-  (false (sb::parse-initial ""))
-  (false (sb::parse-initial "lowercase only"))
-  (false (sb::parse-initial nil)))
+(deftest parse-initial
+  (ok (string= "BW" (sb::parse-initial "BW")))
+  (ok (string= "BW" (sb::parse-initial "   bw no wait BW please")))
+  (ok (string= "CGH" (sb::parse-initial "CGH")))
+  (ng (sb::parse-initial ""))
+  (ng (sb::parse-initial "lowercase only"))
+  (ng (sb::parse-initial nil)))
 
-(define-test slash-commands-table
-  :parent slack-bot-suite
+(deftest slash-commands-table
   (let ((names (mapcar #'car sb::*slash-commands*)))
-    (is equal '("/book" "/view" "/iam" "/subscribe" "/unsubscribe" "/help") names))
+    (ok (equal '("/book" "/view" "/iam" "/subscribe" "/unsubscribe" "/help") names)))
   ;; Every handler has a docstring (developer reference; users get +help-text+).
   (dolist (entry sb::*slash-commands*)
-    (true (documentation (cdr entry) 'function)
-          "~a has a docstring" (car entry))))
+    (ok (documentation (cdr entry) 'function) (format nil "~a has a docstring" (car entry)))))
 
-(define-test cmd-help-includes-all-commands
-  :parent slack-bot-suite
+(deftest cmd-help-includes-all-commands
   ;; /help posts the one user-facing help page, and that page names every
   ;; registered command, so adding a command without documenting it fails here.
   (let ((out (sb::cmd-help (make-hash-table :test #'equal))))
-    (is string= sb::+help-text+ out)
+    (ok (string= sb::+help-text+ out))
     (dolist (entry sb::*slash-commands*)
-      (true (search (car entry) out) "help output mentions ~a" (car entry)))
+      (ok (search (car entry) out) (format nil "help output mentions ~a" (car entry))))
     ;; no developer notation leaks into what users read
     (dolist (jargon '("<" ">" "[" "]" "docstring" "argument"))
-      (false (search jargon out) "help output contains ~s" jargon))))
+      (ng (search jargon out) (format nil "help output contains ~s" jargon)))))
 
-(define-test reply-channel-for
-  :parent slack-bot-suite
+(deftest reply-channel-for
   (flet ((params (cmd)
            (let ((h (make-hash-table :test #'equal)))
              (setf (gethash "command" h) cmd)
              (setf (gethash "user_id" h) "U1")
              (setf (gethash "channel_id" h) "C1")
              h)))
-    (is string= "U1" (sb::reply-channel-for (params "/subscribe")))
-    (is string= "U1" (sb::reply-channel-for (params "/unsubscribe")))
-    (is string= "C1" (sb::reply-channel-for (params "/book")))
-    (is string= "C1" (sb::reply-channel-for (params "/view")))
-    (is string= "C1" (sb::reply-channel-for (params "/help")))))
+    (ok (string= "U1" (sb::reply-channel-for (params "/subscribe"))))
+    (ok (string= "U1" (sb::reply-channel-for (params "/unsubscribe"))))
+    (ok (string= "C1" (sb::reply-channel-for (params "/book"))))
+    (ok (string= "C1" (sb::reply-channel-for (params "/view"))))
+    (ok (string= "C1" (sb::reply-channel-for (params "/help"))))))
 
 ;;; --- Scheduler bookkeeping ---
 
-(define-test today-date-key-matches-decoded-date
-  :parent slack-bot-suite
+(deftest today-date-key-matches-decoded-date
   (multiple-value-bind (s m h day month year)
       (decode-universal-time (get-universal-time))
     (declare (ignore s m h))
-    (is = (+ (* year 10000) (* month 100) day)
-        (sb::today-date-key))))
+    (ok (= (+ (* year 10000) (* month 100) day)
+           (sb::today-date-key)))))
 
-(define-test sent-reminders-resets-across-days
-  :parent slack-bot-suite
+(deftest sent-reminders-resets-across-days
   (let ((sb::*sent-reminders* (make-hash-table :test #'equal))
         (sb::*sent-reminders-date* (- (sb::today-date-key) 1)))
     (setf (gethash '(stale) sb::*sent-reminders*) t)
     (sb::maybe-reset-sent-reminders)
-    (is = 0 (hash-table-count sb::*sent-reminders*))
-    (is = (sb::today-date-key) sb::*sent-reminders-date*))
+    (ok (= 0 (hash-table-count sb::*sent-reminders*)))
+    (ok (= (sb::today-date-key) sb::*sent-reminders-date*)))
   ;; Second call on same day is a no-op.
   (let ((sb::*sent-reminders* (make-hash-table :test #'equal))
         (sb::*sent-reminders-date* (sb::today-date-key)))
     (setf (gethash '(keep) sb::*sent-reminders*) t)
     (sb::maybe-reset-sent-reminders)
-    (is = 1 (hash-table-count sb::*sent-reminders*))))
+    (ok (= 1 (hash-table-count sb::*sent-reminders*)))))
 
 ;;; --- Subscription CRUD (graph-db round-trip) ---
 ;;;
-;;; Each CRUD test runs against a fresh, temporary graph-db store so nothing
-;;; leaks into ~/.local/share/project-isidore/ (or wherever
-;;; PROJECT_ISIDORE_DATA points). WITH-TEMP-DATABASE handles the open,
-;;; the *database* rebind, and the teardown.
+;;; Each CRUD test runs against a fresh store under a temporary data root, so
+;;; nothing leaks into ~/.local/share/project-isidore/ (or wherever
+;;; PROJECT_ISIDORE_DATA points).
 
 (defparameter +test-user-id+ "__TEST_USER_slack_bot_tests__"
   "Sentinel Slack user_id used inside the temp DB.")
 
 (defmacro with-temp-database (&body body)
-  "Open a fresh graph-db CRUD store in a unique temp dir, swap it in for
-DB:*DATABASE*, run BODY, then close and delete it and reopen the real store.
-The graph is opened under name :ISIDORE-CRUD so the vertex types and views
-declared for that store at load time are attached to it, and so the real
-store is closed meanwhile: graph-db allows one open store per name in a
-system directory."
-  (let ((dir (gensym "DIR"))
-        (g (gensym "G")))
-    `(let ((,dir (uiop:ensure-directory-pathname
-                  (format nil "/tmp/pi-crud-test-~A-~A/"
-                          (get-universal-time) (random 1000000))))
-           (,g nil))
-       (ensure-directories-exist ,dir)
-       (when db:*database*
-         (graph-db:close-graph db:*database* :snapshot-p nil))
-       (unwind-protect
-            (let ((db:*database* nil))
-              (setf ,g (db:open-or-make-graph :isidore-crud ,dir))
-              (setf db:*database* ,g)
-              (locally ,@body))
-         (when ,g
-           (graph-db:close-graph ,g :snapshot-p nil))
-         (uiop:delete-directory-tree ,dir :validate (constantly t))
-         (db:reopen-database)))))
+  "Run BODY with the bot's store open, fresh, under a temporary data root."
+  `(with-temp-data-root ()
+     (db:open-database)
+     (unwind-protect (progn ,@body)
+       (db:close-database))))
 
-(define-test subscription-add-upsert-remove
-  :parent slack-bot-suite
+(deftest subscription-add-upsert-remove
   (with-temp-database
-      (db:add-slack-subscription +test-user-id+ "BW")
-    ;; Direct lookup outside WITH-DB-TRANSACTION, i.e. with GRAPH-DB:*GRAPH*
+    (db:add-slack-subscription +test-user-id+ "BW")
+    ;; Direct lookup outside a transaction, i.e. with GRAPH-DB:*GRAPH*
     ;; unbound: used to fail with VERTEX-TABLE (NIL) once a row existed.
     (let ((found (db:find-slack-subscription +test-user-id+)))
-      (true found)
-      (is string= "BW" (db:initial-of found)))
-    (is equal '(("BW"))
-        (mapcar (lambda (s) (list (cdr s)))
-                (remove-if-not
-                 (lambda (s) (string= (car s) +test-user-id+))
-                 (db:all-slack-subscriptions))))
+      (ok found)
+      (ok (string= "BW" (db:initial-of found))))
+    (ok (equal '(("BW"))
+               (mapcar (lambda (s) (list (cdr s)))
+                       (remove-if-not
+                        (lambda (s) (string= (car s) +test-user-id+))
+                        (db:all-slack-subscriptions)))))
     (db:add-slack-subscription +test-user-id+ "CG")
-    (is equal '(("CG"))
-        (mapcar (lambda (s) (list (cdr s)))
-                (remove-if-not
-                 (lambda (s) (string= (car s) +test-user-id+))
-                 (db:all-slack-subscriptions))))
-    (true (db:remove-slack-subscription +test-user-id+))
-    (false (find +test-user-id+ (db:all-slack-subscriptions)
-                 :key #'car :test #'string=))
-    (false (db:remove-slack-subscription +test-user-id+))))
+    (ok (equal '(("CG"))
+               (mapcar (lambda (s) (list (cdr s)))
+                       (remove-if-not
+                        (lambda (s) (string= (car s) +test-user-id+))
+                        (db:all-slack-subscriptions)))))
+    (ok (db:remove-slack-subscription +test-user-id+))
+    (ng (find +test-user-id+ (db:all-slack-subscriptions)
+              :key #'car :test #'string=))
+    (ng (db:remove-slack-subscription +test-user-id+))))
 
-;;; --- Database split: bible vs CRUD are isolated ---
+;;; --- Where the store lives ---
 
-(define-test database-path-honors-env-var
-  :parent slack-bot-suite
-  ;; Custom path
+(deftest store-path-honors-env-var
   (let ((saved (uiop:getenvp "PROJECT_ISIDORE_DATA")))
     (unwind-protect
          (progn
            (setf (uiop:getenv "PROJECT_ISIDORE_DATA") "/tmp/pi-env-var-test/")
-           (is equal (merge-pathnames
-                      "graph-db/"
-                      (uiop:ensure-directory-pathname "/tmp/pi-env-var-test/"))
-               (db:database-path))
-           ;; Empty / unset: XDG default + graph-db subdir
+           (ok (equal #p"/tmp/pi-env-var-test/slack-bot/" (db:store-path)))
+           ;; Empty / unset: the XDG default
            (setf (uiop:getenv "PROJECT_ISIDORE_DATA") "")
-           (is equal (merge-pathnames "graph-db/"
-                                      (uiop:xdg-data-home "project-isidore/"))
-               (db:database-path)))
-      (if saved
-          (setf (uiop:getenv "PROJECT_ISIDORE_DATA") saved)
-          (setf (uiop:getenv "PROJECT_ISIDORE_DATA") "")))))
+           (ok (equal (uiop:xdg-data-home "project-isidore/slack-bot/")
+                      (db:store-path))))
+      (setf (uiop:getenv "PROJECT_ISIDORE_DATA") (or saved "")))))
 
-(defun count-bible-objects ()
-  "Count BIBLE vertices in DB:*BIBLE-DATABASE*."
-  (let ((c 0))
-    (graph-db:map-vertices
-     (lambda (v) (declare (ignore v)) (incf c))
-     db:*bible-database*
-     :vertex-type 'project-isidore/database::bible)
-    c))
-
-(define-test bible-and-general-databases-are-distinct
-  :parent slack-bot-suite
-  ;; Needs the bible store under /var/local/, which the guix.scm build
-  ;; sandbox does not have.
-  (if (not db:*bible-database*)
-      (skip "no bible graph-db store on this machine"
-        (true db:*bible-database*))
-      (progn
-        (false (eq db:*database* db:*bible-database*))
-        ;; CRUD writes go to *database*, never *bible-database*. Snapshot bible
-        ;; object count before and after a subscription round-trip.
-        (let ((bible-count-before (count-bible-objects)))
-          (with-temp-database
-              (db:add-slack-subscription +test-user-id+ "BW")
-            (db:remove-slack-subscription +test-user-id+))
-          (let ((bible-count-after (count-bible-objects)))
-            (is = bible-count-before bible-count-after)
-            (true (> bible-count-before 0)))))))
-
-(define-test database-creates-missing-directory
-  :parent slack-bot-suite
-  (let* ((tmp-root (uiop:ensure-directory-pathname
-                    (format nil "/tmp/pi-mkdir-test-~A/" (get-universal-time))))
-         (target (uiop:ensure-directory-pathname
-                  (merge-pathnames "deeply/nested/subdir/" tmp-root)))
-         (graph-db-dir (merge-pathnames "graph-db/" target))
-         (saved (uiop:getenvp "PROJECT_ISIDORE_DATA"))
-         (bible-open-p (graph-db:lookup-graph :isidore-bible)))
-    (unwind-protect
-         (progn
-           (false (uiop:directory-exists-p graph-db-dir))
-           ;; Close the production graph before pointing the env var at a
-           ;; temp dir; otherwise REOPEN-DATABASE swaps it out of GRAPH-DB::
-           ;; *GRAPHS* without closing it, leaking fd's, mmaps, and the
-           ;; replication/transaction-manager threads. Several such leaks
-           ;; per test invocation accumulate fast enough to crash SBCL.
-           (when db:*database*
-             (let ((graph-db:*graph* db:*database*))
-               (graph-db:close-graph db:*database* :snapshot-p nil)))
-           ;; The bible store too: the new data root brings a new graph-db
-           ;; system directory, whose store ids may give the CRUD store the
-           ;; one the open bible store holds.
-           (when bible-open-p
-             (graph-db:close-graph db:*bible-database* :snapshot-p nil))
-           (setf (uiop:getenv "PROJECT_ISIDORE_DATA") (namestring target))
-           (db:reopen-database)
-           (true (uiop:directory-exists-p graph-db-dir))
-           ;; graph-db's MAKE-GRAPH eagerly creates schema.dat and heap.dat
-           ;; under the location; a transaction is not required.
-           (let ((files (mapcar #'file-namestring
-                                (uiop:directory-files graph-db-dir))))
-             (true (member "heap.dat" files :test #'string=))
-             (true (member "schema.dat" files :test #'string=))))
-      (when db:*database*
-        (let ((graph-db:*graph* db:*database*))
-          (graph-db:close-graph db:*database* :snapshot-p nil)))
-      (if saved
-          (setf (uiop:getenv "PROJECT_ISIDORE_DATA") saved)
-          (setf (uiop:getenv "PROJECT_ISIDORE_DATA") ""))
-      (when bible-open-p
-        (db:reopen-bible-database))
-      (db:reopen-database)
-      (when (uiop:directory-exists-p tmp-root)
-        (uiop:delete-directory-tree tmp-root :validate (constantly t))))))
+(deftest open-database-creates-missing-directory
+  (with-temp-data-root (root)
+    (let ((store (uiop:subpathname root "slack-bot/")))
+      (ng (uiop:directory-exists-p store))
+      (db:open-database)
+      (unwind-protect
+           ;; MAKE-GRAPH creates schema.dat and heap.dat eagerly; no
+           ;; transaction is needed.
+           (let ((files (mapcar #'file-namestring (uiop:directory-files store))))
+             (ok (member "heap.dat" files :test #'string=))
+             (ok (member "schema.dat" files :test #'string=)))
+        (db:close-database)))))
 
 ;;; --- Subscribe / unsubscribe handlers (stubs for DB side-effects) ---
 
@@ -280,39 +181,34 @@ system directory."
           do (setf (gethash k h) v))
     h))
 
-(define-test cmd-subscribe-requires-user-id
-  :parent slack-bot-suite
+(deftest cmd-subscribe-requires-user-id
   (let ((reply (sb::cmd-subscribe (make-params "text" "BW"))))
-    (true (search "Slack user" reply))))
+    (ok (search "Slack user" reply))))
 
-(define-test cmd-subscribe-requires-initial
-  :parent slack-bot-suite
+(deftest cmd-subscribe-requires-initial
   (let ((reply (sb::cmd-subscribe (make-params "user_id" "Uabc" "text" ""))))
-    (true (search "Usage" reply))))
+    (ok (search "Usage" reply))))
 
-(define-test cmd-subscribe-happy-path
-  :parent slack-bot-suite
+(deftest cmd-subscribe-happy-path
   (with-temp-database
       (let ((reply (sb::cmd-subscribe
                     (make-params "user_id" +test-user-id+
                                  "text" "please use BW thanks"))))
-        (true (search "BW" reply))
-        (true (search +test-user-id+
-                      (format nil "~{~A~%~}"
-                              (mapcar #'car (db:all-slack-subscriptions))))))))
+        (ok (search "BW" reply))
+        (ok (search +test-user-id+
+                    (format nil "~{~A~%~}"
+                            (mapcar #'car (db:all-slack-subscriptions))))))))
 
-(define-test cmd-unsubscribe-when-not-subscribed
-  :parent slack-bot-suite
+(deftest cmd-unsubscribe-when-not-subscribed
   (with-temp-database
       (let ((reply (sb::cmd-unsubscribe (make-params "user_id" +test-user-id+))))
-        (true (search "not subscribed" reply)))))
+        (ok (search "not subscribed" reply)))))
 
-(define-test cmd-unsubscribe-after-subscribe
-  :parent slack-bot-suite
+(deftest cmd-unsubscribe-after-subscribe
   (with-temp-database
       (sb::cmd-subscribe (make-params "user_id" +test-user-id+ "text" "BW"))
     (let ((reply (sb::cmd-unsubscribe (make-params "user_id" +test-user-id+))))
-      (true (search "Unsubscribed" reply)))))
+      (ok (search "Unsubscribed" reply)))))
 
 (defun unix-now ()
   "Current time as Unix epoch seconds, as Slack sends it."
@@ -350,140 +246,136 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
           do (setf (gethash k h) v))
     h))
 
-(define-test signature-verification
-  :parent slack-bot-suite
+(deftest signature-verification
   (let ((sb::*slack-signing-secret* "testsecret")
         (ts (princ-to-string (unix-now)))
         (body "command=%2Fbook&text=hi"))
-    (true (sb::verify-slack-signature ts body (sign "testsecret" ts body)))
+    (ok (sb::verify-slack-signature ts body (sign "testsecret" ts body)))
     ;; tampered body or wrong secret
-    (false (sb::verify-slack-signature ts (concatenate 'string body "x") (sign "testsecret" ts body)))
-    (false (sb::verify-slack-signature ts body (sign "othersecret" ts body)))
+    (ng (sb::verify-slack-signature ts (concatenate 'string body "x") (sign "testsecret" ts body)))
+    (ng (sb::verify-slack-signature ts body (sign "othersecret" ts body)))
     ;; stale timestamp (replay protection)
     (let ((old (princ-to-string (- (unix-now) 1000))))
-      (false (sb::verify-slack-signature old body (sign "testsecret" old body))))
+      (ng (sb::verify-slack-signature old body (sign "testsecret" old body))))
     ;; missing or malformed pieces
-    (false (sb::verify-slack-signature nil body "v0=00"))
-    (false (sb::verify-slack-signature ts body nil))
-    (false (sb::verify-slack-signature "not-a-number" body "v0=00")))
+    (ng (sb::verify-slack-signature nil body "v0=00"))
+    (ng (sb::verify-slack-signature ts body nil))
+    (ng (sb::verify-slack-signature "not-a-number" body "v0=00")))
   ;; no secret configured -> nothing verifies
   (let ((sb::*slack-signing-secret* nil)
         (ts (princ-to-string (unix-now))))
-    (false (sb::verify-slack-signature ts "b" (sign "testsecret" ts "b")))))
+    (ng (sb::verify-slack-signature ts "b" (sign "testsecret" ts "b")))))
 
-(define-test request-helpers
-  :parent slack-bot-suite
+(deftest request-helpers
   ;; strip-mention
-  (is string= "book a van" (sb::strip-mention "<@U123ABC> book a van"))
-  (is string= "book a van" (sb::strip-mention "book a van"))
-  (is string= "hi <@U123ABC>" (sb::strip-mention "hi <@U123ABC>"))
-  (is string= "" (sb::strip-mention "<@U123ABC>"))
+  (ok (string= "book a van" (sb::strip-mention "<@U123ABC> book a van")))
+  (ok (string= "book a van" (sb::strip-mention "book a van")))
+  (ok (string= "hi <@U123ABC>" (sb::strip-mention "hi <@U123ABC>")))
+  (ok (string= "" (sb::strip-mention "<@U123ABC>")))
   ;; json-response
   (let ((resp (sb::json-response 200 (plist-hash-table '("challenge" "abc") :test #'equal))))
-    (is = 200 (first resp))
-    (is equal '(:content-type "application/json") (second resp))
-    (is string= "abc" (gethash "challenge" (com.inuoe.jzon:parse (first (third resp))))))
+    (ok (= 200 (first resp)))
+    (ok (equal '(:content-type "application/json") (second resp)))
+    (ok (string= "abc" (gethash "challenge" (com.inuoe.jzon:parse (first (third resp)))))))
   ;; read-body-string decodes UTF-8 and tolerates a missing body
-  (is string= "héllo=wörld" (sb::read-body-string (body-env "héllo=wörld")))
-  (is string= "" (sb::read-body-string (body-env "")))
-  (false (sb::read-body-string '(:path-info "/x")))
+  (ok (string= "héllo=wörld" (sb::read-body-string (body-env "héllo=wörld"))))
+  (ok (string= "" (sb::read-body-string (body-env ""))))
+  (ng (sb::read-body-string '(:path-info "/x")))
   ;; help text describes the free-form contract
   (dolist (needle '("destination" "day" "passengers" "times" "vehicle" "re-send"
                     "/view" "/subscribe" "/unsubscribe" "/help"))
-    (true (search needle sb::+help-text+) "help mentions ~a" needle)))
+    (ok (search needle sb::+help-text+) (format nil "help mentions ~a" needle))))
 
-(define-test middleware-routing
-  :parent slack-bot-suite
+(deftest middleware-routing
   (let* ((app-calls '())
          (app (lambda (env) (push (getf env :path-info) app-calls) '(200 () ("app"))))
          (handler (funcall (sb:make-slack-middleware) app)))
     ;; GET passes through, even on the slack paths
-    (is equal '(200 () ("app"))
-        (funcall handler '(:request-method :get :path-info "/slack/events")))
+    (ok (equal '(200 () ("app"))
+               (funcall handler '(:request-method :get :path-info "/slack/events"))))
     ;; POST elsewhere passes through
-    (is equal '(200 () ("app"))
-        (funcall handler (body-env "x" :request-method :post :path-info "/other")))
-    (is equal '("/other" "/slack/events") app-calls)
+    (ok (equal '(200 () ("app"))
+               (funcall handler (body-env "x" :request-method :post :path-info "/other"))))
+    (ok (equal '("/other" "/slack/events") app-calls))
     ;; POST to the slack paths is handled here: no body -> 400
-    (is = 400 (first (funcall handler '(:request-method :post :path-info "/slack/events"))))
-    (is = 400 (first (funcall handler '(:request-method :post :path-info "/slack/commands"))))
-    (is = 2 (length app-calls))))
+    (ok (= 400 (first (funcall handler '(:request-method :post :path-info "/slack/events")))))
+    (ok (= 400 (first (funcall handler '(:request-method :post :path-info "/slack/commands")))))
+    (ok (= 2 (length app-calls)))))
 
-(define-test events-endpoint
-  :parent slack-bot-suite
+(deftest events-endpoint
   (let ((sb::*slack-signing-secret* "testsecret"))
     ;; the url_verification handshake echoes the challenge as JSON
     (let ((resp (sb::handle-slack-request
                  (signed-env "/slack/events"
                              "{\"type\":\"url_verification\",\"challenge\":\"xyz\"}"))))
-      (is = 200 (first resp))
-      (is equal '(:content-type "application/json") (second resp))
-      (is string= "xyz" (gethash "challenge" (com.inuoe.jzon:parse (first (third resp))))))
+      (ok (= 200 (first resp)))
+      (ok (equal '(:content-type "application/json") (second resp)))
+      (ok (string= "xyz" (gethash "challenge" (com.inuoe.jzon:parse (first (third resp)))))))
     ;; bad or missing signature -> 403; no body -> 400
-    (is = 403 (first (sb::handle-slack-request
-                      (signed-env "/slack/events" "{\"type\":\"url_verification\"}"
-                                  :signature "v0=bad"))))
-    (is = 403 (first (sb::handle-slack-request
-                      (body-env "{}" :request-method :post :path-info "/slack/events"))))
-    (is = 400 (first (sb::handle-slack-request '(:request-method :post :path-info "/slack/events"))))
+    (ok (= 403 (first (sb::handle-slack-request
+                       (signed-env "/slack/events" "{\"type\":\"url_verification\"}"
+                                   :signature "v0=bad")))))
+    (ok (= 403 (first (sb::handle-slack-request
+                       (body-env "{}" :request-method :post :path-info "/slack/events")))))
+    (ok (= 400 (first (sb::handle-slack-request '(:request-method :post :path-info "/slack/events")))))
     ;; retries are acknowledged but not processed; first deliveries dispatch
     (let ((events '()))
       (with-mocked-functions ((sb::handle-message-event (lambda (event) (push event events) nil)))
         (let ((body "{\"type\":\"event_callback\",\"event\":{\"type\":\"message\",\"text\":\"hi\"}}"))
-          (is = 200 (first (sb::handle-slack-request
-                            (signed-env "/slack/events" body
-                                        :extra-headers '("x-slack-retry-num" "1")))))
-          (is = 0 (length events))
-          (is = 200 (first (sb::handle-slack-request (signed-env "/slack/events" body))))
-          (is = 1 (length events))
-          (is string= "hi" (gethash "text" (first events))))
+          (ok (= 200 (first (sb::handle-slack-request
+                             (signed-env "/slack/events" body
+                                         :extra-headers '("x-slack-retry-num" "1"))))))
+          (ok (= 0 (length events)))
+          (ok (= 200 (first (sb::handle-slack-request (signed-env "/slack/events" body)))))
+          (ok (= 1 (length events)))
+          (ok (string= "hi" (gethash "text" (first events)))))
         ;; an event_callback without an event is harmless
-        (is = 200 (first (sb::handle-slack-request
-                          (signed-env "/slack/events" "{\"type\":\"event_callback\"}"))))
-        (is = 1 (length events))))
+        (ok (= 200 (first (sb::handle-slack-request
+                           (signed-env "/slack/events" "{\"type\":\"event_callback\"}")))))
+        (ok (= 1 (length events)))))
     ;; unknown payload types are acknowledged
-    (is = 200 (first (sb::handle-slack-request
-                      (signed-env "/slack/events" "{\"type\":\"something_else\"}"))))))
+    (ok (= 200 (first (sb::handle-slack-request
+                       (signed-env "/slack/events" "{\"type\":\"something_else\"}")))))))
 
-(define-test commands-endpoint
-  :parent slack-bot-suite
+(deftest commands-endpoint
   (let ((sb::*slack-signing-secret* "testsecret"))
-    (is = 403 (first (sb::handle-slash-command
-                      (signed-env "/slack/commands" "command=%2Fhelp" :signature "v0=bad"))))
-    (is = 400 (first (sb::handle-slash-command '(:request-method :post :path-info "/slack/commands"))))
+    (ok (= 403 (first (sb::handle-slash-command
+                       (signed-env "/slack/commands" "command=%2Fhelp" :signature "v0=bad")))))
+    (ok (= 400 (first (sb::handle-slash-command '(:request-method :post :path-info "/slack/commands")))))
     (let ((resp (sb::handle-slash-command
                  (signed-env "/slack/commands" "command=%2Fbogus&user_id=U1&channel_id=C1"))))
-      (is = 200 (first resp))
-      (true (search "Unknown command: /bogus" (first (third resp)))))
+      (ok (= 200 (first resp)))
+      (ok (search "Unknown command: /bogus" (first (third resp)))))
     ;; a known command runs in a worker thread and posts its reply to the channel
     (let ((posted '()))
       (with-mocked-functions ((sb::post-slack-message
                                (lambda (channel text) (push (cons channel text) posted))))
         (let ((resp (sb::handle-slash-command
                      (signed-env "/slack/commands" "command=%2Fhelp&user_id=U1&channel_id=C1"))))
-          (is = 200 (first resp))
+          (ok (= 200 (first resp)))
           (loop repeat 100 until posted do (sleep 0.05))
-          (is = 1 (length posted))
-          (is string= "C1" (car (first posted)))
-          (true (search "/book" (cdr (first posted)))))))
+          (ok (= 1 (length posted)))
+          (ok (string= "C1" (car (first posted))))
+          (ok (search "/book" (cdr (first posted)))))))
     ;; subscribe replies go to the user as a DM
     (let ((posted '()))
       (with-mocked-functions ((sb::post-slack-message
                                (lambda (channel text) (push (cons channel text) posted)))
                               (db:add-slack-subscription (lambda (user-id initial)
-                                                           (declare (ignore user-id initial)) t)))
+                                                           (declare (ignore user-id initial)) t))
+                              (db:add-slack-identity (lambda (user-id initial)
+                                                       (declare (ignore user-id initial)) t)))
         (sb::handle-slash-command
          (signed-env "/slack/commands" "command=%2Fsubscribe&text=BW&user_id=U7&channel_id=C1"))
         (loop repeat 100 until posted do (sleep 0.05))
-        (is = 1 (length posted))
-        (is string= "U7" (car (first posted)))
-        (true (search "Subscribed" (cdr (first posted))))))))
+        (ok (= 1 (length posted)))
+        (ok (string= "U7" (car (first posted))))
+        (ok (search "Subscribed" (cdr (first posted))))))))
 
-(define-test cmd-book-replies
-  :parent slack-bot-suite
-  (true (search "Usage" (sb::cmd-book (make-params "text" ""))))
-  (true (search "Usage" (sb::cmd-book (make-params "text" "   "))))
-  (true (search "Usage" (sb::cmd-book (make-params))))
+(deftest cmd-book-replies
+  (ok (search "Usage" (sb::cmd-book (make-params "text" ""))))
+  (ok (search "Usage" (sb::cmd-book (make-params "text" "   "))))
+  (ok (search "Usage" (sb::cmd-book (make-params))))
   ;; an incomplete booking returns the re-send prompt, not an error banner
   (with-mocked-functions ((vb:book-natural
                            (lambda (text &key week) (declare (ignore week))
@@ -491,34 +383,33 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                                                            :understood '(:destination "pool")
                                                            :text text))))
     (let ((reply (sb::cmd-book (make-params "text" "for the pool for MM"))))
-      (true (search "Please re-send" reply))
-      (true (search "destination: pool" reply))
-      (true (search (bn:missing-piece-hint :day) reply))
-      (false (search "Booking failed" reply))))
+      (ok (search "Please re-send" reply))
+      (ok (search "destination: pool" reply))
+      (ok (search (bn:missing-piece-hint :day) reply))
+      (ng (search "Booking failed" reply))))
   ;; the booking's printed output is the reply
   (with-mocked-functions ((vb:book-natural
                            (lambda (text &key week) (declare (ignore text week))
                              (format t "Created DGH booking~%"))))
-    (true (search "Created DGH booking" (sb::cmd-book (make-params "text" "x")))))
+    (ok (search "Created DGH booking" (sb::cmd-book (make-params "text" "x")))))
   ;; silent success
   (with-mocked-functions ((vb:book-natural (lambda (text &key week) (declare (ignore text week)) nil)))
-    (true (search "no output" (sb::cmd-book (make-params "text" "x")))))
+    (ok (search "no output" (sb::cmd-book (make-params "text" "x")))))
   ;; other errors are reported with their condition type
   (with-mocked-functions ((vb:book-natural (lambda (text &key week) (declare (ignore text week))
                                              (error "boom"))))
     (let ((reply (sb::cmd-book (make-params "text" "x"))))
-      (true (search "Booking failed [SIMPLE-ERROR]" reply))
-      (true (search "boom" reply))
-      (true (search "/help" reply)))))
+      (ok (search "Booking failed [SIMPLE-ERROR]" reply))
+      (ok (search "boom" reply))
+      (ok (search "/help" reply)))))
 
-(define-test cmd-view-replies
-  :parent slack-bot-suite
+(deftest cmd-view-replies
   (with-mocked-functions ((vb:view-schedule
                            (lambda (&optional range) (format t "TABLE for ~a" range) "ignored")))
-    (true (search "TABLE for today" (sb::cmd-view (make-params "text" ""))))
-    (true (search "TABLE for today" (sb::cmd-view (make-params))))
-    (true (search "TABLE for Apr 20 to Apr 26"
-                  (sb::cmd-view (make-params "text" " Apr 20 to Apr 26 ")))))
+    (ok (search "TABLE for today" (sb::cmd-view (make-params "text" ""))))
+    (ok (search "TABLE for today" (sb::cmd-view (make-params))))
+    (ok (search "TABLE for Apr 20 to Apr 26"
+                (sb::cmd-view (make-params "text" " Apr 20 to Apr 26 ")))))
   ;; a multi-line table is posted in code fences (a list of message parts)
   ;; so its columns line up in Slack
   (with-mocked-functions ((vb:view-schedule
@@ -526,23 +417,22 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                              (format t "Date  Vehicle~%----  -------~%Mon   DGH~%")
                              "ignored")))
     (let ((reply (sb::cmd-view (make-params "text" "today"))))
-      (true (listp reply))
-      (is = 1 (length reply))
-      (true (uiop:string-prefix-p (format nil "```~%Date  Vehicle~%") (first reply)))
-      (true (search "Mon   DGH" (first reply)))
-      (true (uiop:string-suffix-p (first reply) "```"))))
+      (ok (listp reply))
+      (ok (= 1 (length reply)))
+      (ok (uiop:string-prefix-p (format nil "```~%Date  Vehicle~%") (first reply)))
+      (ok (search "Mon   DGH" (first reply)))
+      (ok (uiop:string-suffix-p (first reply) "```"))))
   (with-mocked-functions ((vb:view-schedule
                            (lambda (&optional range) (declare (ignore range)) (error "no sheet"))))
     (let ((reply (sb::cmd-view (make-params "text" "x"))))
-      (true (search "View failed" reply))
-      (true (search "no sheet" reply)))))
+      (ok (search "View failed" reply))
+      (ok (search "no sheet" reply)))))
 
-(define-test code-block-chunks
-  :parent slack-bot-suite
+(deftest code-block-chunks
   ;; short text: one fenced part
   (let ((parts (sb::code-block-chunks (format nil "a~%b~%"))))
-    (is = 1 (length parts))
-    (is string= (format nil "```~%a~%b~%```") (first parts)))
+    (ok (= 1 (length parts)))
+    (ok (string= (format nil "```~%a~%b~%```") (first parts))))
   ;; long text is split on line boundaries under the limit, each part
   ;; repeating the header lines, and no row is lost or duplicated
   (let* ((header (format nil "Date  Vehicle~%----  -------"))
@@ -550,15 +440,15 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                      collect (format nil "row ~2d ~a" i (make-string 60 :initial-element #\x))))
          (text (format nil "~a~%~{~a~%~}" header rows))
          (parts (sb::code-block-chunks text :limit 1000 :header-lines 2)))
-    (true (> (length parts) 1))
+    (ok (> (length parts) 1))
     (dolist (p parts)
-      (true (<= (length p) (+ 1000 8)))
-      (true (uiop:string-prefix-p (format nil "```~%Date  Vehicle~%----  -------~%") p))
-      (true (uiop:string-suffix-p p "```")))
+      (ok (<= (length p) (+ 1000 8)))
+      (ok (uiop:string-prefix-p (format nil "```~%Date  Vehicle~%----  -------~%") p))
+      (ok (uiop:string-suffix-p p "```")))
     (let ((all (apply #'concatenate 'string parts)))
       (dolist (r rows)
-        (is = 1 (loop for start = (search r all) then (search r all :start2 (1+ start))
-                      while start count t)))))
+        (ok (= 1 (loop for start = (search r all) then (search r all :start2 (1+ start))
+                       while start count t))))))
   ;; a split prefers the blank line between groups (the days of a schedule),
   ;; so no part opens in the middle of a day or with a blank line
   (let* ((header (format nil "  Vehicle  Destination~%  -------  -----------"))
@@ -569,21 +459,20 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                                                              (make-string 30 :initial-element #\z))))))
          (text (format nil "~a~%~{~a~^~%~}" header groups))
          (parts (sb::code-block-chunks text :limit 700 :header-lines 2)))
-    (true (> (length parts) 1))
+    (ok (> (length parts) 1))
     (dolist (p parts)
       (let ((lines (uiop:split-string p :separator '(#\Newline))))
-        (is string= "```" (first lines))
-        (is string= "  Vehicle  Destination" (second lines))
-        (true (uiop:string-prefix-p "Day " (fourth lines)))))
+        (ok (string= "```" (first lines)))
+        (ok (string= "  Vehicle  Destination" (second lines)))
+        (ok (uiop:string-prefix-p "Day " (fourth lines)))))
     (let ((all (apply #'concatenate 'string parts)))
       (loop for d from 1 to 8
             for needle = (format nil "Day ~d~%" d)
-            do (is = 1 (loop for start = (search needle all)
-                               then (search needle all :start2 (1+ start))
-                             while start count t))))))
+            do (ok (= 1 (loop for start = (search needle all)
+                              then (search needle all :start2 (1+ start))
+                              while start count t)))))))
 
-(define-test message-events
-  :parent slack-bot-suite
+(deftest message-events
   (let ((posted '()))
     (with-mocked-functions ((sb::post-slack-message
                              (lambda (channel text) (push (cons channel text) posted)))
@@ -591,24 +480,24 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                              (lambda (text &key week) (declare (ignore week))
                                (format t "booked ~a" text))))
       ;; ignored events post nothing and return NIL
-      (false (sb::handle-message-event (message-event "text" "x" "channel" "C1" "bot_id" "B1")))
-      (false (sb::handle-message-event (message-event "text" "x" "channel" "C1" "subtype" "edited")))
-      (false (sb::handle-message-event (message-event "text" "   " "channel" "C1")))
-      (false (sb::handle-message-event (message-event "channel" "C1")))
-      (false (sb::handle-message-event (message-event "text" "x")))
-      (is = 0 (length posted))
+      (ng (sb::handle-message-event (message-event "text" "x" "channel" "C1" "bot_id" "B1")))
+      (ng (sb::handle-message-event (message-event "text" "x" "channel" "C1" "subtype" "edited")))
+      (ng (sb::handle-message-event (message-event "text" "   " "channel" "C1")))
+      (ng (sb::handle-message-event (message-event "channel" "C1")))
+      (ng (sb::handle-message-event (message-event "text" "x")))
+      (ok (= 0 (length posted)))
       ;; help keywords post the help text synchronously
-      (false (sb::handle-message-event (message-event "text" "help" "channel" "C1")))
-      (false (sb::handle-message-event (message-event "text" "?" "channel" "C1")))
-      (is = 2 (length posted))
-      (true (search "Van Steward Bot" (cdr (first posted))))
+      (ng (sb::handle-message-event (message-event "text" "help" "channel" "C1")))
+      (ng (sb::handle-message-event (message-event "text" "?" "channel" "C1")))
+      (ok (= 2 (length posted)))
+      (ok (search "Van Steward Bot" (cdr (first posted))))
       ;; a booking runs in a worker thread; the mention prefix is stripped
       (let ((thread (sb::handle-message-event
                      (message-event "text" "<@U1> for the pool" "channel" "C2"))))
-        (true (bt:threadp thread))
+        (ok (bt:threadp thread))
         (bt:join-thread thread)
-        (is string= "C2" (car (first posted)))
-        (is string= "booked for the pool" (cdr (first posted))))))
+        (ok (string= "C2" (car (first posted))))
+        (ok (string= "booked for the pool" (cdr (first posted)))))))
   ;; an incomplete booking posts the re-send prompt, not an error banner
   (let ((posted '()))
     (with-mocked-functions ((sb::post-slack-message
@@ -619,27 +508,26 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                                                              :understood '(:destination "pool")
                                                              :text text))))
       (bt:join-thread (sb::handle-message-event (message-event "text" "for the pool" "channel" "C1")))
-      (is = 1 (length posted))
-      (true (search "Please re-send" (first posted)))
-      (true (search "destination: pool" (first posted)))
-      (false (search "Booking failed" (first posted)))))
+      (ok (= 1 (length posted)))
+      (ok (search "Please re-send" (first posted)))
+      (ok (search "destination: pool" (first posted)))
+      (ng (search "Booking failed" (first posted)))))
   ;; silent success and other errors
   (let ((posted '()))
     (with-mocked-functions ((sb::post-slack-message
                              (lambda (channel text) (declare (ignore channel)) (push text posted)))
                             (vb:book-natural (lambda (text &key week) (declare (ignore text week)) nil)))
       (bt:join-thread (sb::handle-message-event (message-event "text" "for the pool" "channel" "C1")))
-      (true (search "no output" (first posted))))
+      (ok (search "no output" (first posted))))
     (with-mocked-functions ((sb::post-slack-message
                              (lambda (channel text) (declare (ignore channel)) (push text posted)))
                             (vb:book-natural (lambda (text &key week) (declare (ignore text week))
                                                (error "boom"))))
       (bt:join-thread (sb::handle-message-event (message-event "text" "for the pool" "channel" "C1")))
-      (true (search "Booking failed [SIMPLE-ERROR]" (first posted)))
-      (true (search "boom" (first posted))))))
+      (ok (search "Booking failed [SIMPLE-ERROR]" (first posted)))
+      (ok (search "boom" (first posted))))))
 
-(define-test llm-fallback
-  :parent slack-bot-suite
+(deftest llm-fallback
   ;; The rule parser goes first; the model is asked only when it cannot find
   ;; the destination, day or passengers, and its reading is posted before the
   ;; ordinary handler runs on it.
@@ -664,13 +552,13 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
       (bt:join-thread (sb::handle-message-event
                        (message-event "text" "bw and mm need the dentist tmrw 8:30-11"
                                       "channel" "C1")))
-      (is equal '("bw and mm need the dentist tmrw 8:30-11") asked)
-      (is = 2 (length posted))
+      (ok (equal '("bw and mm need the dentist tmrw 8:30-11") asked))
+      (ok (= 2 (length posted)))
       ;; POSTED is pushed, so the echo is second and the result first
-      (true (search "Interpreted as: `/book BW and MM to the dentist tomorrow leaving at 8:30 am and back at 11:00 am`"
-                    (second posted)))
-      (is string= "booked BW and MM to the dentist tomorrow leaving at 8:30 am and back at 11:00 am"
-          (first posted))))
+      (ok (search "Interpreted as: `/book BW and MM to the dentist tomorrow leaving at 8:30 am and back at 11:00 am`"
+                  (second posted)))
+      (ok (string= "booked BW and MM to the dentist tomorrow leaving at 8:30 am and back at 11:00 am"
+                   (first posted)))))
   ;; a question about the schedule becomes /view, through CMD-VIEW
   (let ((posted '())
         (ranges '()))
@@ -692,10 +580,10 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                                "ignored")))
       (bt:join-thread (sb::handle-message-event
                        (message-event "text" "what's on the van this week?" "channel" "C1")))
-      (is equal '("this week") ranges)
-      (is = 2 (length posted))
-      (true (search "Interpreted as: `/view this week`" (second posted)))
-      (is string= "TABLE for this week" (first posted))))
+      (ok (equal '("this week") ranges))
+      (ok (= 2 (length posted)))
+      (ok (search "Interpreted as: `/view this week`" (second posted)))
+      (ok (string= "TABLE for this week" (first posted)))))
   ;; no model configured: the report is posted exactly as before, and the
   ;; model is never asked
   (let ((posted '())
@@ -711,10 +599,10 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                                                              :understood '(:destination "pool")
                                                              :text text))))
       (bt:join-thread (sb::handle-message-event (message-event "text" "for the pool" "channel" "C1")))
-      (is = 0 asked)
-      (is = 1 (length posted))
-      (true (search "Please re-send" (first posted)))
-      (true (search "destination: pool" (first posted)))))
+      (ok (= 0 asked))
+      (ok (= 1 (length posted)))
+      (ok (search "Please re-send" (first posted)))
+      (ok (search "destination: pool" (first posted)))))
   ;; the model answers, but names someone who is not in the message: the
   ;; reading is rejected and the report is posted
   (let ((posted '()))
@@ -732,8 +620,8 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                                                              :text text))))
       (bt:join-thread (sb::handle-message-event
                        (message-event "text" "for the pool tomorrow" "channel" "C1")))
-      (is = 1 (length posted))
-      (true (search "Please re-send" (first posted)))))
+      (ok (= 1 (length posted)))
+      (ok (search "Please re-send" (first posted)))))
   ;; a miss on the times alone (BOOK found no matching trip) is not the
   ;; model's business
   (let ((posted '())
@@ -750,12 +638,11 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                                                              :text text))))
       (bt:join-thread (sb::handle-message-event
                        (message-event "text" "add MM to the pool trip tomorrow" "channel" "C1")))
-      (is = 0 asked)
-      (is = 1 (length posted))
-      (true (search "No existing trip to pool" (first posted))))))
+      (ok (= 0 asked))
+      (ok (= 1 (length posted)))
+      (ok (search "No existing trip to pool" (first posted))))))
 
-(define-test cmd-book-llm-fallback
-  :parent slack-bot-suite
+(deftest cmd-book-llm-fallback
   ;; an explicit /book never turns into a view
   (with-mocked-functions ((sb::llm-known-destinations (lambda () nil))
                           (llm:llm-enabled-p (lambda () t))
@@ -767,8 +654,8 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                              (error 'bn:booking-incomplete
                                     :missing '(:destination :day :passengers) :text text))))
     (let ((reply (sb::cmd-book (make-params "text" "what's on this week"))))
-      (true (stringp reply))
-      (true (search "Please re-send" reply))))
+      (ok (stringp reply))
+      (ok (search "Please re-send" reply))))
   ;; a booking the model read is echoed, then run; here the rewritten
   ;; sentence still lacks the times, so the ordinary report follows
   (with-mocked-functions ((sb::llm-known-destinations (lambda () nil))
@@ -785,13 +672,12 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                                  (error 'bn:booking-incomplete :missing '(:passengers)
                                                                :text text)))))
     (let ((reply (sb::cmd-book (make-params "text" "bw to the pool tmrw"))))
-      (true (listp reply))
-      (is = 2 (length reply))
-      (true (search "Interpreted as: `/book BW to the pool tomorrow`" (first reply)))
-      (true (search "No existing trip to pool" (second reply))))))
+      (ok (listp reply))
+      (ok (= 2 (length reply)))
+      (ok (search "Interpreted as: `/book BW to the pool tomorrow`" (first reply)))
+      (ok (search "No existing trip to pool" (second reply))))))
 
-(define-test timing-questions
-  :parent slack-bot-suite
+(deftest timing-questions
   ;; A question about a trip's timing that names no passengers is a /view of
   ;; the day it names, decided by the rule parser alone: the model is not
   ;; asked and nothing is booked.
@@ -812,25 +698,25 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                                (format t "TABLE for ~a" range)
                                "ignored")))
       (let ((reply (sb::run-request "when is my ride home this coming tuesday")))
-        (true (listp reply))
-        (is = 2 (length reply))
-        (true (search "Interpreted as: `/view this coming tuesday`" (first reply)))
-        (is string= "TABLE for this coming tuesday" (second reply)))
-      (is equal '("this coming tuesday") ranges)
+        (ok (listp reply))
+        (ok (= 2 (length reply)))
+        (ok (search "Interpreted as: `/view this coming tuesday`" (first reply)))
+        (ok (string= "TABLE for this coming tuesday" (second reply))))
+      (ok (equal '("this coming tuesday") ranges))
       (setf ranges '())
       (sb::run-request "when is my van home this tuesday")
-      (is equal '("this tuesday") ranges)
+      (ok (equal '("this tuesday") ranges))
       ;; no day named: today, as with a bare /view
       (setf ranges '())
       (sb::run-request "what time does the van leave?")
-      (is equal '("today") ranges)
-      (is = 0 asked)
-      (is equal '() booked)
+      (ok (equal '("today") ranges))
+      (ok (= 0 asked))
+      (ok (equal '() booked))
       ;; passengers make it a booking phrased as a question: the ordinary path
       (let ((reply (sb::run-request "when can BW and MM have the van for the dentist tomorrow?")))
-        (true (stringp reply))
-        (true (search "Please re-send" reply)))
-      (is equal '("when can BW and MM have the van for the dentist tomorrow?") booked)
+        (ok (stringp reply))
+        (ok (search "Please re-send" reply)))
+      (ok (equal '("when can BW and MM have the van for the dentist tomorrow?") booked))
       ;; An explicit /book never turns into a view.  Its "my" is resolved to
       ;; the sender first, so the text that reaches BOOK-NATURAL names them.
       (setf ranges '() booked '())
@@ -838,10 +724,10 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                                (lambda (uid) (declare (ignore uid)) (values "DMM" :registered nil))))
         (let ((reply (sb::cmd-book (make-params "user_id" "U1"
                                                "text" "when is my ride home tuesday"))))
-          (true (stringp reply))
-          (true (search "Please re-send" reply)))
-        (is equal '() ranges)
-        (is equal '("when is DMM ride home tuesday") booked))
+          (ok (stringp reply))
+          (ok (search "Please re-send" reply)))
+        (ok (equal '() ranges))
+        (ok (equal '("when is DMM ride home tuesday") booked)))
       ;; The same /book from someone the bot cannot name asks for /iam and
       ;; runs no booking at all, rather than guessing a passenger.
       (setf booked '())
@@ -849,46 +735,44 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                                (lambda (uid) (declare (ignore uid)) (values nil nil nil))))
         (let ((reply (sb::cmd-book (make-params "user_id" "U1"
                                                "text" "when is my ride home tuesday"))))
-          (true (stringp reply))
-          (true (search "/iam" reply)))
-        (is equal '() booked))
+          (ok (stringp reply))
+          (ok (search "/iam" reply)))
+        (ok (equal '() booked)))
       ;; /view itself takes the question, a plain range as before, and passes
       ;; anything else through for VIEW-SCHEDULE to reject
       (setf ranges '())
       (sb::cmd-view (make-params "text" "when is my ride home tuesday"))
       (sb::cmd-view (make-params "text" "tomorrow"))
       (sb::cmd-view (make-params "text" "xyzzy"))
-      (is equal '("xyzzy" "tomorrow" "tuesday") ranges)
+      (ok (equal '("xyzzy" "tomorrow" "tuesday") ranges))
       ;; through a message event: the interpretation is posted, then the table
       (let ((posted '()))
         (with-mocked-functions ((sb::post-slack-message
                                  (lambda (channel text) (declare (ignore channel)) (push text posted))))
           (bt:join-thread (sb::handle-message-event
                            (message-event "text" "when is my van home on monday" "channel" "C1")))
-          (is = 2 (length posted))
-          (true (search "Interpreted as: `/view monday`" (second posted)))
-          (is string= "TABLE for monday" (first posted))))))
-  (true (search "when is my ride home" sb::+help-text+)))
+          (ok (= 2 (length posted)))
+          (ok (search "Interpreted as: `/view monday`" (second posted)))
+          (ok (string= "TABLE for monday" (first posted)))))))
+  (ok (search "when is my ride home" sb::+help-text+)))
 
-(define-test parse-slash-text
-  :parent slack-bot-suite
+(deftest parse-slash-text
   (multiple-value-bind (cmd args) (sb::parse-slash-text "/view")
-    (is string= "/view" cmd)
-    (is string= "" args))
+    (ok (string= "/view" cmd))
+    (ok (string= "" args)))
   (multiple-value-bind (cmd args) (sb::parse-slash-text "/view  this week and next week ")
-    (is string= "/view" cmd)
-    (is string= "this week and next week" args))
+    (ok (string= "/view" cmd))
+    (ok (string= "this week and next week" args)))
   ;; an argument line may itself span lines
   (multiple-value-bind (cmd args) (sb::parse-slash-text (format nil "/book a van~%for MM"))
-    (is string= "/book" cmd)
-    (is string= (format nil "a van~%for MM") args))
+    (ok (string= "/book" cmd))
+    (ok (string= (format nil "a van~%for MM") args)))
   ;; plain requests, and a slash that is not a command word, stay bookings
-  (false (sb::parse-slash-text "book a van for MM"))
-  (false (sb::parse-slash-text "9/4 trip to town"))
-  (false (sb::parse-slash-text "/ view")))
+  (ng (sb::parse-slash-text "book a van for MM"))
+  (ng (sb::parse-slash-text "9/4 trip to town"))
+  (ng (sb::parse-slash-text "/ view")))
 
-(define-test message-event-slash-commands
-  :parent slack-bot-suite
+(deftest message-event-slash-commands
   ;; A client that does not expand slash commands sends "/view" as message
   ;; text; it must show the schedule, not book a trip to "view".
   (let ((posted '())
@@ -904,26 +788,25 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                                (format t "TABLE for ~a" range) "ignored")))
       (bt:join-thread (sb::handle-message-event
                        (message-event "text" "/view" "channel" "C1" "user" "U1")))
-      (is = 0 (length booked))
-      (is string= "C1" (car (first posted)))
-      (true (search "TABLE for today" (cdr (first posted))))
+      (ok (= 0 (length booked)))
+      (ok (string= "C1" (car (first posted))))
+      (ok (search "TABLE for today" (cdr (first posted))))
       ;; the rest of the line is the date range, mention prefix and all
       (bt:join-thread (sb::handle-message-event
                        (message-event "text" "<@U9> /view tomorrow" "channel" "C1" "user" "U1")))
-      (true (search "TABLE for tomorrow" (cdr (first posted))))
-      (is = 0 (length booked))
+      (ok (search "TABLE for tomorrow" (cdr (first posted))))
+      (ok (= 0 (length booked)))
       ;; /book still books, with the command word stripped
       (bt:join-thread (sb::handle-message-event
                        (message-event "text" "/book for the pool" "channel" "C1" "user" "U1")))
-      (is equal '("for the pool") booked)
+      (ok (equal '("for the pool") booked))
       ;; a mistyped command is named rather than booked
-      (false (sb::handle-message-event
-              (message-event "text" "/vew tomorrow" "channel" "C1" "user" "U1")))
-      (is equal '("for the pool") booked)
-      (true (search "Unknown command: /vew" (cdr (first posted)))))))
+      (ng (sb::handle-message-event
+           (message-event "text" "/vew tomorrow" "channel" "C1" "user" "U1")))
+      (ok (equal '("for the pool") booked))
+      (ok (search "Unknown command: /vew" (cdr (first posted)))))))
 
-(define-test message-event-subscribe-uses-event-user
-  :parent slack-bot-suite
+(deftest message-event-subscribe-uses-event-user
   ;; /subscribe as message text identifies the user from the event, since
   ;; there is no slash-command payload to carry user_id.
   (let ((posted '())
@@ -941,16 +824,15 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                                (declare (ignore user-id initial)) t)))
       (bt:join-thread (sb::handle-message-event
                        (message-event "text" "/subscribe BW" "channel" "D1" "user" "U7")))
-      (is equal '(("U7" . "BW")) subscribed)
+      (ok (equal '(("U7" . "BW")) subscribed))
       ;; the reply goes back to the conversation the message came from
-      (is string= "D1" (car (first posted)))
-      (true (search "Subscribed" (cdr (first posted))))
+      (ok (string= "D1" (car (first posted))))
+      (ok (search "Subscribed" (cdr (first posted))))
       ;; ... and says how far ahead the reminders come
-      (true (search "30 minutes before each departure or return that BW drives"
-                    (cdr (first posted)))))))
+      (ok (search "30 minutes before each departure or return that BW drives"
+                  (cdr (first posted)))))))
 
-(define-test scheduler-tick-window
-  :parent slack-bot-suite
+(deftest scheduler-tick-window
   ;; A leg is due from *REMINDER-LEAD-MINUTES* plus the minute between sweeps
   ;; until it leaves: with the lead at 30 minutes, 0 to 1860 seconds ahead.
   (let* ((trip (vb:make-trip :day "Monday" :vehicle :dgh :destination "SHMS"
@@ -977,53 +859,52 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                              (lambda (channel text) (push (cons channel text) posted))))
       ;; inside the window -> one DM to the subscriber
       (sb::scheduler-tick)
-      (is = 1 (length posted))
-      (is string= "U1" (car (first posted)))
-      (is string= "reminder for BW" (cdr (first posted)))
+      (ok (= 1 (length posted)))
+      (ok (string= "U1" (car (first posted))))
+      (ok (string= "reminder for BW" (cdr (first posted))))
       ;; the same trip on the next tick is deduplicated
       (sb::scheduler-tick)
-      (is = 1 (length posted))
+      (ok (= 1 (length posted)))
       ;; outside the window (too far ahead, or already departed) -> nothing
       (clrhash sb::*sent-reminders*)
       (setf dep-offset 1900)
       (sb::scheduler-tick)
-      (is = 1 (length posted))
+      (ok (= 1 (length posted)))
       (setf dep-offset -10)
       (sb::scheduler-tick)
-      (is = 1 (length posted))
+      (ok (= 1 (length posted)))
       ;; the window's far edge is inclusive
       (setf dep-offset 1855)
       (sb::scheduler-tick)
-      (is = 2 (length posted))
+      (ok (= 2 (length posted)))
       ;; the lead is half an hour, not the five minutes it used to be: a
       ;; departure 20 minutes off is already due
       (clrhash sb::*sent-reminders*)
       (setf dep-offset 1200)
       (sb::scheduler-tick)
-      (is = 3 (length posted))
+      (ok (= 3 (length posted)))
       ;; ... and it is whatever *REMINDER-LEAD-MINUTES* says
       (clrhash sb::*sent-reminders*)
       (let ((sb::*reminder-lead-minutes* 10))
         (sb::scheduler-tick)
-        (is = 3 (length posted))
+        (ok (= 3 (length posted)))
         (setf dep-offset 650)
         (sb::scheduler-tick)
-        (is = 4 (length posted)))
+        (ok (= 4 (length posted))))
       ;; a trip without a parseable departure is skipped
       (clrhash sb::*sent-reminders*)
       (with-mocked-functions ((vb:trip-departure-universal-time (lambda (tr) (declare (ignore tr)) nil)))
         (sb::scheduler-tick)
-        (is = 4 (length posted))))
+        (ok (= 4 (length posted)))))
     ;; errors for one subscription are logged, not raised
     (with-mocked-functions ((db:all-slack-subscriptions (lambda () '(("U1" . "BW"))))
                             (vb:trips-for-driver-today (lambda (initial) (declare (ignore initial))
                                                          (error "sheet unavailable"))))
       (let ((*error-output* (make-string-output-stream)))
-        (finish (sb::scheduler-tick))
-        (true (search "sheet unavailable" (get-output-stream-string *error-output*)))))))
+        (ok (progn (sb::scheduler-tick) t))
+        (ok (search "sheet unavailable" (get-output-stream-string *error-output*)))))))
 
-(define-test scheduler-tick-return-leg
-  :parent slack-bot-suite
+(deftest scheduler-tick-return-leg
   ;; The driver of the return is reminded before the return time, apart from
   ;; the departure: the two legs of one trip are deduplicated separately.
   (let* ((trip (vb:make-trip :day "Thursday" :vehicle :dgh :destination "SHMS"
@@ -1056,30 +937,29 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
         ;; both legs in the window -> two DMs, the return one worded by
         ;; REMIND-RETURN-DRIVER and naming the vehicle to drive
         (sb::scheduler-tick)
-        (is = 2 (length posted))
-        (true (find "departure for BW" posted :key #'cdr :test #'string=))
-        (true (find "BW is the driver of the DGH for the return from SHMS at 12 pm and DM, CG are passengers."
-                    posted :key #'cdr :test #'string=))
+        (ok (= 2 (length posted)))
+        (ok (find "departure for BW" posted :key #'cdr :test #'string=))
+        (ok (find "BW is the driver of the DGH for the return from SHMS at 12 pm and DM, CG are passengers."
+                  posted :key #'cdr :test #'string=))
         ;; neither leg repeats on the next tick
         (sb::scheduler-tick)
-        (is = 2 (length posted))
+        (ok (= 2 (length posted)))
         ;; a return still far off waits, while a new day's departure goes out
         (clrhash sb::*sent-reminders*)
         (setf ret-offset 3600)
         (sb::scheduler-tick)
-        (is = 3 (length posted))
-        (is string= "departure for BW" (cdr (first posted)))))))
+        (ok (= 3 (length posted)))
+        (ok (string= "departure for BW" (cdr (first posted))))))))
 
-(define-test reminder-key-shape
-  :parent slack-bot-suite
+(deftest reminder-key-shape
   (let ((a (vb:make-trip :vehicle :dgh :block-start-row 3))
         (b (vb:make-trip :vehicle :lgh :block-start-row 3))
         (c (vb:make-trip :vehicle :dgh :block-start-row 18)))
-    (is equal (sb::reminder-key "U1" a) (sb::reminder-key "U1" a))
-    (false (equal (sb::reminder-key "U1" a) (sb::reminder-key "U2" a)))
-    (false (equal (sb::reminder-key "U1" a) (sb::reminder-key "U1" b)))
-    (false (equal (sb::reminder-key "U1" a) (sb::reminder-key "U1" c)))
-    (is = (sb::today-date-key) (fourth (sb::reminder-key "U1" a)))))
+    (ok (equal (sb::reminder-key "U1" a) (sb::reminder-key "U1" a)))
+    (ng (equal (sb::reminder-key "U1" a) (sb::reminder-key "U2" a)))
+    (ng (equal (sb::reminder-key "U1" a) (sb::reminder-key "U1" b)))
+    (ng (equal (sb::reminder-key "U1" a) (sb::reminder-key "U1" c)))
+    (ok (= (sb::today-date-key) (fourth (sb::reminder-key "U1" a))))))
 
 ;;; --- Sender identity: who "me" is ---------------------------------------
 ;;;
@@ -1089,64 +969,61 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
 ;;; and from the Slack profile otherwise; a guess is announced in the reply
 ;;; and never persisted.
 
-(define-test derive-initials-from-a-name
-  :parent slack-bot-suite
+(deftest derive-initials-from-a-name
   ;; The cases this was built for: three-letter initials that include a title.
-  (is string= "DMM" (sb::derive-initials "Deacon Matt Marin"))
-  (is string= "FBM" (sb::derive-initials "Fr Bob Marin"))
-  (is string= "CG"  (sb::derive-initials "Cassian Gray"))
+  (ok (string= "DMM" (sb::derive-initials "Deacon Matt Marin")))
+  (ok (string= "FBM" (sb::derive-initials "Fr Bob Marin")))
+  (ok (string= "CG"  (sb::derive-initials "Cassian Gray")))
   ;; Punctuation between the parts is ignored, so "Ben H. W." still yields
   ;; three letters -- wrong for someone who signs BW, which is exactly why a
   ;; derived guess is announced rather than stored.
-  (is string= "BHW" (sb::derive-initials "Ben H. W."))
+  (ok (string= "BHW" (sb::derive-initials "Ben H. W.")))
   ;; A display name that is already initials is taken as it stands.
-  (is string= "DMM" (sb::derive-initials "dmm"))
-  (is string= "DMM" (sb::derive-initials "DMM"))
-  (is string= "CG"  (sb::derive-initials "  CG  "))
+  (ok (string= "DMM" (sb::derive-initials "dmm")))
+  (ok (string= "DMM" (sb::derive-initials "DMM")))
+  (ok (string= "CG"  (sb::derive-initials "  CG  ")))
   ;; Pronouns and status markers are not part of a name.
-  (is string= "MM"  (sb::derive-initials "Matt Marin (he/him)"))
+  (ok (string= "MM"  (sb::derive-initials "Matt Marin (he/him)")))
   ;; Anything that would not produce 2-3 letters is refused rather than
   ;; guessed at; the caller then asks for /iam.
-  (false (sb::derive-initials "Madonna"))
-  (false (sb::derive-initials "Juan Carlos de la Cruz Smith"))
-  (false (sb::derive-initials ""))
-  (false (sb::derive-initials nil))
+  (ng (sb::derive-initials "Madonna"))
+  (ng (sb::derive-initials "Juan Carlos de la Cruz Smith"))
+  (ng (sb::derive-initials ""))
+  (ng (sb::derive-initials nil))
   ;; Accented letters are letters.  Splitting on [A-Za-z] instead cut
   ;; "Garcia"-with-an-accent in two and turned a two-word name into a
   ;; well-formed but wrong three-letter guess, which is the one failure
   ;; nothing downstream could have caught.  This workspace really does hold a
   ;; "Marin" spelled with an accent.
-  (is string= "JG"  (sb::derive-initials "Jose Garcia"))
-  (is string= "JG"  (sb::derive-initials (format nil "Jos~c Garc~ca" #\LATIN_SMALL_LETTER_E_WITH_ACUTE
-                                                 #\LATIN_SMALL_LETTER_I_WITH_ACUTE)))
-  (is string= "MMC" (sb::derive-initials (format nil "Matt Mar~cn, CC"
-                                                 #\LATIN_SMALL_LETTER_I_WITH_ACUTE)))
+  (ok (string= "JG"  (sb::derive-initials "Jose Garcia")))
+  (ok (string= "JG"  (sb::derive-initials (format nil "Jos~c Garc~ca" #\LATIN_SMALL_LETTER_E_WITH_ACUTE
+                                                  #\LATIN_SMALL_LETTER_I_WITH_ACUTE))))
+  (ok (string= "MMC" (sb::derive-initials (format nil "Matt Mar~cn, CC"
+                                                  #\LATIN_SMALL_LETTER_I_WITH_ACUTE))))
   ;; ...but an initial the sheet could not hold is no guess at all: both
   ;; readers of an initial require plain A-Z, so a name yielding one outside
   ;; that shape asks for /iam rather than producing a passenger nothing will
   ;; recognise.
-  (false (sb::derive-initials (format nil "Fr. ~ctienne Dubois"
-                                      #\LATIN_CAPITAL_LETTER_E_WITH_ACUTE))))
+  (ng (sb::derive-initials (format nil "Fr. ~ctienne Dubois"
+                                   #\LATIN_CAPITAL_LETTER_E_WITH_ACUTE))))
 
-(define-test parse-initial-argument-is-strict
-  :parent slack-bot-suite
+(deftest parse-initial-argument-is-strict
   ;; A lone word is accepted in any case, so a phone that eats capitals still
   ;; registers someone.
-  (is string= "DMM" (sb::parse-initial-argument "dmm"))
-  (is string= "DMM" (sb::parse-initial-argument "  DMM "))
-  (is string= "CG"  (sb::parse-initial-argument "cg"))
+  (ok (string= "DMM" (sb::parse-initial-argument "dmm")))
+  (ok (string= "DMM" (sb::parse-initial-argument "  DMM ")))
+  (ok (string= "CG"  (sb::parse-initial-argument "cg")))
   ;; A lone word of the wrong length is refused outright rather than trimmed
   ;; to its first three letters, which would have registered DMM for DMMM.
-  (false (sb::parse-initial-argument "DMMM"))
-  (false (sb::parse-initial-argument "toolongname"))
-  (false (sb::parse-initial-argument "x"))
-  (false (sb::parse-initial-argument ""))
-  (false (sb::parse-initial-argument nil))
+  (ng (sb::parse-initial-argument "DMMM"))
+  (ng (sb::parse-initial-argument "toolongname"))
+  (ng (sb::parse-initial-argument "x"))
+  (ng (sb::parse-initial-argument ""))
+  (ng (sb::parse-initial-argument nil))
   ;; A sentence still falls back to scanning for an uppercase run.
-  (is string= "BW" (sb::parse-initial-argument "my initials are BW")))
+  (ok (string= "BW" (sb::parse-initial-argument "my initials are BW"))))
 
-(define-test sender-initials-prefers-registration
-  :parent slack-bot-suite
+(deftest sender-initials-prefers-registration
   (with-temp-database
       (with-mocked-functions ((sb::slack-user-names
                                (lambda (uid)
@@ -1155,32 +1032,30 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
         ;; With nothing registered, the Slack profile is the source, and the
         ;; name it came from is returned so the reply can show its working.
         (multiple-value-bind (initial source name) (sb::sender-initials +test-user-id+)
-          (is string= "DMM" initial)
-          (is eq :derived source)
-          (is string= "Deacon Matt Marin" name))
+          (ok (string= "DMM" initial))
+          (ok (eq :derived source))
+          (ok (string= "Deacon Matt Marin" name)))
         ;; A registration wins over the guess, and reports no name.
         (db:add-slack-identity +test-user-id+ "FBM")
         (multiple-value-bind (initial source name) (sb::sender-initials +test-user-id+)
-          (is string= "FBM" initial)
-          (is eq :registered source)
-          (false name))))
+          (ok (string= "FBM" initial))
+          (ok (eq :registered source))
+          (ng name))))
   ;; No user at all (a payload without user_id) resolves to nobody.
-  (false (sb::sender-initials nil)))
+  (ng (sb::sender-initials nil)))
 
-(define-test sender-initials-when-nothing-works
-  :parent slack-bot-suite
+(deftest sender-initials-when-nothing-works
   (with-temp-database
       (with-mocked-functions ((sb::slack-user-names
                                (lambda (uid) (declare (ignore uid)) (values nil "Madonna"))))
-        (false (sb::sender-initials +test-user-id+)))
+        (ng (sb::sender-initials +test-user-id+)))
     ;; A users.info that fails outright (no scope, network down) is not an
     ;; error, just an unknown sender.
     (with-mocked-functions ((sb::slack-user-names
                              (lambda (uid) (declare (ignore uid)) (values nil nil))))
-      (false (sb::sender-initials +test-user-id+)))))
+      (ng (sb::sender-initials +test-user-id+)))))
 
-(define-test resolve-sender-rewrites-and-announces
-  :parent slack-bot-suite
+(deftest resolve-sender-rewrites-and-announces
   (with-temp-database
       (with-mocked-functions ((sb::slack-user-names
                                (lambda (uid)
@@ -1190,17 +1065,17 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
         (db:add-slack-identity +test-user-id+ "DMM")
         (multiple-value-bind (text notice)
             (sb::resolve-sender "book me a van to the pool" +test-user-id+)
-          (is string= "book DMM a van to the pool" text)
-          (false notice))
+          (ok (string= "book DMM a van to the pool" text))
+          (ng notice))
         ;; Derived: rewritten, but the reply must say where the name came from.
         (db:remove-slack-identity +test-user-id+)
         (multiple-value-bind (text notice)
             (sb::resolve-sender "book me a van to the pool" +test-user-id+)
-          (is string= "book DMM a van to the pool" text)
-          (true notice)
-          (true (search "DMM" notice))
-          (true (search "Deacon Matt Marin" notice))
-          (true (search "/iam" notice)))
+          (ok (string= "book DMM a van to the pool" text))
+          (ok notice)
+          (ok (search "DMM" notice))
+          (ok (search "Deacon Matt Marin" notice))
+          (ok (search "/iam" notice)))
         ;; A message that names nobody is returned untouched, and must not
         ;; cost a lookup: SLACK-USER-NAMES is mocked to fail the test if hit.
         (with-mocked-functions ((sb::slack-user-names
@@ -1210,20 +1085,18 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                                    (values nil nil))))
           (multiple-value-bind (text notice)
               (sb::resolve-sender "book a van for CG and DMM" +test-user-id+)
-            (is string= "book a van for CG and DMM" text)
-            (false notice))))))
+            (ok (string= "book a van for CG and DMM" text))
+            (ng notice))))))
 
-(define-test resolve-sender-gives-up-on-an-unknown-sender
-  :parent slack-bot-suite
+(deftest resolve-sender-gives-up-on-an-unknown-sender
   (with-temp-database
       (with-mocked-functions ((sb::slack-user-names
                                (lambda (uid) (declare (ignore uid)) (values nil "Madonna"))))
         ;; NIL, not the original text: the caller must refuse rather than let
         ;; a message with an unresolved "me" reach the sheet.
-        (false (sb::resolve-sender "book me a van to the pool" +test-user-id+)))))
+        (ng (sb::resolve-sender "book me a van to the pool" +test-user-id+)))))
 
-(define-test cmd-iam-registers-and-reports
-  :parent slack-bot-suite
+(deftest cmd-iam-registers-and-reports
   (with-temp-database
       (with-mocked-functions ((sb::slack-user-names
                                (lambda (uid)
@@ -1231,41 +1104,39 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                                  (values nil "Deacon Matt Marin"))))
         ;; Bare /iam before registering offers the guess to confirm.
         (let ((reply (sb::cmd-iam (make-params "user_id" +test-user-id+ "text" ""))))
-          (true (search "not registered" reply))
-          (true (search "DMM" reply)))
+          (ok (search "not registered" reply))
+          (ok (search "DMM" reply)))
         ;; Registering, in lower case.
         (let ((reply (sb::cmd-iam (make-params "user_id" +test-user-id+ "text" "fbm"))))
-          (true (search "FBM" reply)))
-        (is string= "FBM" (db:initial-of (db:find-slack-identity +test-user-id+)))
+          (ok (search "FBM" reply)))
+        (ok (string= "FBM" (db:initial-of (db:find-slack-identity +test-user-id+))))
         ;; Bare /iam afterwards reports the registration.
         (let ((reply (sb::cmd-iam (make-params "user_id" +test-user-id+ "text" ""))))
-          (true (search "registered as" reply))
-          (true (search "FBM" reply)))
+          (ok (search "registered as" reply))
+          (ok (search "FBM" reply)))
         ;; Re-registering replaces.
         (sb::cmd-iam (make-params "user_id" +test-user-id+ "text" "DMM"))
-        (is string= "DMM" (db:initial-of (db:find-slack-identity +test-user-id+)))
+        (ok (string= "DMM" (db:initial-of (db:find-slack-identity +test-user-id+))))
         ;; Junk is refused with usage rather than truncated.
         (let ((reply (sb::cmd-iam (make-params "user_id" +test-user-id+ "text" "DMMM"))))
-          (true (search "Usage" reply)))
-        (is string= "DMM" (db:initial-of (db:find-slack-identity +test-user-id+)))))
-  (true (search "Slack user" (sb::cmd-iam (make-params "text" "DMM")))))
+          (ok (search "Usage" reply)))
+        (ok (string= "DMM" (db:initial-of (db:find-slack-identity +test-user-id+))))))
+  (ok (search "Slack user" (sb::cmd-iam (make-params "text" "DMM")))))
 
-(define-test subscribing-registers-an-identity-that-outlives-it
-  :parent slack-bot-suite
+(deftest subscribing-registers-an-identity-that-outlives-it
   (with-temp-database
       ;; /subscribe says who you are as well as asking for reminders, so
       ;; nobody has to register twice.
       (sb::cmd-subscribe (make-params "user_id" +test-user-id+ "text" "CG"))
-    (is string= "CG" (db:initial-of (db:find-slack-identity +test-user-id+)))
+    (ok (string= "CG" (db:initial-of (db:find-slack-identity +test-user-id+))))
     ;; ...and /unsubscribe gives up the reminders only.  Losing the identity
     ;; here would silently break "book me a van" for anyone who stops their
     ;; DMs, which is why the two are separate vertices.
     (sb::cmd-unsubscribe (make-params "user_id" +test-user-id+))
-    (false (db:find-slack-subscription +test-user-id+))
-    (is string= "CG" (db:initial-of (db:find-slack-identity +test-user-id+)))))
+    (ng (db:find-slack-subscription +test-user-id+))
+    (ok (string= "CG" (db:initial-of (db:find-slack-identity +test-user-id+))))))
 
-(define-test run-request-resolves-me-end-to-end
-  :parent slack-bot-suite
+(deftest run-request-resolves-me-end-to-end
   (with-temp-database
       (with-mocked-functions ((sb::slack-user-names
                                (lambda (uid)
@@ -1279,15 +1150,15 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
         ;; Registered: the booking runs on the rewritten sentence, and the
         ;; reply is the handler's alone.
         (db:add-slack-identity +test-user-id+ "DMM")
-        (is string= "book DMM a van to the pool"
-            (sb::run-request "book me a van to the pool" :user-id +test-user-id+))
+        (ok (string= "book DMM a van to the pool"
+                     (sb::run-request "book me a van to the pool" :user-id +test-user-id+)))
         ;; Derived: same booking, with the notice posted above it.
         (db:remove-slack-identity +test-user-id+)
         (let ((reply (sb::run-request "book me a van to the pool"
                                       :user-id +test-user-id+)))
-          (true (listp reply))
-          (true (search "DMM" (first reply)))
-          (is string= "book DMM a van to the pool" (second reply)))))
+          (ok (listp reply))
+          (ok (search "DMM" (first reply)))
+          (ok (string= "book DMM a van to the pool" (second reply))))))
   ;; Unknown sender: the reply asks for /iam and the booking never runs.
   (with-temp-database
       (with-mocked-functions ((sb::slack-user-names
@@ -1298,15 +1169,14 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                                  (fail "a booking ran for an unidentified sender"))))
         (let ((reply (sb::run-request "book me a van to the pool"
                                       :user-id +test-user-id+)))
-          (true (search "/iam" reply))
-          (true (search "initials" reply))))))
+          (ok (search "/iam" reply))
+          (ok (search "initials" reply))))))
 
-(define-test timing-question-survives-self-resolution
-  :parent slack-bot-suite
-  :description "\"when is my ride home Tuesday?\" is a /view, and stays one.  The rewrite
-has to happen after the timing-question check: SCHEDULE-QUESTION-RANGE only
-answers for a question that names no passengers, and \"when is DMM ride home
-Tuesday?\" names one."
+;; "when is my ride home Tuesday?" is a /view, and stays one.  The rewrite
+;; has to happen after the timing-question check: SCHEDULE-QUESTION-RANGE only
+;; answers for a question that names no passengers, and "when is DMM ride home
+;; Tuesday?" names one.
+(deftest timing-question-survives-self-resolution
   (with-temp-database
       (with-mocked-functions ((sb::slack-user-names
                                (lambda (uid) (declare (ignore uid)) (values nil "Deacon Matt Marin")))
@@ -1314,7 +1184,7 @@ Tuesday?\" names one."
         (db:add-slack-identity +test-user-id+ "DMM")
         (let ((reply (sb::run-request "when is my ride home on Tuesday?"
                                       :user-id +test-user-id+)))
-          (true (listp reply))
-          (true (search "/view" (first reply)))
+          (ok (listp reply))
+          (ok (search "/view" (first reply)))
           ;; The range, not a booking for DMM.
-          (false (search "DMM" (first reply)))))))
+          (ng (search "DMM" (first reply)))))))

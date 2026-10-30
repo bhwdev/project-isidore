@@ -1231,6 +1231,13 @@ written to."
        (apps-script-get (format nil "read the tab ~a" sheet-name)
                         "values" "sheet" sheet-name)))
 
+(defun apps-script-secret ()
+  "The secret every write to the web app carries: the environment variable
+VAN_SCHEDULE_SECRET, which must equal the web app's script property of that
+name.  Reads carry none, since the spreadsheet is public to view."
+  (or (uiop:getenvp "VAN_SCHEDULE_SECRET")
+      (error "VAN_SCHEDULE_SECRET is not set, so the van schedule cannot be written.")))
+
 (defun write-range (range values &key sheet-name)
   "Write VALUES, a list of rows, to RANGE (of the tab SHEET-NAME when given)
 through the web app's doPost."
@@ -1243,7 +1250,8 @@ through the web app's doPost."
                     (list "values" (map 'vector (lambda (row) (coerce row 'vector)) values))
                     :test #'equal))
          (root (alexandria:plist-hash-table
-                (list "arguments" args "body" body-obj) :test #'equal))
+                (list "secret" (apps-script-secret) "arguments" args "body" body-obj)
+                :test #'equal))
          (payload (com.inuoe.jzon:stringify root))
          (url (format nil "~a?spreadsheetId=~a" *apps-script-url* *spreadsheet-id*)))
     ;; A web app answers a POST with a redirect to its reply.

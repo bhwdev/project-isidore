@@ -1707,10 +1707,21 @@ would, and records the URL it was asked for in *URLS*."
 (defun query-parameter (url name)
   (cdr (assoc name (quri:uri-query-params (quri:uri url)) :test #'string=)))
 
+(defun call-with-schedule-secret (secret thunk)
+  "Call THUNK with the environment variable VAN_SCHEDULE_SECRET set to SECRET,
+or, when SECRET is NIL, empty, which APPS-SCRIPT-SECRET takes as unset."
+  (let ((saved (uiop:getenv "VAN_SCHEDULE_SECRET")))
+    (unwind-protect
+         (progn
+           (setf (uiop:getenv "VAN_SCHEDULE_SECRET") (or secret ""))
+           (funcall thunk))
+      (setf (uiop:getenv "VAN_SCHEDULE_SECRET") (or saved "")))))
+
 (deftest sheet-io-tests
   (testing "write-range-payload"
     (let ((requests '()) (*urls* '()))
-      (with-mocked-functions ((dexador:request
+      (with-mocked-functions ((vb::apps-script-secret (constantly "test-secret"))
+                              (dexador:request
                                (lambda (uri &rest args)
                                  (push (list* uri args) requests)
                                  (let ((headers (make-hash-table :test #'equal)))
@@ -1731,11 +1742,13 @@ would, and records the URL it was asked for in *URLS*."
           (let* ((payload (com.inuoe.jzon:parse content))
                  (arguments (gethash "arguments" payload))
                  (body (gethash "body" payload)))
+            (ok (string= "test-secret" (gethash "secret" payload)))
             (ok (string= "Apr 20-26!F4" (gethash "range" arguments)))
             (ok (string= "USER_ENTERED" (gethash "valueInputOption" arguments)))
             (ok (equalp #(#("SHMS")) (gethash "values" body))))))
       ;; without a sheet name the range is unqualified
-      (with-mocked-functions ((dexador:request
+      (with-mocked-functions ((vb::apps-script-secret (constantly "test-secret"))
+                              (dexador:request
                                (lambda (uri &rest args)
                                  (declare (ignore uri))
                                  (push args requests)
@@ -1749,17 +1762,37 @@ would, and records the URL it was asked for in *URLS*."
           (ok (equalp #(#("BW") #("CG")) (gethash "values" (gethash "body" payload))))))))
 
   (testing "write-range-without-redirect-errors"
-    (with-mocked-functions ((dexador:request
+    (with-mocked-functions ((vb::apps-script-secret (constantly "test-secret"))
+                            (dexador:request
                              (lambda (uri &rest args)
                                (declare (ignore uri args))
                                (values "" 200 (make-hash-table :test #'equal)))))
       (ok (signals (vb:write-range "F4" '(("SHMS")) :sheet-name "Apr 20-26") 'error))))
 
+  (testing "write-range-needs-the-secret"
+    ;; The web app refuses a write without it, so none is sent.
+    (let ((requests '()))
+      (with-mocked-functions ((dexador:request
+                               (lambda (uri &rest args)
+                                 (push (list* uri args) requests)
+                                 (values "" 200 (make-hash-table :test #'equal)))))
+        (call-with-schedule-secret
+         nil
+         (lambda ()
+           (ok (signals (vb::apps-script-secret) 'error))
+           (ok (signals (vb:write-range "F4" '(("SHMS")) :sheet-name "Apr 20-26") 'error))
+           (ok (null requests))))
+        (call-with-schedule-secret
+         "from-the-environment"
+         (lambda ()
+           (ok (string= "from-the-environment" (vb::apps-script-secret))))))))
+
   (testing "write-range-error-reply-errors"
     ;; A write the script could not make, e.g. to a protected range, is an
     ;; error rather than a booking that silently did not happen.
     (let ((*urls* '()))
-      (with-mocked-functions ((dexador:request
+      (with-mocked-functions ((vb::apps-script-secret (constantly "test-secret"))
+                              (dexador:request
                                (lambda (uri &rest args)
                                  (declare (ignore uri args))
                                  (let ((headers (make-hash-table :test #'equal)))

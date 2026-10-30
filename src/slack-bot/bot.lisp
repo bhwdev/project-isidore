@@ -92,8 +92,9 @@ For someone who has registered neither, the initials are guessed from their
 Slack profile name (users.info), and the reply says so every time, because a
 guess is never persisted.
 
-Setup: set SLACK_BOT_TOKEN and SLACK_SIGNING_SECRET environment variables,
-and optionally VAN_LLM_URL.  The bot token needs the `users:read` scope for
+Setup: set SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET and VAN_SCHEDULE_SECRET (the
+van schedule web app's, see van-booking.gs) environment variables, and
+optionally VAN_LLM_URL.  The bot token needs the `users:read` scope for
 the profile guess; without it users.info answers \"missing_scope\", which is
 handled like any other failure -- everyone simply has to run /iam once.  See
 the project plan for Slack app configuration details."))

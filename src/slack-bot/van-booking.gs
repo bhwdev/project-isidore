@@ -11,11 +11,15 @@
 //        -> [["cell", ...], ...], every row of the tab from the first to the
 //           last with content, empty rows included, as the sheet displays it
 //   POST ?spreadsheetId=ID
-//        {"arguments": {"range": "NAME!F4:F5", "valueInputOption": "USER_ENTERED"},
+//        {"secret": SECRET,
+//         "arguments": {"range": "NAME!F4:F5", "valueInputOption": "USER_ENTERED"},
 //         "body": {"values": [["BW"], ["CG"]]}}
 //        -> the Sheets API's UpdateValuesResponse
 //
-// Any failure answers {"error": "message"}.  ID must be SPREADSHEET_ID.
+// Any failure answers {"error": "message"}.  ID must be SPREADSHEET_ID, and
+// SECRET the script property VAN_SCHEDULE_SECRET, which the bot has in its
+// environment variable of that name.  Reads need no secret, since the
+// spreadsheet is public to view.
 //
 // Deploying: in an Apps Script project of the account the web app is to run
 // as, replace the code with this file.  The project's manifest (Project
@@ -29,7 +33,9 @@
 // The web app cannot ask for consent itself, so run any function in the
 // editor and grant every permission the consent screen asks for; without it,
 // every request fails with "You do not have permission to call
-// SpreadsheetApp.openById".  The first deployment (Deploy > New deployment, a
+// SpreadsheetApp.openById".  Set the script property VAN_SCHEDULE_SECRET
+// (Project Settings, Script Properties) to the bot's; until it is set, every
+// write is refused.  The first deployment (Deploy > New deployment, a
 // web app executing as "Me", accessible to anyone) gives the /exec URL that
 // van-booking.lisp has in *APPS-SCRIPT-URL*.  Later versions go to the same
 // deployment (Deploy > Manage deployments, edit, "New version"), which keeps
@@ -46,6 +52,19 @@ function spreadsheetId(e) {
     throw new Error('This web app serves only the van schedule');
   }
   return SPREADSHEET_ID;
+}
+
+// Throw unless REQUEST, a parsed POST, carries the secret: only the bot may
+// write.
+function requireSecret(request) {
+  var secret = PropertiesService.getScriptProperties()
+      .getProperty('VAN_SCHEDULE_SECRET');
+  if (!secret) {
+    throw new Error('The script property VAN_SCHEDULE_SECRET is not set');
+  }
+  if (request.secret !== secret) {
+    throw new Error('A write needs the secret');
+  }
 }
 
 function doGet(e) {
@@ -71,6 +90,7 @@ function doGet(e) {
 function doPost(e) {
   return reply(function () {
     var request = JSON.parse(e.postData.contents);
+    requireSecret(request);
     return Sheets.Spreadsheets.Values.update(
       request.body,
       spreadsheetId(e),

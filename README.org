@@ -1,9 +1,9 @@
 * Project Isidore
 
 The third iteration of my personal website. It was quite fun building this with
-Common Lisp circa 2020. LLM agents have since taken over post 2025. Pull
-requests and patches -- see "project-isidore.asd" for the correct mailing
-address -- are most welcome.
+Common Lisp circa 2020-2024. The use of Large Language Models have taken over
+post 2025. Pull requests and patches -- see "project-isidore.asd" for the
+correct mailing address -- are most welcome.
 
 Copyright (c) 2021  Ben H. W. Source code is under the [[https://www.gnu.org/licenses/agpl-3.0-standalone.html][GNU-AGPL-3.0
 License]]. Blog content is available under the [[https://creativecommons.org/licenses/by-sa/4.0/][CC-BY-SA 4.0 License]] unless

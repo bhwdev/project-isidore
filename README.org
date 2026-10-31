@@ -1,7 +1,7 @@
 * Project Isidore
 
 The third iteration of my personal website. It was quite fun building this with
-Common Lisp circa 2020-2024. The use of Large Language Models have taken over
+Common Lisp circa 2020-2024. The use of Large Language Models has taken over
 post 2025. Pull requests and patches -- see "project-isidore.asd" for the
 correct mailing address -- are most welcome.
 

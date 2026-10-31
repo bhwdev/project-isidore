@@ -711,3 +711,46 @@ new parser's terms (no articles in destinations, no default day).")
     (ok (member :passengers (bn:booking-request-missing req))))
   (let ((req (bn:parse-booking "MY RIDE TO SHMS TOMORROW 8 TO 10 AM")))
     (ng (bn:booking-request-passengers req))))
+
+(deftest revise-booking
+  ;; The answer `edit ...` to a booking's confirmation: each piece it names
+  ;; replaces the request's, and the rest stand.
+  (let ((base (bn:parse-booking "BW and MM to the pool on April 9 7-9pm")))
+    (flet ((revise (text)
+             (bn:revise-booking base text :known-initials '("GG")
+                                          :known-destinations '("SHMS")))
+           (fields (req)
+             (list (bn:booking-request-destination req)
+                   (bn:booking-request-passengers req)
+                   (bn:booking-request-dep-time req)
+                   (bn:booking-request-ret-time req)
+                   (bn:booking-request-vehicle req))))
+      (multiple-value-bind (req changed) (revise "8 to 10pm")
+        (ok (equal '(:dep-time :ret-time) changed))
+        (ok (equal '("pool" ("BW" "MM") "8:00 pm" "10:00 pm" nil) (fields req))))
+      ;; a lone time is read against the one it pairs with
+      (ok (equal '("7:00 pm" "10:00 pm") (subseq (fields (revise "back at 10")) 2 4)))
+      (ok (equal '("8:00 pm" "9:00 pm") (subseq (fields (revise "leaving at 8")) 2 4)))
+      ;; ...but an am or pm the edit says is kept
+      (ok (equal '("7:00 pm" "10:00 am") (subseq (fields (revise "back at 10 am")) 2 4)))
+      (ok (eq :lgh (bn:booking-request-vehicle (revise "take the LGH"))))
+      (ok (string= (month-day-string "April 10")
+                   (string-downcase (bn:booking-request-day (revise "April 10")))))
+      ;; passengers named replace the list; "add" puts them on it
+      (ok (equal '("GG") (bn:booking-request-passengers (revise "for gg"))))
+      (ok (equal '("BW" "MM" "GG") (bn:booking-request-passengers (revise "add GG"))))
+      (ok (equal '("BW" "MM" "GG") (bn:booking-request-passengers (revise "add GG and BW"))))
+      ;; a destination needs a cue: leftover words are not one
+      (ok (string= "dentist" (bn:booking-request-destination (revise "to the dentist"))))
+      (ok (string= "SHMS" (bn:booking-request-destination (revise "the SHMS trip"))))
+      (multiple-value-bind (req changed) (revise "back by 11 instead")
+        (ok (equal '(:ret-time) changed))
+        (ok (string= "pool" (bn:booking-request-destination req))))
+      ;; an edit that names nothing changes nothing
+      (dolist (text '("" "please" "change it"))
+        (multiple-value-bind (req changed) (revise text)
+          (ng changed text)
+          (ok (eq base req) text)))
+      ;; the request it was given is left alone
+      (ok (equal '("pool" ("BW" "MM") "7:00 pm" "9:00 pm" nil) (fields base)))
+      (ok (null (bn:booking-request-missing (revise "take the LGH")))))))

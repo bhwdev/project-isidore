@@ -312,9 +312,26 @@ by date, so they neither depend on the live spreadsheet's tabs nor fetch them.")
   (testing "substring-match"
     (let ((trips (sample-trips)))
       (ok (= 2 (length (vb::find-trips trips :day "April 20"))))
-      ;; a bare "April 2" is a prefix of every April 2x day
-      (ok (= 4 (length (vb::find-trips trips :day "April 2"))))
       (ok (= 1 (length (vb::find-trips trips :destination "Shr"))))))
+
+  (testing "a-day-does-not-stop-inside-a-number"
+    ;; "April 2" is not April 20-22, and the 1st is not the 15th two weeks
+    ;; on: both tabs are read when a booking searches every week.
+    (let ((trips (append (sample-trips)
+                         (list (make-trip :day "Sunday November 1" :vehicle :dgh
+                                          :destination "SHMS")
+                               (make-trip :day "Sunday November 15" :vehicle :dgh
+                                          :destination "SHMS")))))
+      (ok (= 0 (length (vb::find-trips trips :day "April 2"))))
+      (let ((found (vb::find-trips trips :day "Sunday November 1")))
+        (ok (= 1 (length found)))
+        (ok (string= "Sunday November 1" (trip-day (first found)))))
+      (ok (= 1 (length (vb::find-trips trips :day "Sunday November 15"))))
+      ;; text after the day still matches, as long as it is not a digit
+      (ok (= 1 (length (vb::find-trips (list (make-trip :day "Thursday April 9th"))
+                                       :day "Thursday April 9"))))
+      ;; and a trip with no day is never found by one
+      (ok (= 0 (length (vb::find-trips (list (make-trip)) :day "Monday"))))))
 
   (testing "no-filters"
     (ok (= 4 (length (vb::find-trips (sample-trips))))))
@@ -1224,7 +1241,7 @@ writes needs one: the sheet being written is re-read immediately beforehand
           (call-recording-writes
            (lambda () (vb:book "Thursday April 9" "SHMS" '("GG") :trips trips))
            :sheet (sheet-with-shms))
-        (ok (search "Found 1 existing trip" out))
+        (ok (search "Added GG to DGH SHMS trip" out))
         ;; MM already occupies row 7, so GG goes to row 8 in both columns
         (ok (equal '(("F8:F8" (("GG")) "test-sheet")
                      ("G8:G8" (("GG")) "test-sheet"))
@@ -1612,7 +1629,7 @@ BOOKING-INCOMPLETE signalled, if any."
                            (make-block (fixture-header) '(:dgh "SHMS")
                                        '(:dgh ("8:35 am" "10:30 am"))
                                        '(:dgh (("MM") ("MM"))))))
-      (ok (search "Found 1 existing trip" out))
+      (ok (search "Added GG to DGH SHMS trip" out))
       (ok (equal '(("F8:F8" (("GG")) "Apr 6-12")
                    ("G8:G8" (("GG")) "Apr 6-12"))
                  writes))))
@@ -1626,7 +1643,7 @@ BOOKING-INCOMPLETE signalled, if any."
                            (make-block (fixture-header) '(:lgh "Saint Mary's Church")
                                        '(:lgh ("5:00 pm" "8:00 pm"))
                                        '(:lgh (("MK") ("MK"))))))
-      (ok (search "Found 1 existing trip" out))
+      (ok (search "Added MM to LGH Saint Mary's Church trip" out))
       (ok (equal '("I8:I8" "J8:J8") (mapcar #'first writes)))))
 
   (testing "skips-passengers-already-on-the-trip"
@@ -1684,7 +1701,7 @@ BOOKING-INCOMPLETE signalled, if any."
                           :registered-initials '("BW"))
       (declare (ignore reads))
       (ng condition)
-      (ok (search "Found 1 existing trip" out))
+      (ok (search "Added BW to DGH SHMS trip" out))
       (ok (equal '(("F8:F8" (("BW")) "Apr 6-12")
                    ("G8:G8" (("BW")) "Apr 6-12"))
                  writes))))
@@ -1737,18 +1754,20 @@ BOOKING-INCOMPLETE signalled, if any."
       (ok (equal '(:ret-time) (bn:booking-incomplete-missing condition)))
       (ok (string= "8:00 am" (getf (bn:booking-incomplete-understood condition) :dep-time)))))
 
-  (testing "book-natural-calls-book"
-    ;; The parsed pieces reach BOOK in the sheet's formats, with the
-    ;; pre-fetched trips passed through.
+  (testing "book-natural-calls-propose-booking"
+    ;; The parsed pieces reach PROPOSE-BOOKING in the sheet's formats, with
+    ;; the pre-fetched trips passed through.
     (let ((book-args nil))
       (with-mocked-functions ((vb::fetch-all-trips (lambda (&key week) (declare (ignore week))
                                                      (list (make-trip :destination "Pool"
                                                                       :dep-passengers '("CG")))))
-                              (vb::book (lambda (day dest pax &key dep-time ret-time vehicle week trips)
-                                          (setf book-args (list :day day :dest dest :pax pax
-                                                                :dep dep-time :ret ret-time
-                                                                :vehicle vehicle :week week
-                                                                :trips trips)))))
+                              (vb:propose-booking
+                               (lambda (day dest pax &key dep-time ret-time vehicle week trips)
+                                 (declare (ignore week))
+                                 (setf book-args (list :day day :dest dest :pax pax
+                                                       :dep dep-time :ret ret-time
+                                                       :vehicle vehicle :trips trips))
+                                 nil)))
         (vb:book-natural
          "I want to book the DGH for the pool next week Tuesday for cg and BW at seven PM to nine PM"
          :week "Apr 6-12")
@@ -1758,8 +1777,186 @@ BOOKING-INCOMPLETE signalled, if any."
         (ok (string= "7:00 pm" (getf book-args :dep)))
         (ok (string= "9:00 pm" (getf book-args :ret)))
         (ok (eq :dgh (getf book-args :vehicle)))
-        (ok (string= "Apr 6-12" (getf book-args :week)))
         (ok (= 1 (length (getf book-args :trips))))))))
+
+(deftest proposal-tests
+  ;; PROPOSE-BOOKING decides what BOOK would write and writes nothing;
+  ;; COMMIT-BOOKING writes it, after re-reading the sheet.  Fixtures as in
+  ;; BOOK-TESTS: one block for "Thursday April 9" from sheet row 3.
+  (testing "a-new-booking-is-proposed-then-written"
+    (let ((trips (vb::parse-schedule (empty-sheet) :sheet-name "test-sheet"))
+          (proposal nil))
+      (multiple-value-bind (out writes reads)
+          (call-recording-writes
+           (lambda ()
+             (setf proposal (vb:propose-booking "Thursday April 9" "Dentist" '("BW" "CG")
+                                                :dep-time "8:00 am" :ret-time "10:00 am"
+                                                :trips trips)))
+           :sheet (empty-sheet))
+        (ok (string= "" out))
+        (ok (equal '() writes))
+        (ok (equal '() reads)))
+      (ok (eq :create (vb:proposal-action proposal)))
+      (ok (vb:proposal-clash-checked-p proposal))
+      (let ((view (vb:proposal-trip-view proposal)))
+        (ok (search "DGH" view))
+        (ok (search "Dentist" view))
+        (ok (search "8:00 am" view))
+        (ok (search "BW, CG" view)))
+      ;; nothing is booked that day yet
+      (ng (vb:proposal-day-view proposal))
+      ;; the write is BOOK's, after one re-read of the sheet
+      (let ((written nil))
+        (multiple-value-bind (out writes reads)
+            (call-recording-writes (lambda () (setf written (vb:commit-booking proposal)))
+                                   :sheet (empty-sheet))
+          (ok written)
+          (ok (search "Created DGH booking" out))
+        (ok (equal '("test-sheet") reads))
+        (ok (equal '(("F4" (("Dentist")) "test-sheet")
+                     ("F6" (("8:00 am")) "test-sheet")
+                     ("G6" (("10:00 am")) "test-sheet")
+                       ("F7:F8" (("BW") ("CG")) "test-sheet")
+                       ("G7:G8" (("BW") ("CG")) "test-sheet"))
+                     writes))))))
+
+  (testing "a-join-is-proposed-with-the-passengers-added"
+    (let* ((trips (vb::parse-schedule (sheet-with-shms) :sheet-name "test-sheet"))
+           (proposal (vb:propose-booking "Thursday April 9" "SHMS" '("GG") :trips trips)))
+      (ok (eq :join (vb:proposal-action proposal)))
+      (ok (equal '("MM" "GG") (trip-dep-passengers (vb:proposal-trip proposal))))
+      (ok (equal '("MM" "GG") (trip-ret-passengers (vb:proposal-trip proposal))))
+      ;; the day as booked now shows MM alone
+      (let ((day (vb:proposal-day-view proposal)))
+        (ok (search "SHMS" day))
+        (ng (search "GG" day)))
+      (multiple-value-bind (out writes)
+          (call-recording-writes (lambda () (vb:commit-booking proposal))
+                                 :sheet (sheet-with-shms))
+        (ok (search "Added GG to DGH SHMS trip" out))
+        (ok (equal '(("F8:F8" (("GG")) "test-sheet")
+                     ("G8:G8" (("GG")) "test-sheet"))
+                   writes)))))
+
+  (testing "nobody-new-to-add-proposes-nothing"
+    (let ((trips (vb::parse-schedule (sheet-with-shms) :sheet-name "test-sheet")))
+      (multiple-value-bind (out writes)
+          (call-recording-writes
+           (lambda () (ng (vb:propose-booking "Thursday April 9" "SHMS" '("MM") :trips trips))))
+        (ok (search "MM is already on the DGH trip to SHMS" out))
+        (ok (equal '() writes)))))
+
+  (testing "a-clash-proposes-nothing"
+    ;; GG is on the LGH pool run 9-10, which overlaps the SHMS trip: refused
+    ;; before anyone is asked, as BOOK refuses it before writing.
+    (let* ((sheet (make-test-sheet
+                   (make-block "Thursday April 9           Thursday April 9"
+                               '(:dgh "SHMS" :lgh "Pool")
+                               '(:dgh ("8:35 am" "10:30 am") :lgh ("9:00 am" "10:00 am"))
+                               '(:dgh (("MM") ("MM")) :lgh (("GG") ("GG"))))))
+           (trips (vb::parse-schedule sheet :sheet-name "test-sheet")))
+      (multiple-value-bind (out writes reads)
+          (call-recording-writes
+           (lambda () (ng (vb:propose-booking "Thursday April 9" "SHMS" '("GG") :trips trips)))
+           :sheet sheet)
+        (ok (search "GG is already booked" out))
+        (ok (equal '() reads))
+        (ok (equal '() writes)))))
+
+  (testing "a-slot-taken-while-waiting-is-not-written-over"
+    ;; Proposed against an empty day; by the time of the yes, somebody else
+    ;; has the DGH.
+    (let* ((trips (vb::parse-schedule (empty-sheet) :sheet-name "test-sheet"))
+           (proposal (vb:propose-booking "Thursday April 9" "Dentist" '("BW")
+                                         :dep-time "11:00 am" :ret-time "12:00 pm"
+                                         :trips trips)))
+      (multiple-value-bind (out writes)
+          (call-recording-writes (lambda () (ng (vb:commit-booking proposal)))
+                                 :sheet (sheet-with-shms))
+        (ok (search "while this request was being handled" out))
+        (ok (equal '() writes)))))
+
+  (testing "the-15th-is-not-the-1st"
+    ;; Every van is taken on Sunday November 1; the 15th, on the tab two
+    ;; weeks on, is free and has an SHMS trip.  A booking or a join for the
+    ;; 1st must not land on the 15th.
+    (let* ((full (make-block "Sunday November 1           Sunday November 1"
+                             '(:dgh "Mass" :lgh "Pool" :chevy "Shrine")
+                             '(:dgh ("8:00 am" "9:00 am") :lgh ("8:00 am" "9:00 am")
+                               :chevy ("8:00 am" "9:00 am"))
+                             '(:dgh (("MM") ("MM")) :lgh (("DM") ("DM")) :chevy (("CG") ("CG")))))
+           (later (make-block "Sunday November 15           Sunday November 15"
+                              '(:dgh "SHMS") '(:dgh ("1:00 pm" "2:00 pm"))
+                              '(:dgh (("BW") ("BW")))))
+           (trips (append (vb::parse-schedule (make-test-sheet full) :sheet-name "Oct 26-Nov 1")
+                          (vb::parse-schedule (make-test-sheet later) :sheet-name "Nov 9-15"))))
+      (multiple-value-bind (out writes)
+          (call-recording-writes
+           (lambda ()
+             (ng (vb:propose-booking "Sunday November 1" "Dentist" '("GG")
+                                     :dep-time "10:00 am" :ret-time "11:00 am"
+                                     :trips trips))))
+        (ok (search "No available vehicle slots for Sunday November 1" out))
+        (ok (equal '() writes)))
+      (ok (signals (vb:propose-booking "Sunday November 1" "SHMS" '("GG") :trips trips)
+                   'bn:booking-incomplete))))
+
+  (testing "times-that-are-not-a-window-are-flagged"
+    (let* ((trips (vb::parse-schedule (empty-sheet) :sheet-name "test-sheet"))
+           (proposal (vb:propose-booking "Thursday April 9" "Dentist" '("BW")
+                                         :dep-time "7:00 pm" :ret-time "10:00 am"
+                                         :trips trips)))
+      (ok proposal)
+      (ng (vb:proposal-clash-checked-p proposal))))
+
+  (testing "an-edit-is-proposed-afresh-and-writes-nothing"
+    (let ((vb::*weeks* '("Apr 6-12"))
+          (sheet (make-test-sheet
+                  (make-block (fixture-header) '(:dgh "SHMS")
+                              '(:dgh ("8:35 am" "10:30 am"))
+                              '(:dgh (("MM") ("MM"))))))
+          (proposal nil))
+      (multiple-value-bind (out writes)
+          (call-recording-writes
+           (lambda ()
+             (setf proposal (vb:propose-natural "BW to the dentist on April 9 from 11 am to noon")))
+           :sheet sheet)
+        (ok (string= "" out))
+        (ok (equal '() writes)))
+      ;; the DGH is out on the SHMS trip, so the LGH is the first van free
+      (ok (eq :lgh (trip-vehicle (vb:proposal-trip proposal))))
+      ;; the vehicle and the return change; the rest is kept
+      (let ((revised nil) (changed nil))
+        (multiple-value-bind (out writes reads)
+            (call-recording-writes
+             (lambda ()
+               (multiple-value-setq (revised changed)
+                 (vb:revise-proposal proposal "take the Chevy, back at 1")))
+             :sheet sheet)
+          (ok (string= "" out))
+          (ok (equal '("Apr 6-12") reads))
+          (ok (equal '() writes)))
+        (ok (equal '(:ret-time :vehicle) changed))
+        (let ((trip (vb:proposal-trip revised)))
+          (ok (eq :chevy (trip-vehicle trip)))
+          (ok (string= "dentist" (trip-destination trip)))
+          (ok (string= "11:00 am" (trip-departure trip)))
+          (ok (string= "1:00 pm" (trip-return-time trip)))
+          (ok (equal '("BW") (trip-dep-passengers trip)))))
+      ;; naming the trip on the sheet turns it into a join, with BW added
+      (let ((revised nil))
+        (call-recording-writes
+         (lambda () (setf revised (vb:revise-proposal proposal "the SHMS trip")))
+         :sheet sheet)
+        (ok (eq :join (vb:proposal-action revised)))
+        (ok (equal '("MM" "BW") (trip-dep-passengers (vb:proposal-trip revised)))))
+      ;; words that change nothing give nothing back
+      (let ((result :unset))
+        (call-recording-writes
+         (lambda ()
+           (setf result (multiple-value-list (vb:revise-proposal proposal "please"))))
+         :sheet sheet)
+        (ok (equal '(nil nil) result))))))
 
 (defvar *urls* '()
   "The URLs the REPLY mock was asked for, most recent first.")

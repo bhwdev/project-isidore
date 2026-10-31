@@ -15,10 +15,21 @@
   (:import-from #:quri)
   (:import-from #:project-isidore/slack-bot/booking-nlp
                 #:booking-incomplete
+                #:booking-incomplete-missing
+                #:booking-incomplete-preamble
+                #:slot-label
                 #:self-reference-p
                 #:resolve-self-reference)
   (:import-from #:project-isidore/slack-bot/van-booking
-                #:book-natural
+                #:propose-natural
+                #:revise-proposal
+                #:commit-booking
+                #:proposal-action
+                #:proposal-day
+                #:proposal-passengers
+                #:proposal-day-view
+                #:proposal-trip-view
+                #:proposal-clash-checked-p
                 #:view-schedule
                 #:date-range-phrase-p
                 #:remind-driver
@@ -58,8 +69,15 @@ Provides a Lack middleware that serves two endpoints:
 `/book` takes the request in free-form English (see
 project-isidore/slack-bot/booking-nlp).  When a required piece is missing,
 the BOOKING-INCOMPLETE report is posted back: it lists what was understood
-and asks the user to re-send the request with the missing piece.  `/view`
-takes a day or a range of days.
+and asks the user to re-send the request with the missing piece.  A
+request that can be booked is not written straight away: the reply shows the
+day as booked now and the trip as it would be written, and the booking is
+held (*PENDING-BOOKINGS*) for *CONFIRMATION-MINUTES* until its asker
+answers `y` (write it), `n` (drop it) or `edit` and a change (propose the
+changed booking instead).  The answer may be a plain message -- the one kind
+of message without a command that is acted on -- or `/book y`, for a
+channel whose messages do not reach the bot.  `/view` takes a day or a range
+of days.
 
 A persistent /subscribe registry (graph-db-backed via
 project-isidore/slack-bot/database)
@@ -164,6 +182,8 @@ The order and the wording don't matter. For example:
   • `/book a van for swimming next Tuesday for CG and BW at 7 pm to 9 pm`
   • `/book Can BW and MM take the DGH to the dentist tomorrow, leaving at 8:30 and back around 11?`
 
+*Before I write anything*, I show you the day as it is booked now and the trip as I would write it, and wait 15 minutes for your answer: `y` to book it, `n` to cancel, or `edit` and what to change — `edit 8 to 10 pm`, `edit take the LGH`, `edit Friday`, `edit for BW and GG` (the new list), `edit add GG`. If a plain reply doesn't reach me, put `/book` in front: `/book y`.
+
 I never book over a clash: if the van you asked for is already out at that time, or if somebody on your list is already on another trip that overlaps, I say which trip is in the way and book nothing.
 
 *To join a trip already on the sheet*, name the trip and who is coming; no times needed:
@@ -259,21 +279,132 @@ store cannot be read."
                                             (all-slack-subscriptions)))
                       :test #'string=)))
 
-(defun book-natural-reply (text)
-  "Run BOOK-NATURAL on TEXT and return what it printed as the reply, or a
-placeholder when it printed nothing.  Conditions propagate."
-  (let ((output (with-output-to-string (*standard-output*)
-                  (book-natural text :registered-initials (registered-initials)))))
-    (if (plusp (length (string-trim '(#\Space #\Newline) output)))
-        output
-        "Booking processed (no output).")))
+;;; Booking confirmation
+;;;
+;;; `/book` writes nothing straight away.  It shows the day as booked now and
+;;; the trip as it would be written, and holds that proposal for its asker's
+;;; answer: `y` writes it (COMMIT-BOOKING re-reads the sheet and checks it
+;;; again first), `n` drops it, and `edit` with a change proposes the changed
+;;; booking in its place.
 
-(defun run-booking (text)
-  "Run BOOK-NATURAL on TEXT and return the reply to post.  The captured output
-is the reply; a BOOKING-INCOMPLETE condition becomes its own report, which
+(defparameter *confirmation-minutes* 15
+  "How long a proposed booking waits for its asker's answer.  +HELP-TEXT+
+states it in words and has to be changed by hand.")
+
+(defstruct pending-booking
+  "A PROPOSAL shown to its asker and not yet answered, and the universal time
+after which a yes no longer writes it."
+  proposal expires)
+
+(defvar *pending-bookings* (make-hash-table :test #'equal)
+  "Slack user id -> the PENDING-BOOKING awaiting that user's answer.  One per
+user: a new `/book` replaces it.  An expired one stays until it is answered
+or replaced, so a late `y` hears that it expired rather than that nothing is
+waiting.  Held in memory only, so a restart forgets them.")
+
+(defvar *pending-lock* (bt:make-lock "slack-pending-bookings"))
+
+(defun pending-expired-p (pending)
+  (> (get-universal-time) (pending-booking-expires pending)))
+
+(defun hold-booking (user-id proposal)
+  "Hold PROPOSAL for USER-ID's answer, in place of whatever was held for them.
+True when that was a booking still waiting, which the reply mentions."
+  (let ((pending (make-pending-booking
+                  :proposal proposal
+                  :expires (+ (get-universal-time) (* 60 *confirmation-minutes*)))))
+    (bt:with-lock-held (*pending-lock*)
+      (let ((old (gethash user-id *pending-bookings*)))
+        (setf (gethash user-id *pending-bookings*) pending)
+        (and old (not (pending-expired-p old)))))))
+
+(defun held-booking (user-id)
+  "The PENDING-BOOKING held for USER-ID, expired or not, or NIL."
+  (bt:with-lock-held (*pending-lock*)
+    (gethash user-id *pending-bookings*)))
+
+(defun take-booking (user-id)
+  "Remove the PENDING-BOOKING held for USER-ID and return it, or NIL.  Taking
+it under the lock is what stops two quick `y`s writing one booking twice."
+  (bt:with-lock-held (*pending-lock*)
+    (prog1 (gethash user-id *pending-bookings*)
+      (remhash user-id *pending-bookings*))))
+
+(defun answer-word (text)
+  "Read TEXT as an answer to a booking's confirmation: :YES for `y` or `yes`,
+:NO for `n`, `no` or `cancel`, :EDIT for `edit` followed by the change, which
+is the second value; NIL for anything else.  Case and trailing punctuation do
+not matter, but a yes or a no must stand alone: \"no van needed after all\"
+is not an answer."
+  (let ((trimmed (string-trim '(#\Space #\Tab #\Newline) (or text ""))))
+    (cond ((cl-ppcre:scan "(?i)^(?:y|yes)[.!]*$" trimmed) :yes)
+          ((cl-ppcre:scan "(?i)^(?:n|no|cancel)[.!]*$" trimmed) :no)
+          (t (multiple-value-bind (match groups)
+                 (cl-ppcre:scan-to-strings "(?is)^edit\\b[\\s:,-]*(.*)$" trimmed)
+               (when match
+                 (values :edit (aref groups 0))))))))
+
+(defparameter +edit-examples+
+  "`edit 8 to 10 pm`, `edit take the LGH`, `edit Friday`, `edit for BW and GG` or `edit add GG`"
+  "Examples of an `edit` answer, quoted wherever the bot asks for one.")
+
+(defparameter +answer-reminder+
+  "*Reply `y` (yes) to book it, `n` (no) to cancel, or `edit` and the change.*"
+  "The last line of every reply that leaves a booking waiting, so the way to
+answer is the last thing read.")
+
+(defun fenced-table (heading table &optional footer)
+  "TABLE, a schedule from FORMAT-SCHEDULE-TABLE, in code fences
+(CODE-BLOCK-CHUNKS) as a list of messages, with HEADING above the first and
+FOOTER, when given, below the last."
+  (let ((parts (code-block-chunks table :header-lines 2)))
+    (setf (first parts) (format nil "~a~%~a" heading (first parts)))
+    (when footer
+      (setf (car (last parts)) (format nil "~a~%~a" (car (last parts)) footer)))
+    parts))
+
+(defun confirmation-reply (proposal &key replaced)
+  "The messages that put PROPOSAL to its asker: the day as booked now, then
+the trip as it would be written and how to answer.  REPLACED says PROPOSAL
+took the place of a booking that was still waiting."
+  (let ((day (proposal-day proposal))
+        (day-view (proposal-day-view proposal)))
+    (append
+     (if day-view
+         (fenced-table (format nil "Booked on *~a* so far:" day) day-view)
+         (list (format nil "Nothing is booked on *~a* yet." day)))
+     (fenced-table
+      (if (eq (proposal-action proposal) :join)
+          (format nil "I'd add ~{~a~^, ~} to this trip, which would then read:"
+                  (proposal-passengers proposal))
+          "I'd book this trip:")
+      (proposal-trip-view proposal)
+      (format nil "~:[Note: I can't read this trip's times as a window, so I haven't checked it against the other trips that day.~%~;~]~:[~;This replaces the booking you had waiting.~%~]Nothing is written until you answer, and I'll wait ~D minutes. To change something, reply `edit` and the change, e.g. ~a. If a plain reply doesn't reach me here, start it with `/book`, as in `/book y`.~2%~a"
+              (proposal-clash-checked-p proposal) replaced
+              *confirmation-minutes* +edit-examples+ +answer-reminder+)))))
+
+(defun propose-reply (text user-id)
+  "Propose TEXT as a booking (PROPOSE-NATURAL) and return the reply.  When
+there is a booking to make, it is held for USER-ID's answer (HOLD-BOOKING)
+and the reply is its confirmation (CONFIRMATION-REPLY); otherwise the reply
+is what PROPOSE-NATURAL printed about why there is none, or a placeholder
+when it printed nothing.  Conditions propagate."
+  (let* ((proposal nil)
+         (output (with-output-to-string (*standard-output*)
+                   (setf proposal (propose-natural
+                                   text :registered-initials (registered-initials))))))
+    (cond (proposal
+           (confirmation-reply proposal :replaced (hold-booking user-id proposal)))
+          ((plusp (length (string-trim '(#\Space #\Newline) output)))
+           output)
+          (t "Nothing was booked (no output)."))))
+
+(defun run-booking (text user-id)
+  "Propose TEXT as a booking held for USER-ID (PROPOSE-REPLY) and return the
+reply to post.  A BOOKING-INCOMPLETE condition becomes its own report, which
 asks the user to re-send the request with the missing pieces.  Other errors
 propagate to the caller."
-  (handler-case (book-natural-reply text)
+  (handler-case (propose-reply text user-id)
     (booking-incomplete (c)
       (princ-to-string c))))
 
@@ -414,18 +545,97 @@ database read nor a Slack API call."
           (t (values (resolve-self-reference text initial) nil))))))
 
 (defun run-request (text &key user-id)
-  "Run TEXT, the argument of a `/book`, as a booking from USER-ID.
+  "Run TEXT, the argument of a `/book`, as a booking from USER-ID: propose it
+and hold it for their answer (RUN-BOOKING).
 First-person references in it are rewritten to the sender's initials
 \(RESOLVE-SENDER) so \"book me a van\" names somebody.  A sender who writes
-\"me\" but cannot be identified is asked for `/iam` and nothing is booked.
+\"me\" but cannot be identified is asked for `/iam` and nothing is proposed.
 When the initials were guessed from a Slack profile rather than registered,
 the reply is a list: a notice saying so, then RUN-BOOKING's reply; otherwise
 it is RUN-BOOKING's reply alone.  Errors other than BOOKING-INCOMPLETE
 propagate to the caller."
   (multiple-value-bind (resolved notice) (resolve-sender text user-id)
     (cond ((null resolved) +unknown-sender-reply+)
-          (notice (cons notice (ensure-list (run-booking resolved))))
-          (t (run-booking resolved)))))
+          (notice (cons notice (ensure-list (run-booking resolved user-id))))
+          (t (run-booking resolved user-id)))))
+
+(defparameter +nothing-waiting-reply+
+  "There's no booking waiting for your answer, so nothing was written. If you were answering one, it has been answered already or I have restarted since: send the `/book` request again."
+  "The reply to `y`, `n` or `edit` from someone with no booking held.")
+
+(defparameter +still-waiting+
+  (format nil "The booking above is still waiting.~%~a" +answer-reminder+)
+  "Closes the reply to an `edit` that changed nothing.")
+
+(defun expired-reply ()
+  (format nil "That booking waited more than ~D minutes for an answer, so I dropped it and wrote nothing. Send the `/book` request again."
+          *confirmation-minutes*))
+
+(defun commit-reply (proposal)
+  "Write PROPOSAL (COMMIT-BOOKING) and return what it printed: what was
+written, or why nothing was."
+  (let* ((written nil)
+         (output (with-output-to-string (*standard-output*)
+                   (setf written (commit-booking proposal)))))
+    (cond ((null written)
+           (format nil "~aSend the `/book` request again to try afresh." output))
+          ((plusp (length (string-trim '(#\Space #\Newline) output))) output)
+          (t "Booked."))))
+
+(defun edit-booking (proposal change user-id)
+  "Apply CHANGE, the words after `edit`, to PROPOSAL, the booking held for
+USER-ID (REVISE-PROPOSAL), and return the reply: the confirmation of the
+changed booking, which is held in PROPOSAL's place, or why it could not be
+changed, with PROPOSAL left waiting.  \"me\" in CHANGE is the sender, as in
+`/book` (RESOLVE-SENDER)."
+  (if (zerop (length (string-trim '(#\Space #\Tab #\Newline) change)))
+      (format nil "What should I change? Reply `edit` and the change, e.g. ~a." +edit-examples+)
+      (multiple-value-bind (resolved notice) (resolve-sender change user-id)
+        (if (null resolved)
+            +unknown-sender-reply+
+            (let* ((revised nil)
+                   (changed nil)
+                   (incomplete nil)
+                   (output (with-output-to-string (*standard-output*)
+                             (handler-case
+                                 (multiple-value-setq (revised changed)
+                                   (revise-proposal proposal resolved
+                                                    :registered-initials (registered-initials)))
+                               (booking-incomplete (c) (setf incomplete c))))))
+              (cond
+                (incomplete
+                 (format nil "~@[~a ~]So nothing changed: I'd also need ~{the ~a~^ and ~}. Reply `edit` with all of it at once, e.g. `edit Friday 7 pm to 9 pm`.~%~a"
+                         (booking-incomplete-preamble incomplete)
+                         (mapcar #'slot-label (booking-incomplete-missing incomplete))
+                         +still-waiting+))
+                ((null changed)
+                 (format nil "I couldn't find anything to change in \"~a\". Try e.g. ~a.~%~a"
+                         change +edit-examples+ +still-waiting+))
+                ((null revised)
+                 (format nil "~aSo nothing changed. ~a" output +still-waiting+))
+                (t
+                 (hold-booking user-id revised)
+                 (append (and notice (list notice))
+                         (confirmation-reply revised)))))))))
+
+(defun answer-booking (text user-id)
+  "Act on TEXT, an answer (ANSWER-WORD) to the booking held for USER-ID, and
+return the reply.  `y` writes the booking (COMMIT-REPLY), `n` drops it, and
+`edit` changes it (EDIT-BOOKING).  A booking past *CONFIRMATION-MINUTES* is
+dropped unwritten whatever the answer."
+  (multiple-value-bind (answer change) (answer-word text)
+    (if (eq answer :edit)
+        (let ((pending (held-booking user-id)))
+          (cond ((null pending) +nothing-waiting-reply+)
+                ((pending-expired-p pending)
+                 (take-booking user-id)
+                 (expired-reply))
+                (t (edit-booking (pending-booking-proposal pending) change user-id))))
+        (let ((pending (take-booking user-id)))
+          (cond ((null pending) +nothing-waiting-reply+)
+                ((pending-expired-p pending) (expired-reply))
+                ((eq answer :no) "Cancelled. Nothing was booked.")
+                (t (commit-reply (pending-booking-proposal pending))))))))
 
 (defun post-command-reply (reply-to reply)
   "Post a command handler's REPLY to REPLY-TO.
@@ -465,10 +675,12 @@ Ignores bot messages to prevent loops.  Text that begins with a slash
 command (`/view`, `/book ...`) runs that command's handler -- Slack expands
 its own slash commands into a /slack/commands POST, but a client that does
 not (a bridged room, an uninstalled command) delivers the line here as
-ordinary text.  Any other text is answered with +COMMANDS-ONLY-REPLY+ and
+ordinary text.  The one exception is the answer to a booking's confirmation
+-- `y`, `n` or `edit` and a change (ANSWER-WORD) -- which goes to
+ANSWER-BOOKING.  Any other text is answered with +COMMANDS-ONLY-REPLY+ and
 not read at all: every request starts with a command.  Returns the worker
-thread a command runs in, or NIL when the event was answered synchronously
-or ignored."
+thread a command or an answer runs in, or NIL when the event was answered
+synchronously or ignored."
   (let ((text (gethash "text" event))
         (channel (gethash "channel" event))
         (bot-id (gethash "bot_id" event))
@@ -482,6 +694,11 @@ or ignored."
         (let ((handler (and command
                             (cdr (assoc command *slash-commands* :test #'string-equal)))))
           (cond
+            ((and (null command) (answer-word clean-text))
+             (with-slack-error-reply (channel :context "Answer"
+                                              :thread-name "slack-answer")
+               (post-command-reply channel
+                                   (answer-booking clean-text (gethash "user" event)))))
             ((null command)
              (post-slack-message channel +commands-only-reply+)
              nil)
@@ -637,12 +854,21 @@ Needed, in any order: destination, day, passengers (uppercase initials).
 Times (departure and return) are needed only when no matching trip exists.
 Optional: mention a vehicle (DGH, LGH, Chevy, personal car).
 If a piece is missing, the reply says what was understood and asks you to
-re-send the request including it."
-  (let ((text (gethash "text" params)))
+re-send the request including it.
+Nothing is written at once: the reply shows the day as booked and the trip as
+it would be written, and waits *CONFIRMATION-MINUTES* for the answer, which
+can also come as the argument of `/book` itself:
+  /book y
+  /book n
+  /book edit 8 to 10 pm"
+  (let ((text (gethash "text" params))
+        (user-id (gethash "user_id" params)))
     (when (or (null text) (zerop (length (string-trim '(#\Space) text))))
       (return-from cmd-book
         "Usage: type `/book` followed by the trip in your own words, e.g. `/book take the DGH to the dentist tomorrow for BW, leaving at 8:30 and back by 11`. Type `/help` for more."))
-    (handler-case (run-request text :user-id (gethash "user_id" params))
+    (handler-case (if (answer-word text)
+                      (answer-booking text user-id)
+                      (run-request text :user-id user-id))
       (error (c)
         (format nil "Booking failed [~A]: ~A~%Type `/help` to see how to phrase a request."
                 (type-of c) c)))))

@@ -12,7 +12,7 @@
                 #:hour-of #:minute-of #:year-of #:month-of #:day-of)
   (:import-from #:local-time)
   (:import-from #:project-isidore/slack-bot/booking-nlp
-                #:parse-booking #:possible-initials
+                #:parse-booking #:revise-booking #:possible-initials
                 #:booking-request-destination #:booking-request-day
                 #:booking-request-passengers #:booking-request-dep-time
                 #:booking-request-ret-time #:booking-request-vehicle
@@ -33,6 +33,13 @@
    #:fetch-all-trips #:known-destinations
    #:sheet-tabs #:week-sheets
    #:book-natural
+   ;; proposals: a booking decided, shown, then written
+   #:proposal #:make-proposal #:proposal-p
+   #:proposal-action #:proposal-day #:proposal-trip #:proposal-trips
+   #:proposal-passengers
+   #:proposal-request
+   #:propose-booking #:propose-natural #:revise-proposal #:commit-booking
+   #:proposal-day-view #:proposal-trip-view #:proposal-clash-checked-p
    #:remind-driver
    #:view-schedule
    #:date-range-phrase-p
@@ -71,6 +78,11 @@
   - book-natural — free-form English frontend to book (see project-isidore/slack-bot/booking-nlp).
     Signals BOOKING-INCOMPLETE, whose report asks the user to re-send the request
     with the missing pieces, when destination, day or passengers cannot be found.
+  - propose-booking / propose-natural — book and book-natural up to the write:
+    they return a PROPOSAL, shown with proposal-day-view (the day as booked
+    now) and proposal-trip-view (the trip as it will read), which
+    commit-booking writes after re-reading the sheet and checking again;
+    revise-proposal applies an edit (\"8 to 10 pm\", \"take the LGH\")
   - view-schedule — render a plaintext table of booked trips for a natural-language date range"))
 
 (in-package #:project-isidore/slack-bot/van-booking)
@@ -244,19 +256,27 @@ Personal trip departing at \"Saturday\"."
     (nreverse trips)))
 
 (defun find-trips (trips &key day destination)
-  "Return trips matching DAY (substring) and/or DESTINATION (case-insensitive substring).
+  "Return trips matching DAY and/or DESTINATION (case-insensitive substrings).
    Both filters must match when provided. A blank DESTINATION filter matches no trips,
-   so callers must use NIL (not \"\") to mean \"any destination\"."
-  (remove-if-not
-   (lambda (tr)
-     (and (or (null day)
-              (search (string-upcase day) (string-upcase (trip-day tr))))
-          (or (null destination)
-              (and (non-blank-p destination)
-                   (non-blank-p (trip-destination tr))
-                   (search (string-upcase destination)
-                           (string-upcase (trip-destination tr)))))))
-   trips))
+   so callers must use NIL (not \"\") to mean \"any destination\".
+   DAY may not stop partway through a number: \"Sunday November 1\" finds
+   \"Sunday November 1\" but not \"Sunday November 15\", two weeks on, whose
+   tab FETCH-ALL-TRIPS reads in the same search.  A plain substring did, and
+   so a booking for the 1st could join, clash with or be written into the
+   15th."
+  (let ((day-scanner (and day (cl-ppcre:create-scanner
+                               (format nil "~a(?!\\d)" (cl-ppcre:quote-meta-chars day))
+                               :case-insensitive-mode t))))
+    (remove-if-not
+     (lambda (tr)
+       (and (or (null day-scanner)
+                (cl-ppcre:scan day-scanner (or (trip-day tr) "")))
+            (or (null destination)
+                (and (non-blank-p destination)
+                     (non-blank-p (trip-destination tr))
+                     (search (string-upcase destination)
+                             (string-upcase (trip-destination tr)))))))
+     trips)))
 
 (defun print-trip (trip &optional (stream t))
   "Pretty-print a trip summary."
@@ -290,15 +310,20 @@ overlap wants: an unreadable time must not be taken for midnight."
           (when dt (+ (* 60 (hour-of dt)) (minute-of dt))))
       (error () nil))))
 
-(defun trip-window (trip)
-  "Return (values START END), minutes since midnight, for TRIP's departure and
-return times, or NIL when either end is blank, unreadable, or does not run
-forwards -- a return before its departure means the row cannot be read as a
-window, and a trip carrying on past midnight is one such row."
-  (let ((start (clock-minutes (trip-departure trip)))
-        (end (clock-minutes (trip-return-time trip))))
+(defun request-window (dep-time ret-time)
+  "Return (values START END), minutes since midnight, for a trip leaving at
+DEP-TIME and back at RET-TIME, or NIL when either is blank, unreadable, or
+the two do not run forwards -- a return before its departure cannot be read
+as a window, and a trip carrying on past midnight is one such pair."
+  (let ((start (clock-minutes dep-time))
+        (end (clock-minutes ret-time)))
     (when (and start end (< start end))
       (values start end))))
+
+(defun trip-window (trip)
+  "Return (values START END), minutes since midnight, for TRIP's departure and
+return times, or NIL when they cannot be read as a window (REQUEST-WINDOW)."
+  (request-window (trip-departure trip) (trip-return-time trip)))
 
 (defun windows-overlap-p (start-a end-a start-b end-b)
   "True when [START-A, END-A) and [START-B, END-B) share a minute.  The
@@ -500,6 +525,75 @@ would work."
           (dolist (tr clashes) (print-trip tr)))
         (format t "No available vehicle slots for ~a~@[ (tried ~a only)~].~%" day vehicle))))
 
+(defun choose-slot (trips day passengers dep-time ret-time &key vehicle)
+  "The blank slot on DAY that a new booking of PASSENGERS leaving at DEP-TIME
+and back at RET-TIME would be written to, judged against TRIPS, or NIL,
+having printed why, when there is none.  VEHICLE is as for CREATE-BOOKING,
+which describes the checks."
+  (multiple-value-bind (start end) (request-window dep-time ret-time)
+    (let ((slot (find-empty-slot trips day vehicle start end)))
+      (if (null slot)
+          (progn (report-no-slot trips day vehicle start end) nil)
+          (let ((obstacle (booking-obstacle trips day (trip-vehicle slot) passengers
+                                            start end :exclude slot)))
+            (if obstacle
+                (progn (princ obstacle) nil)
+                slot))))))
+
+(defun write-booking (slot day destination dep-time ret-time passengers &key (verify t))
+  "Write a new booking into SLOT, the blank slot CHOOSE-SLOT picked on DAY,
+and return the slot written, or NIL, having printed why, when nothing was.
+Unless VERIFY is NIL, SLOT's sheet is re-read immediately before the first
+write (REFRESH-TRIP) and CHOOSE-SLOT's checks run again against it, so a
+booking decided on a stale snapshot cannot write over one made since."
+  (when verify
+    (multiple-value-bind (start end) (request-window dep-time ret-time)
+      (multiple-value-bind (current fresh-trips) (refresh-trip slot)
+        (cond
+          ((null current)
+           (format t "The ~a block for ~a is no longer on the ~a sheet, so nothing was booked.~%"
+                   (trip-vehicle slot) day (trip-sheet-name slot))
+           (return-from write-booking nil))
+          ((booked-trip-p current)
+           (format t "The ~a was booked for ~a while this request was being handled, so nothing was written:~%"
+                   (trip-vehicle current) day)
+           (print-trip current)
+           (return-from write-booking nil))
+          (fresh-trips
+           (let ((obstacle (booking-obstacle fresh-trips day (trip-vehicle current)
+                                             passengers start end :exclude current)))
+             (when obstacle
+               (princ obstacle)
+               (return-from write-booking nil)))))
+        (setf slot current))))
+  (let ((sn (trip-sheet-name slot)))
+    (let ((dest-row (1+ (trip-block-start-row slot)))
+          (dep-col-letter (col-letter (trip-dep-col slot))))
+      (write-range (format nil "~a~a" dep-col-letter dest-row)
+                   (list (list destination)) :sheet-name sn))
+    (let ((time-row (+ (trip-block-start-row slot) 3))
+          (dep-col-letter (col-letter (trip-dep-col slot)))
+          (ret-col-letter (col-letter (trip-ret-col slot))))
+      (write-range (format nil "~a~a" dep-col-letter time-row)
+                   (list (list dep-time)) :sheet-name sn)
+      (write-range (format nil "~a~a" ret-col-letter time-row)
+                   (list (list ret-time)) :sheet-name sn))
+    (let* ((pass-start (+ (trip-block-start-row slot) 4))
+           (dep-col-letter (col-letter (trip-dep-col slot)))
+           (ret-col-letter (col-letter (trip-ret-col slot)))
+           (dep-range (format nil "~a~a:~a~a"
+                              dep-col-letter pass-start
+                              dep-col-letter (+ pass-start (length passengers) -1)))
+           (ret-range (format nil "~a~a:~a~a"
+                              ret-col-letter pass-start
+                              ret-col-letter (+ pass-start (length passengers) -1)))
+           (values (mapcar #'list passengers)))
+      (write-range dep-range values :sheet-name sn)
+      (write-range ret-range values :sheet-name sn)))
+  (format t "Created ~a booking on ~a → ~a (~a - ~a) for ~{~a~^, ~}~%"
+          (trip-vehicle slot) day destination dep-time ret-time passengers)
+  slot)
+
 (defun create-booking (trips day destination dep-time ret-time passengers
                        &key vehicle (verify t))
   "Create a new booking in an empty slot. Auto-selects vehicle by priority if not given.
@@ -510,69 +604,14 @@ would work."
    was named (FIND-EMPTY-SLOT, REPORT-NO-SLOT), and a passenger already on an
    overlapping trip that day is refused outright (PASSENGER-CONFLICTS).  Both
    checks are skipped when the times cannot be read as a window, since then
-   there is no overlap to judge.
+   there is no overlap to judge.  CHOOSE-SLOT makes them against TRIPS.
 
    Unless VERIFY is NIL, the chosen slot's sheet is re-read immediately before
-   the first write (REFRESH-TRIP) and both checks run again against it, so a
+   the first write and both checks run again against it (WRITE-BOOKING), so a
    booking decided on a stale snapshot cannot write over one made since."
-  (multiple-value-bind (start end)
-      (let ((s (clock-minutes dep-time)) (e (clock-minutes ret-time)))
-        (if (and s e (< s e)) (values s e) (values nil nil)))
-    (let ((slot (find-empty-slot trips day vehicle start end)))
-      (unless slot
-        (report-no-slot trips day vehicle start end)
-        (return-from create-booking nil))
-      (let ((obstacle (booking-obstacle trips day (trip-vehicle slot) passengers
-                                        start end :exclude slot)))
-        (when obstacle
-          (princ obstacle)
-          (return-from create-booking nil)))
-      (when verify
-        (multiple-value-bind (current fresh-trips) (refresh-trip slot)
-          (cond
-            ((null current)
-             (format t "The ~a block for ~a is no longer on the ~a sheet, so nothing was booked.~%"
-                     (trip-vehicle slot) day (trip-sheet-name slot))
-             (return-from create-booking nil))
-            ((booked-trip-p current)
-             (format t "The ~a was booked for ~a while this request was being handled, so nothing was written:~%"
-                     (trip-vehicle current) day)
-             (print-trip current)
-             (return-from create-booking nil))
-            (fresh-trips
-             (let ((obstacle (booking-obstacle fresh-trips day (trip-vehicle current)
-                                               passengers start end :exclude current)))
-               (when obstacle
-                 (princ obstacle)
-                 (return-from create-booking nil)))))
-          (setf slot current)))
-      (let ((sn (trip-sheet-name slot)))
-        (let ((dest-row (1+ (trip-block-start-row slot)))
-              (dep-col-letter (col-letter (trip-dep-col slot))))
-          (write-range (format nil "~a~a" dep-col-letter dest-row)
-                       (list (list destination)) :sheet-name sn))
-        (let ((time-row (+ (trip-block-start-row slot) 3))
-              (dep-col-letter (col-letter (trip-dep-col slot)))
-              (ret-col-letter (col-letter (trip-ret-col slot))))
-          (write-range (format nil "~a~a" dep-col-letter time-row)
-                       (list (list dep-time)) :sheet-name sn)
-          (write-range (format nil "~a~a" ret-col-letter time-row)
-                       (list (list ret-time)) :sheet-name sn))
-        (let* ((pass-start (+ (trip-block-start-row slot) 4))
-               (dep-col-letter (col-letter (trip-dep-col slot)))
-               (ret-col-letter (col-letter (trip-ret-col slot)))
-               (dep-range (format nil "~a~a:~a~a"
-                                  dep-col-letter pass-start
-                                  dep-col-letter (+ pass-start (length passengers) -1)))
-               (ret-range (format nil "~a~a:~a~a"
-                                  ret-col-letter pass-start
-                                  ret-col-letter (+ pass-start (length passengers) -1)))
-               (values (mapcar #'list passengers)))
-          (write-range dep-range values :sheet-name sn)
-          (write-range ret-range values :sheet-name sn)))
-      (format t "Created ~a booking on ~a → ~a (~a - ~a) for ~{~a~^, ~}~%"
-              (trip-vehicle slot) day destination dep-time ret-time passengers)
-      slot)))
+  (let ((slot (choose-slot trips day passengers dep-time ret-time :vehicle vehicle)))
+    (when slot
+      (write-booking slot day destination dep-time ret-time passengers :verify verify))))
 
 (defun fetch-all-trips (&key week)
   "Read and parse the schedule for every week sheet (see WEEK-SHEETS), or only
@@ -599,6 +638,110 @@ Used by BOOK-NATURAL so a request can name them in lowercase."
                         collect (string-upcase cell)))
    :test #'string= :from-end t))
 
+;;; --- Proposals ---
+;;;
+;;; A booking is decided and written in two steps, so the bot can show the
+;;; asker what it is about to write and wait for a yes: PROPOSE-BOOKING makes
+;;; every decision and check BOOK makes and writes nothing, and
+;;; COMMIT-BOOKING writes what it decided.  The answer can take minutes, so
+;;; COMMIT-BOOKING re-reads the sheet and checks again before the first write.
+
+(defstruct proposal
+  "A booking PROPOSE-BOOKING found room for, not yet written.  ACTION is
+:JOIN, adding PASSENGERS to the booked trip SLOT, or :CREATE, filling the
+blank SLOT with DESTINATION, DEP-TIME, RET-TIME and PASSENGERS, on DAY as the
+request named it.  TRIP is SLOT as it will read once written, to show the
+asker; TRIPS the schedule the booking was decided against.  REQUEST is the
+BOOKING-REQUEST it was read from, when it came from words (PROPOSE-NATURAL),
+for REVISE-PROPOSAL to change."
+  action day slot trip passengers destination dep-time ret-time trips request)
+
+(defun propose-join (trips target passengers)
+  "The PROPOSAL adding PASSENGERS to TARGET, a booked trip among TRIPS, or
+NIL, having printed why, when nobody would be added: everyone named is on it
+already, or somebody is on another trip that day whose times overlap it (the
+check ADD-PASSENGERS makes again before writing)."
+  (let ((new-dep (filter-new-passengers passengers (trip-dep-passengers target)))
+        (new-ret (filter-new-passengers passengers (trip-ret-passengers target))))
+    (if (not (or new-dep new-ret))
+        (progn
+          (format t "~{~a~^, ~} ~:[are~;is~] already on the ~a trip to ~a on ~a, so there is nobody to add.~%"
+                  passengers (null (rest passengers))
+                  (trip-vehicle target) (trip-destination target) (trip-day target))
+          nil)
+        (multiple-value-bind (start end) (trip-window target)
+          (let ((clashes (when start
+                           (passenger-conflicts trips (trip-day target) passengers
+                                                start end :exclude target))))
+            (if clashes
+                (progn (princ (format-passenger-conflicts (trip-day target) clashes))
+                       nil)
+                (let ((joined (copy-trip target)))
+                  (setf (trip-dep-passengers joined) (append (trip-dep-passengers target) new-dep)
+                        (trip-ret-passengers joined) (append (trip-ret-passengers target) new-ret))
+                  (make-proposal :action :join :day (trip-day target) :slot target
+                                 :trip joined :passengers passengers
+                                 :destination (trip-destination target) :trips trips))))))))
+
+(defun propose-create (trips day destination dep-time ret-time passengers &key vehicle)
+  "The PROPOSAL for a new booking on DAY (CREATE-BOOKING's arguments), or
+NIL, having printed why, when no slot can take it (CHOOSE-SLOT)."
+  (let ((slot (choose-slot trips day passengers dep-time ret-time :vehicle vehicle)))
+    (when slot
+      (let ((filled (copy-trip slot)))
+        (setf (trip-destination filled) destination
+              (trip-departure filled) dep-time
+              (trip-return-time filled) ret-time
+              (trip-dep-passengers filled) passengers
+              (trip-ret-passengers filled) passengers)
+        (make-proposal :action :create :day day :slot slot :trip filled
+                       :passengers passengers :destination destination
+                       :dep-time dep-time :ret-time ret-time :trips trips)))))
+
+(defun propose-booking (day destination passengers &key dep-time ret-time vehicle week trips)
+  "Decide the booking BOOK would make, with BOOK's arguments, and return it
+as a PROPOSAL without writing anything; COMMIT-BOOKING writes it.  Returns
+NIL, having printed why, when BOOK would write nothing: no sheet covers DAY,
+no vehicle is free, a van or a passenger clashes, or everyone named is on
+the trip being joined already.  Signals BOOKING-INCOMPLETE as BOOK does."
+  (let* ((all-trips (or trips (fetch-all-trips :week week)))
+         (matches (find-trips all-trips :day day :destination destination)))
+    (cond
+      (matches
+       (propose-join all-trips (first matches) passengers))
+      ((null (find-trips all-trips :day day))
+       (format t "No schedule sheet covers ~a yet, so nothing can be booked for that day. Ask the van steward to add that week's tab.~%" day)
+       nil)
+      ((and dep-time ret-time)
+       (propose-create all-trips day destination dep-time ret-time passengers
+                       :vehicle vehicle))
+      (t
+       (error 'booking-incomplete
+              :missing (remove nil (list (unless dep-time :dep-time)
+                                         (unless ret-time :ret-time)))
+              :understood (append (list :destination destination :day day
+                                        :passengers passengers)
+                                  (when dep-time (list :dep-time dep-time))
+                                  (when ret-time (list :ret-time ret-time))
+                                  (when vehicle (list :vehicle vehicle)))
+              :preamble (format nil "No existing trip to ~a on ~a to join, so this would be a new booking."
+                                destination day))))))
+
+(defun commit-booking (proposal)
+  "Write PROPOSAL to the sheet and return the trip written to, or NIL, having
+printed why, when nothing was written.  What was written is printed too.
+The proposal's sheet is re-read first and PROPOSE-BOOKING's checks are made
+again against it (ADD-PASSENGERS, WRITE-BOOKING): an answer can take
+minutes, and a booking made meanwhile must not be written over."
+  (ecase (proposal-action proposal)
+    (:join
+     (add-passengers (proposal-slot proposal) (proposal-passengers proposal)))
+    (:create
+     (write-booking (proposal-slot proposal) (proposal-day proposal)
+                    (proposal-destination proposal)
+                    (proposal-dep-time proposal) (proposal-ret-time proposal)
+                    (proposal-passengers proposal)))))
+
 (defun book (day destination passengers &key dep-time ret-time vehicle week trips)
   "Book PASSENGERS for a trip on DAY to DESTINATION.
    If an existing trip matches, adds passengers to it (no times needed).
@@ -614,45 +757,36 @@ Used by BOOK-NATURAL so a request can name them in lowercase."
    Nothing is written over a conflict: a van already out at that time, a
    passenger already on an overlapping trip that day, or a slot booked by
    somebody else since TRIPS was read.  The reason is printed and NIL
-   returned, as for a day with no free slots."
-  (let* ((all-trips (or trips (fetch-all-trips :week week)))
-         (matches (find-trips all-trips :day day :destination destination)))
-    (cond
-      (matches
-       (format t "Found ~d existing trip~:p to ~a on ~a:~%" (length matches) destination day)
-       (mapc #'print-trip matches)
-       (let ((target (first matches)))
-         (format t "Adding passengers to ~a trip (~a)...~%"
-                 (trip-vehicle target) (trip-sheet-name target))
-         (add-passengers target passengers)))
-      ((null (find-trips all-trips :day day))
-       (format t "No schedule sheet covers ~a yet, so nothing can be booked for that day. Ask the van steward to add that week's tab.~%" day)
-       nil)
-      ((and dep-time ret-time)
-       (create-booking all-trips day destination dep-time ret-time passengers
-                       :vehicle vehicle))
-      (t
-       (error 'booking-incomplete
-              :missing (remove nil (list (unless dep-time :dep-time)
-                                         (unless ret-time :ret-time)))
-              :understood (append (list :destination destination :day day
-                                        :passengers passengers)
-                                  (when dep-time (list :dep-time dep-time))
-                                  (when ret-time (list :ret-time ret-time))
-                                  (when vehicle (list :vehicle vehicle)))
-              :preamble (format nil "No existing trip to ~a on ~a to join, so this would be a new booking."
-                                destination day))))))
+   returned, as for a day with no free slots.
+   This is PROPOSE-BOOKING followed by COMMIT-BOOKING, for a caller with
+   nobody to ask whether the booking is the one they meant."
+  (let ((proposal (propose-booking day destination passengers
+                                   :dep-time dep-time :ret-time ret-time
+                                   :vehicle vehicle :week week :trips trips)))
+    (when proposal
+      (commit-booking proposal))))
 
 (defun parse-passenger-initials (text)
   "Extract uppercase 2-3 character initials from TEXT."
   (cl-ppcre:all-matches-as-strings "[A-Z]{2,3}" text))
 
-(defun book-natural (text &key week registered-initials)
-  "Book from free-form English TEXT, e.g.
+(defun propose-request (req trips)
+  "PROPOSE-BOOKING for REQ, a BOOKING-REQUEST, against TRIPS; the proposal
+returned keeps REQ."
+  (let ((proposal (propose-booking (booking-request-day req)
+                                   (booking-request-destination req)
+                                   (booking-request-passengers req)
+                                   :dep-time (booking-request-dep-time req)
+                                   :ret-time (booking-request-ret-time req)
+                                   :vehicle (booking-request-vehicle req)
+                                   :trips trips)))
+    (when proposal
+      (setf (proposal-request proposal) req))
+    proposal))
 
-  (book-natural \"book a van for swimming next Tuesday for CG and BW at 7 pm to 9 pm\")
-  (book-natural \"Can BW and MM take the DGH to the dentist tomorrow, leaving at 8:30 and back around 11?\")
-  (book-natural \"add GG to the SHMS trip on Thursday\")
+(defun propose-natural (text &key week registered-initials)
+  "PROPOSE-BOOKING from free-form English TEXT: the PROPOSAL BOOK-NATURAL
+would write, or NIL, having printed why, when it would write nothing.
 
 TEXT is parsed by project-isidore/slack-bot/BOOKING-NLP:PARSE-BOOKING.  Destination, day
 and passengers are required; if any is missing, BOOKING-INCOMPLETE is signalled
@@ -660,8 +794,8 @@ and its report tells the user what was understood and how to phrase the
 missing pieces.  That happens before the sheet is read, unless TEXT has a
 lowercase word that may be someone's initials (POSSIBLE-INITIALS): then the
 sheet is read first, so the report does not ask for passengers it was given.
-Times are optional when an existing trip matches; otherwise BOOK signals
-BOOKING-INCOMPLETE for the absent time(s).
+Times are optional when an existing trip matches; otherwise PROPOSE-BOOKING
+signals BOOKING-INCOMPLETE for the absent time(s).
 The sheet's own destination spellings are used as a gazetteer so \"the SHMS
 trip\" joins the existing SHMS trip, and the initials on it, together with
 REGISTERED-INITIALS (the bot's `/iam` and `/subscribe` registrations), let
@@ -688,14 +822,39 @@ to one sheet."
                :text text))
       (unless trips
         (read-sheet-and-reparse))
-      (book (booking-request-day req)
-            (booking-request-destination req)
-            (booking-request-passengers req)
-            :dep-time (booking-request-dep-time req)
-            :ret-time (booking-request-ret-time req)
-            :vehicle (booking-request-vehicle req)
-            :week week
-            :trips trips))))
+      (propose-request req trips))))
+
+(defun revise-proposal (proposal text &key registered-initials)
+  "PROPOSAL, which PROPOSE-NATURAL made, with the changes TEXT asks for (the
+words after `edit`, read by REVISE-BOOKING), proposed afresh against a new
+read of the sheet.  Returns (values REVISED CHANGED): CHANGED lists the
+pieces TEXT named, and REVISED is the new PROPOSAL, or NIL, having printed
+why, when the changed booking cannot be made.  When TEXT names no change,
+both are NIL and nothing is printed.  Signals BOOKING-INCOMPLETE as
+PROPOSE-BOOKING does, when the change leaves a new booking without times.
+REGISTERED-INITIALS is as for PROPOSE-NATURAL."
+  (let ((trips (fetch-all-trips)))
+    (multiple-value-bind (req changed)
+        (revise-booking (proposal-request proposal) text
+                        :known-destinations (known-destinations trips)
+                        :known-initials (union registered-initials (known-initials trips)
+                                               :test #'string=))
+      (values (and changed (propose-request req trips))
+              changed))))
+
+(defun book-natural (text &key week registered-initials)
+  "Book from free-form English TEXT, e.g.
+
+  (book-natural \"book a van for swimming next Tuesday for CG and BW at 7 pm to 9 pm\")
+  (book-natural \"Can BW and MM take the DGH to the dentist tomorrow, leaving at 8:30 and back around 11?\")
+  (book-natural \"add GG to the SHMS trip on Thursday\")
+
+This is PROPOSE-NATURAL, which describes how TEXT is read, followed by
+COMMIT-BOOKING."
+  (let ((proposal (propose-natural text :week week
+                                        :registered-initials registered-initials)))
+    (when proposal
+      (commit-booking proposal))))
 
 (defun month-abbrev-num (abbrev)
   "Return 1-based month number from ABBREV like \"Mar\", \"Apr\", or \"May\".
@@ -1149,6 +1308,21 @@ a code block.  Times such as \"12:00 pm\" fit the Dep and Ret caps.")
                  (emit-cells cells))))
     (get-output-stream-string out)))
 
+(defun schedule-order (a b)
+  "True when trip A comes before trip B in a schedule table: by day, then
+departure time, then vehicle priority.  A day that cannot be read sorts
+first."
+  (let ((ka (or (trip-date-key a) 0))
+        (kb (or (trip-date-key b) 0)))
+    (cond ((< ka kb) t)
+          ((> ka kb) nil)
+          (t (let ((da (departure-minutes (trip-departure a)))
+                   (db (departure-minutes (trip-departure b))))
+               (cond ((< da db) t)
+                     ((> da db) nil)
+                     (t (< (vehicle-priority (trip-vehicle a))
+                           (vehicle-priority (trip-vehicle b))))))))))
+
 (defun view-schedule (&optional (range-phrase "today"))
   "Display booked trips over a natural-language date range as a plaintext table.
    RANGE-PHRASE may be a single day or period (\"today\", \"tomorrow\", \"Apr 20\",
@@ -1189,25 +1363,33 @@ a code block.  Times such as \"12:00 pm\" fit the Dep and Ret caps.")
                             (and k (<= start-key k end-key)
                                  (booked-trip-p tr))))
                         all-trips))
-                     (sorted
-                       (sort in-range
-                             (lambda (a b)
-                               (let ((ka (trip-date-key a))
-                                     (kb (trip-date-key b)))
-                                 (cond ((< ka kb) t)
-                                       ((> ka kb) nil)
-                                       (t (let ((da (departure-minutes (trip-departure a)))
-                                                (db (departure-minutes (trip-departure b))))
-                                            (cond ((< da db) t)
-                                                  ((> da db) nil)
-                                                  (t (< (vehicle-priority (trip-vehicle a))
-                                                        (vehicle-priority (trip-vehicle b))))))))))))
+                     (sorted (sort in-range #'schedule-order))
                      (out (if sorted
                               (format-schedule-table sorted)
                               (format nil "No trips scheduled from ~a to ~a.~%"
                                       start-label end-label))))
                 (format t "~a" out)
                 out)))))))
+
+(defun proposal-day-view (proposal)
+  "The trips already booked on PROPOSAL's day, in the schedule it was decided
+against, as VIEW-SCHEDULE's table, or NIL when none is."
+  (let ((booked (remove-if-not #'booked-trip-p
+                               (find-trips (proposal-trips proposal)
+                                           :day (proposal-day proposal)))))
+    (when booked
+      (format-schedule-table (sort booked #'schedule-order)))))
+
+(defun proposal-trip-view (proposal)
+  "PROPOSAL's trip as it will read once written, as VIEW-SCHEDULE's table."
+  (format-schedule-table (list (proposal-trip proposal))))
+
+(defun proposal-clash-checked-p (proposal)
+  "True when PROPOSAL's times could be read as a window, so that it was
+checked for clashes with the vans and passengers already out that day.  The
+checks are skipped for times that cannot be (BOOKING-OBSTACLE), which the
+asker should hear before saying yes."
+  (and (trip-window (proposal-trip proposal)) t))
 
 (defun date-range-phrase-p (phrase)
   "True when PHRASE is a date range VIEW-SCHEDULE can read: a single day or

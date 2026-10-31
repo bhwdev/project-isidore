@@ -376,7 +376,7 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
   (ok (search "Usage" (sb::cmd-book (make-params "text" "   "))))
   (ok (search "Usage" (sb::cmd-book (make-params))))
   ;; an incomplete booking returns the re-send prompt, not an error banner
-  (with-mocked-functions ((vb:book-natural
+  (with-mocked-functions ((vb:propose-natural
                            (lambda (text &key week registered-initials)
                              (declare (ignore week registered-initials))
                              (error 'bn:booking-incomplete :missing '(:day)
@@ -387,20 +387,21 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
       (ok (search "destination: pool" reply))
       (ok (search (bn:missing-piece-hint :day) reply))
       (ng (search "Booking failed" reply))))
-  ;; the booking's printed output is the reply
-  (with-mocked-functions ((vb:book-natural
+  ;; when there is nothing to propose, what was printed about why is the reply
+  (with-mocked-functions ((vb:propose-natural
                            (lambda (text &key week registered-initials)
                              (declare (ignore text week registered-initials))
-                             (format t "Created DGH booking~%"))))
-    (ok (search "Created DGH booking" (sb::cmd-book (make-params "text" "x")))))
+                             (format t "No vehicle is free~%")
+                             nil)))
+    (ok (search "No vehicle is free" (sb::cmd-book (make-params "text" "x")))))
   ;; silent success
-  (with-mocked-functions ((vb:book-natural
+  (with-mocked-functions ((vb:propose-natural
                            (lambda (text &key week registered-initials)
                              (declare (ignore text week registered-initials))
                              nil)))
     (ok (search "no output" (sb::cmd-book (make-params "text" "x")))))
   ;; other errors are reported with their condition type
-  (with-mocked-functions ((vb:book-natural
+  (with-mocked-functions ((vb:propose-natural
                            (lambda (text &key week registered-initials)
                              (declare (ignore text week registered-initials))
                              (error "boom"))))
@@ -415,11 +416,12 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                              (lambda () '(("U1" . "DMM") ("U2" . "BW"))))
                             (db:all-slack-subscriptions
                              (lambda () '(("U2" . "BW") ("U3" . "CG"))))
-                            (vb:book-natural
+                            (vb:propose-natural
                              (lambda (text &key week registered-initials)
                                (declare (ignore text week))
                                (setf seen registered-initials)
-                               (format t "booked"))))
+                               (format t "booked")
+                               nil)))
       (sb::cmd-book (make-params "text" "dmm and cg to the pool"))
       (ok (= 3 (length seen)))
       (ng (set-exclusive-or '("DMM" "BW" "CG") seen :test #'string=)))))
@@ -508,7 +510,7 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
         (booked '()))
     (with-mocked-functions ((sb::post-slack-message
                              (lambda (channel text) (push (cons channel text) posted)))
-                            (vb:book-natural
+                            (vb:propose-natural
                              (lambda (text &key week registered-initials)
                                (declare (ignore week registered-initials))
                                (push text booked)
@@ -566,7 +568,7 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
         (booked '()))
     (with-mocked-functions ((sb::post-slack-message
                              (lambda (channel text) (push (cons channel text) posted)))
-                            (vb:book-natural
+                            (vb:propose-natural
                              (lambda (text &key week registered-initials)
                                (declare (ignore week registered-initials))
                                (push text booked)
@@ -930,7 +932,8 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
                                (lambda (uid)
                                  (declare (ignore uid))
                                  (values nil "Deacon Matt Marin")))
-                              (sb::book-natural-reply (lambda (text) text)))
+                              (sb::propose-reply
+                               (lambda (text user-id) (declare (ignore user-id)) text)))
         ;; Registered: the booking runs on the rewritten sentence, and the
         ;; reply is the handler's alone.
         (db:add-slack-identity +test-user-id+ "DMM")
@@ -947,11 +950,217 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
   (with-temp-database
       (with-mocked-functions ((sb::slack-user-names
                                (lambda (uid) (declare (ignore uid)) (values nil "Madonna")))
-                              (sb::book-natural-reply
-                               (lambda (text)
-                                 (declare (ignore text))
+                              (sb::propose-reply
+                               (lambda (text user-id)
+                                 (declare (ignore text user-id))
                                  (fail "a booking ran for an unidentified sender"))))
         (let ((reply (sb::run-request "book me a van to the pool"
                                       :user-id +test-user-id+)))
           (ok (search "/iam" reply))
           (ok (search "initials" reply))))))
+
+;;; --- Booking confirmation ---
+
+(defun sample-proposal (&key (destination "Dentist") (vehicle :lgh)
+                             (dep "11:00 am") (ret "12:00 pm"))
+  "A proposal to take VEHICLE to DESTINATION on Thursday April 9, a day the
+DGH is already out to SHMS."
+  (let ((shms (vb:make-trip :day "Thursday April 9" :vehicle :dgh :destination "SHMS"
+                            :departure "8:35 am" :return-time "10:30 am"
+                            :dep-passengers '("MM") :ret-passengers '("MM")))
+        (slot (vb:make-trip :day "Thursday April 9" :vehicle vehicle
+                            :destination "" :departure "" :return-time "")))
+    (vb:make-proposal :action :create :day "Thursday April 9" :slot slot
+                      :trip (vb:make-trip :day "Thursday April 9" :vehicle vehicle
+                                          :destination destination
+                                          :departure dep :return-time ret
+                                          :dep-passengers '("BW") :ret-passengers '("BW"))
+                      :passengers '("BW") :destination destination
+                      :dep-time dep :ret-time ret :trips (list shms slot))))
+
+(defmacro with-booking-mocks ((&key (proposal '(sample-proposal)) commits) &body body)
+  "Run BODY with PROPOSE-NATURAL answering PROPOSAL, COMMIT-BOOKING pushing
+what it is given onto the place COMMITS and printing what it wrote, and
+nothing held for anyone beforehand."
+  `(with-mocked-functions ((sb::registered-initials (lambda () '()))
+                           (vb:propose-natural
+                            (lambda (text &key week registered-initials)
+                              (declare (ignore text week registered-initials))
+                              ,proposal))
+                           (vb:commit-booking
+                            (lambda (proposal)
+                              (push proposal ,commits)
+                              (format t "Created LGH booking on Thursday April 9~%")
+                              (vb:proposal-trip proposal))))
+     (clrhash sb::*pending-bookings*)
+     (unwind-protect (progn ,@body)
+       (clrhash sb::*pending-bookings*))))
+
+(defun book-as (user-id text)
+  (sb::cmd-book (make-params "text" text "user_id" user-id)))
+
+(deftest answer-words
+  (dolist (yes '("y" "Y" "yes" "Yes!" "YES."))
+    (ok (eq :yes (sb::answer-word yes)) yes))
+  (dolist (no '("n" "no" "No." "cancel"))
+    (ok (eq :no (sb::answer-word no)) no))
+  (multiple-value-bind (answer change) (sb::answer-word "Edit: take the LGH")
+    (ok (eq :edit answer))
+    (ok (string= "take the LGH" change)))
+  (ok (equal '(:edit "") (multiple-value-list (sb::answer-word "edit"))))
+  ;; a yes or a no has to stand alone, and "edit" has to be a word
+  (dolist (other '("no van needed after all" "yesterday" "editor" "y not" "" "BW to the pool"))
+    (ng (sb::answer-word other) other)))
+
+(deftest booking-is-confirmed-before-it-is-written
+  (let ((commits '()))
+    (with-booking-mocks (:commits commits)
+      ;; the reply is the day as booked, then the trip, then how to answer
+      (let ((reply (book-as "U1" "BW to the dentist on April 9 11 to noon")))
+        (ok (listp reply))
+        (ok (search "Booked on *Thursday April 9* so far" (first reply)))
+        (ok (search "SHMS" (first reply)))
+        (ok (search "```" (first reply)))
+        (let ((last (car (last reply))))
+          (ok (search "I'd book this trip" last))
+          (ok (search "Dentist" last))
+          (ok (search "11:00 am" last))
+          (ok (search "`y`" last))
+          (ok (search "`edit`" last))
+          (ok (search "15 minutes" last))
+          ;; the way to answer is the last thing read
+          (ok (uiop:string-suffix-p last sb::+answer-reminder+))
+          (ng (search "replaces" last))
+          (ng (search "can't read" last))))
+      (ok (equal '() commits))
+      (ok (sb::held-booking "U1"))
+      ;; another user's yes is not this booking's
+      (ok (search "no booking waiting" (book-as "U2" "y")))
+      (ok (equal '() commits))
+      ;; yes writes it, once
+      (ok (search "Created LGH booking" (book-as "U1" "y")))
+      (ok (= 1 (length commits)))
+      (ng (sb::held-booking "U1"))
+      (ok (search "no booking waiting" (book-as "U1" "yes")))
+      (ok (= 1 (length commits))))))
+
+(deftest booking-answers-no-replace-and-expiry
+  (let ((commits '()))
+    (with-booking-mocks (:commits commits)
+      (book-as "U1" "BW to the dentist on April 9 11 to noon")
+      (ok (search "Cancelled" (book-as "U1" "n")))
+      (ng (sb::held-booking "U1"))
+      ;; a new /book takes the place of one still waiting, and says so
+      (book-as "U1" "BW to the dentist on April 9 11 to noon")
+      (ok (search "replaces the booking you had waiting"
+                  (car (last (book-as "U1" "BW to the pool on April 9 11 to noon")))))
+      ;; a booking past its time is dropped, whatever the answer
+      (setf (sb::pending-booking-expires (sb::held-booking "U1"))
+            (- (get-universal-time) 1))
+      (ok (search "waited more than 15 minutes" (book-as "U1" "y")))
+      (ng (sb::held-booking "U1"))
+      (book-as "U1" "BW to the dentist on April 9 11 to noon")
+      (setf (sb::pending-booking-expires (sb::held-booking "U1"))
+            (- (get-universal-time) 1))
+      (ok (search "waited more than 15 minutes" (book-as "U1" "edit Friday")))
+      (ok (equal '() commits))))
+  ;; times that are not a window are flagged before the yes
+  (let ((commits '()))
+    (with-booking-mocks (:proposal (sample-proposal :dep "7:00 pm" :ret "10:00 am")
+                         :commits commits)
+      (ok (search "can't read this trip's times"
+                  (car (last (book-as "U1" "BW to the dentist on April 9 7pm back at 10am"))))))))
+
+(deftest booking-proposes-nothing-it-cannot-make
+  (let ((commits '()))
+    (with-booking-mocks (:proposal (progn (format t "No vehicle is free on Thursday April 9~%") nil)
+                         :commits commits)
+      (ok (search "No vehicle is free" (book-as "U1" "BW to the dentist on April 9 11 to noon")))
+      (ng (sb::held-booking "U1"))))
+  ;; a yes the sheet no longer allows writes nothing, and says to try again
+  (let ((commits '()))
+    (with-booking-mocks (:commits commits)
+      (with-mocked-functions ((vb:commit-booking
+                               (lambda (proposal)
+                                 (declare (ignore proposal))
+                                 (format t "The LGH was booked for Thursday April 9 while this request was being handled, so nothing was written:~%")
+                                 nil)))
+        (book-as "U1" "BW to the dentist on April 9 11 to noon")
+        (let ((reply (book-as "U1" "y")))
+          (ok (search "while this request was being handled" reply))
+          (ok (search "Send the `/book` request again" reply)))
+        (ng (sb::held-booking "U1"))))))
+
+(deftest booking-edits
+  (let ((commits '())
+        (revised (sample-proposal :vehicle :chevy)))
+    (with-booking-mocks (:commits commits)
+      (book-as "U1" "BW to the dentist on April 9 11 to noon")
+      (let ((original (sb::pending-booking-proposal (sb::held-booking "U1")))
+            (asked '()))
+        ;; a change is proposed afresh and held in the original's place
+        (with-mocked-functions ((vb:revise-proposal
+                                 (lambda (proposal text &key registered-initials)
+                                   (declare (ignore registered-initials))
+                                   (setf asked (list proposal text))
+                                   (values revised '(:vehicle)))))
+          (let ((reply (book-as "U1" "edit take the Chevy")))
+            (ok (eq original (first asked)))
+            (ok (string= "take the Chevy" (second asked)))
+            (ok (search "Booked on *Thursday April 9* so far" (first reply)))
+            (ok (search "CHEVY" (car (last reply))))
+            (ng (search "replaces" (car (last reply)))))
+          (ok (eq revised (sb::pending-booking-proposal (sb::held-booking "U1")))))
+        ;; words that change nothing leave the booking waiting
+        (with-mocked-functions ((vb:revise-proposal
+                                 (lambda (proposal text &key registered-initials)
+                                   (declare (ignore proposal text registered-initials))
+                                   (values nil nil))))
+          (let ((reply (book-as "U1" "edit please")))
+            (ok (search "couldn't find anything to change in \"please\"" reply))
+            (ok (search "still waiting" reply))
+            (ok (uiop:string-suffix-p reply sb::+answer-reminder+))))
+        ;; a change that cannot be booked says why and leaves it waiting
+        (with-mocked-functions ((vb:revise-proposal
+                                 (lambda (proposal text &key registered-initials)
+                                   (declare (ignore proposal text registered-initials))
+                                   (format t "No vehicle is free on Thursday April 9~%")
+                                   (values nil '(:vehicle)))))
+          (let ((reply (book-as "U1" "edit take the DGH")))
+            (ok (search "No vehicle is free" reply))
+            (ok (search "still waiting" reply))))
+        ;; a change that turns a join into a new booking asks for the times
+        (with-mocked-functions ((vb:revise-proposal
+                                 (lambda (proposal text &key registered-initials)
+                                   (declare (ignore proposal text registered-initials))
+                                   (error 'bn:booking-incomplete
+                                          :missing '(:dep-time :ret-time)
+                                          :preamble "No existing trip to SHMS on Friday to join."))))
+          (let ((reply (book-as "U1" "edit Friday")))
+            (ok (search "No existing trip to SHMS" reply))
+            (ok (search "the departure time and the return time" reply))
+            (ok (search "still waiting" reply))))
+        (ok (search "What should I change?" (book-as "U1" "edit")))
+        (ok (eq revised (sb::pending-booking-proposal (sb::held-booking "U1"))))
+        ;; and the yes writes the edited booking
+        (book-as "U1" "y")
+        (ok (equal (list revised) commits))))))
+
+(deftest booking-answers-as-messages
+  ;; A plain `y` reaches the booking held for its sender; with nothing held
+  ;; it is told so, rather than pointed at the commands.
+  (let ((commits '())
+        (posted '()))
+    (with-booking-mocks (:commits commits)
+      (with-mocked-functions ((sb::post-slack-message
+                               (lambda (channel text) (push (cons channel text) posted))))
+        (bt:join-thread (sb::handle-message-event
+                         (message-event "text" "yes" "channel" "D1" "user" "U1")))
+        (ok (search "no booking waiting" (cdr (first posted))))
+        (book-as "U1" "BW to the dentist on April 9 11 to noon")
+        (setf posted '())
+        (bt:join-thread (sb::handle-message-event
+                         (message-event "text" "<@U9> Y" "channel" "D1" "user" "U1")))
+        (ok (= 1 (length commits)))
+        (ok (string= "D1" (car (first posted))))
+        (ok (search "Created LGH booking" (cdr (first posted))))))))

@@ -10,7 +10,7 @@
                 #:year-of #:month-of #:day-of)
   (:export
    ;; parsing
-   #:parse-booking #:possible-initials
+   #:parse-booking #:revise-booking #:possible-initials
    #:self-reference-p #:resolve-self-reference
    #:*self-words* #:*self-contractions*
    #:booking-request #:booking-request-p #:make-booking-request
@@ -44,6 +44,8 @@ decides which time is the departure and which the return, picks the
 destination from the remaining noun material, and resolves dates and times
 with CHRONICITY.  Whatever cannot be found is listed in
 BOOKING-REQUEST-MISSING so the caller can ask the user to re-send the request.
+REVISE-BOOKING lays a correction (\"8 to 10 pm\", \"take the LGH\") over a
+request already parsed, for the `edit` answer to a booking's confirmation.
 
 BOOKING-INCOMPLETE is the condition used to tell the user exactly which pieces
 are missing; its report is ready to post to Slack."))
@@ -705,13 +707,36 @@ incomplete only when there are some."
         when (initial-shaped-p token)
           collect (nlp:token-text token)))
 
-(defun parse-booking (text &key known-destinations known-initials)
+(defun summarize-request (request)
+  "Fill in REQUEST's MISSING and UNDERSTOOD from its other slots, and return
+REQUEST."
+  (let ((values (list :destination (booking-request-destination request)
+                      :day (booking-request-day request)
+                      :passengers (booking-request-passengers request)
+                      :dep-time (booking-request-dep-time request)
+                      :ret-time (booking-request-ret-time request)))
+        (vehicle (booking-request-vehicle request)))
+    (setf (booking-request-missing request)
+          (loop for slot in *booking-slots*
+                unless (getf values slot) collect slot)
+          (booking-request-understood request)
+          (append (loop for slot in *booking-slots*
+                        for v = (getf values slot)
+                        when v append (list slot v))
+                  (when vehicle (list :vehicle vehicle))))
+    request))
+
+(defun parse-booking (text &key known-destinations known-initials fragment)
   "Parse free-form booking TEXT into a BOOKING-REQUEST.  KNOWN-DESTINATIONS
 is an optional list of destination strings already on the sheet; when one
 appears in TEXT it is used verbatim so the booking joins the existing trip.
 KNOWN-INITIALS is an optional list of the initials people go by, in
 uppercase; any of them is read as a passenger in lowercase too (see
-KNOWN-INITIAL-SPANS).  Without it, initials have to be in capitals."
+KNOWN-INITIAL-SPANS).  Without it, initials have to be in capitals.
+FRAGMENT says TEXT corrects a request rather than making one (REVISE-BOOKING):
+its destination is then taken only when a cue such as \"to\" or \"for\"
+introduces it, because the words left over in a correction (\"instead\",
+\"change the time\") are not one."
   (let* ((doc (nlp:make-doc text))
          (ents (progn
                  (nlp:apply-entity-ruler *booking-ruler* doc
@@ -732,26 +757,90 @@ KNOWN-INITIAL-SPANS).  Without it, initials have to be in capitals."
       (multiple-value-bind (dep-span ret-span) (assign-time-roles doc cues)
         (multiple-value-bind (dep-time ret-time dep-phrase ret-phrase)
             (resolve-times dep-span ret-span)
-          (let* ((destination (select-destination
-                               doc ents cues
+          (summarize-request
+           (make-booking-request
+            :text text :doc doc
+            :destination (select-destination
+                          doc ents cues
+                          (and (not fragment)
                                (or day passengers dep-time ret-time)))
-                 (values (list :destination destination :day day
-                               :passengers passengers :dep-time dep-time
-                               :ret-time ret-time))
-                 (missing (loop for slot in *booking-slots*
-                                unless (getf values slot) collect slot))
-                 (understood (append
-                              (loop for slot in *booking-slots*
-                                    for v = (getf values slot)
-                                    when v append (list slot v))
-                              (when vehicle (list :vehicle vehicle)))))
-            (make-booking-request
-             :text text :doc doc :destination destination
-             :day-phrase day-phrase :day-datetime day-dt :day day
-             :passengers passengers
-             :dep-phrase dep-phrase :ret-phrase ret-phrase
-             :dep-time dep-time :ret-time ret-time
-             :vehicle vehicle :missing missing :understood understood)))))))
+            :day-phrase day-phrase :day-datetime day-dt :day day
+            :passengers passengers
+            :dep-phrase dep-phrase :ret-phrase ret-phrase
+            :dep-time dep-time :ret-time ret-time
+            :vehicle vehicle)))))))
+
+(defun revised-times (request edit)
+  "REQUEST's departure and return once EDIT's are laid over it, as (values
+DEP-TIME RET-TIME DEP-PHRASE RET-PHRASE).  When EDIT gives one time and
+REQUEST has the other, the two are read together, as \"DEP to RET\" in one
+request would be (RESOLVE-TIMES), so a time without am or pm takes the
+meaning that fits: after a 7 pm departure \"back at 10\" is 10 pm, and before
+a 9 pm return \"leaving at 8\" is 8 pm.  A pair that cannot be read that way
+keeps EDIT's own reading."
+  (let ((dep-phrase (and (booking-request-dep-time edit) (booking-request-dep-phrase edit)))
+        (ret-phrase (and (booking-request-ret-time edit) (booking-request-ret-phrase edit)))
+        (old-dep (booking-request-dep-time request))
+        (old-ret (booking-request-ret-time request)))
+    (flet ((laid-over ()
+             (values (or (booking-request-dep-time edit) old-dep)
+                     (or (booking-request-ret-time edit) old-ret)
+                     (or dep-phrase (booking-request-dep-phrase request))
+                     (or ret-phrase (booking-request-ret-phrase request)))))
+      (if (and (or dep-phrase ret-phrase) (not (and dep-phrase ret-phrase))
+               old-dep old-ret)
+          (let* ((dep (or dep-phrase old-dep))
+                 (ret (or ret-phrase old-ret))
+                 (pair (parse-booking (format nil "~a to ~a" dep ret))))
+            (if (and (booking-request-dep-time pair) (booking-request-ret-time pair))
+                (values (booking-request-dep-time pair) (booking-request-ret-time pair)
+                        dep ret)
+                (laid-over)))
+          (laid-over)))))
+
+(defun revise-booking (request text &key known-destinations known-initials)
+  "REQUEST, a BOOKING-REQUEST, with the changes TEXT asks for: TEXT is what
+followed `edit` in the answer to a booking's confirmation, such as \"8 to 10
+pm\", \"take the LGH\", \"Friday\" or \"for BW and GG\".  Each piece TEXT
+names replaces REQUEST's and the rest are kept.  Passengers it names replace
+the list, unless TEXT begins with \"add\", when they join it.  Its
+destination needs a cue (PARSE-BOOKING's FRAGMENT), and a lone time is read
+against the one it pairs with (REVISED-TIMES).  KNOWN-DESTINATIONS and
+KNOWN-INITIALS are as for PARSE-BOOKING.
+Returns (values REVISED CHANGED): CHANGED lists the pieces TEXT named, from
+*BOOKING-SLOTS* and :VEHICLE.  When it named none, REVISED is REQUEST and
+CHANGED is NIL."
+  (let* ((edit (parse-booking text :known-destinations known-destinations
+                                   :known-initials known-initials
+                                   :fragment t))
+         (changed (loop for slot in (append *booking-slots* '(:vehicle))
+                        when (getf (booking-request-understood edit) slot)
+                          collect slot)))
+    (if (null changed)
+        (values request nil)
+        (let ((revised (copy-booking-request request)))
+          (when (booking-request-destination edit)
+            (setf (booking-request-destination revised) (booking-request-destination edit)))
+          (when (booking-request-day edit)
+            (setf (booking-request-day revised) (booking-request-day edit)
+                  (booking-request-day-phrase revised) (booking-request-day-phrase edit)
+                  (booking-request-day-datetime revised) (booking-request-day-datetime edit)))
+          (when (booking-request-passengers edit)
+            (setf (booking-request-passengers revised)
+                  (if (cl-ppcre:scan "(?i)^\\s*add\\b" text)
+                      (remove-duplicates (append (booking-request-passengers request)
+                                                 (booking-request-passengers edit))
+                                         :test #'string= :from-end t)
+                      (booking-request-passengers edit))))
+          (when (booking-request-vehicle edit)
+            (setf (booking-request-vehicle revised) (booking-request-vehicle edit)))
+          (multiple-value-bind (dep-time ret-time dep-phrase ret-phrase)
+              (revised-times request edit)
+            (setf (booking-request-dep-time revised) dep-time
+                  (booking-request-ret-time revised) ret-time
+                  (booking-request-dep-phrase revised) dep-phrase
+                  (booking-request-ret-phrase revised) ret-phrase))
+          (values (summarize-request revised) changed)))))
 
 (defparameter *self-contractions*
   '(("i'm"   . "~a is")

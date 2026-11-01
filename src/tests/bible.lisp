@@ -171,6 +171,12 @@ PROJECT-ISIDORE/BIBLE/DATABASE), so elsewhere they skip."))
 
 ;;; =====================================================================
 ;;; resolve-bible-path
+
+;; A reference from the URL is parsed as a string, not interned: a symbol for
+;; every distinct path requested would never be freed.  Needs no store.
+(deftest verse-reference-not-interned
+  (ignore-errors (reader::parse-verse-arg "nosuchbook-1-1"))
+  (ok (null (find-symbol "NOSUCHBOOK-1-1" :project-isidore/bible/reader))))
 ;;; =====================================================================
 
 ;; Symbolic single-verse path resolves to a one-element UID list.

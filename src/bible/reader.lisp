@@ -14,7 +14,7 @@
                 #:set-on-submit #:style #:url #:url-rewrite #:value #:window)
   (:import-from #:quri)
   (:import-from #:project-isidore/bible/database #:+bible-book-url-alist+)
-  (:import-from #:project-isidore/site/layout #:with-page-chrome)
+  (:import-from #:project-isidore/site/layout #:escape-html #:with-page-chrome)
   (:local-nicknames (#:bible #:project-isidore/bible/text))
   (:export #:register-routes)
   (:documentation
@@ -34,17 +34,11 @@ shows a passage with its commentary in a table, /bible-search searches it."))
             "An example of a valid URL is <code>/bible/matthew-4-14/john-3-15</code> where the ending input is optional. Instead of <code>matthew</code> the number 47 may be used instead. This does not hold true for the chapter or verse which must be numeric. <a href=\"https://github.com/bhwdev/project-isidore/blob/master/src/bible/reader.lisp\">Consult the source repository on what constitutes a valid URL (N.B. the function PARSE-UID-SYM)</a> or <a href=\"/contact\">contact me for more information.</a>"))
 
 (defun render-negative-range-page (obj invalid-range)
-  "Render 416 Range Not Specifiable content into OBJ."
-  (let* ((bi (car invalid-range))
-         (ei (cadr invalid-range))
-         (corrected-link
-           (if (symbolp (car invalid-range))
-               (concatenate 'string "/bible/"
-                            (string-downcase (string (cadr invalid-range))) "/"
-                            (string-downcase (string (car invalid-range))) "/")
-               (concatenate 'string "/bible/"
-                            (write-to-string (cadr invalid-range)) "/"
-                            (write-to-string (car invalid-range)) "/"))))
+  "Render 416 Range Not Specifiable content into OBJ.  INVALID-RANGE is the
+beginning and ending references as the URL wrote them, so they are escaped."
+  (let* ((bi (escape-html (first invalid-range)))
+         (ei (escape-html (second invalid-range)))
+         (corrected-link (format nil "/bible/~A/~A/" ei bi)))
     (create-section obj :h1 :content "1883 Haydock Douay Rheims Bible")
     (create-section obj :h4 :content "Error Code 416 - Range Not Specifiable")
     (create-p obj :content
@@ -57,11 +51,13 @@ shows a passage with its commentary in a table, /bible-search searches it."))
 
 (defun parse-verse-arg (str)
   "Parse a verse argument as either a numeric UID or a symbolic reference.
-Pure integers are returned directly; otherwise `parse-uid-sym' is used."
+Pure integers are returned directly; otherwise `parse-uid-sym' is used, on
+the string: interning text from the URL would add a symbol to the package
+for every distinct path requested, which is never freed."
   (let ((n (parse-integer str :junk-allowed t)))
     (if (and n (string= (write-to-string n) str))
         n
-        (parse-uid-sym (intern (string-upcase str))))))
+        (parse-uid-sym (string-upcase str)))))
 
 (defun parse-uid-sym (uid-sym)
   "Human readable call to `view:bible-page'. UID-SYM must be of the following format,

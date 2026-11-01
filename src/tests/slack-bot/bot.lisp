@@ -13,6 +13,7 @@
   (:import-from #:alexandria #:plist-hash-table)
   (:import-from #:bordeaux-threads)
   (:import-from #:com.inuoe.jzon)
+  (:import-from #:dexador)
   (:import-from #:flexi-streams)
   (:import-from #:ironclad)
   (:documentation
@@ -215,9 +216,11 @@ WITH-MOCKED-FUNCTIONS."))
 
 (defun sign (secret timestamp body)
   "Compute Slack's v0 request signature for BODY at TIMESTAMP with SECRET."
-  (let ((hmac (ironclad:make-hmac (ironclad:ascii-string-to-byte-array secret) :sha256)))
-    (ironclad:update-hmac hmac (ironclad:ascii-string-to-byte-array
-                                (format nil "v0:~a:~a" timestamp body)))
+  (let ((hmac (ironclad:make-hmac (flexi-streams:string-to-octets secret :external-format :utf-8)
+                                  :sha256)))
+    (ironclad:update-hmac hmac (flexi-streams:string-to-octets
+                                (format nil "v0:~a:~a" timestamp body)
+                                :external-format :utf-8))
     (format nil "v0=~(~{~2,'0X~}~)" (coerce (ironclad:hmac-digest hmac) 'list))))
 
 (defun body-env (string &rest plist)
@@ -259,11 +262,35 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
     ;; missing or malformed pieces
     (ng (sb::verify-slack-signature nil body "v0=00"))
     (ng (sb::verify-slack-signature ts body nil))
-    (ng (sb::verify-slack-signature "not-a-number" body "v0=00")))
+    (ng (sb::verify-slack-signature "not-a-number" body "v0=00"))
+    ;; Slack signs the UTF-8 octets, so a body beyond ASCII verifies too, and
+    ;; a signature header beyond Latin-1 is refused rather than signalling
+    (let ((utf8 "{\"text\":\"Marín → 日本\"}"))
+      (ok (sb::verify-slack-signature ts utf8 (sign "testsecret" ts utf8))))
+    (ng (sb::verify-slack-signature ts body "v0=日本")))
   ;; no secret configured -> nothing verifies
   (let ((sb::*slack-signing-secret* nil)
         (ts (princ-to-string (unix-now))))
-    (ng (sb::verify-slack-signature ts "b" (sign "testsecret" ts "b")))))
+    (ng (sb::verify-slack-signature ts "b" (sign "testsecret" ts "b"))))
+  ;; nor with an empty one, the key anyone could sign with
+  (let ((sb::*slack-signing-secret* "")
+        (ts (princ-to-string (unix-now))))
+    (ng (sb::verify-slack-signature ts "b" (sign "" ts "b")))))
+
+(deftest slack-control-sequences-escaped
+  ;; what a reply quotes back cannot ping a channel or disguise a link
+  (ok (string= "&lt;!channel&gt; &lt;https://x.example|y&gt; a &amp; b -&gt; c"
+               (sb::escape-control-sequences
+                "<!channel> <https://x.example|y> a &amp; b -> c")))
+  (ok (string= "plain *bold* `code`" (sb::escape-control-sequences "plain *bold* `code`")))
+  ;; and POST-SLACK-MESSAGE sends the escaped text
+  (let ((sent nil))
+    (with-mocked-functions ((dexador:post (lambda (url &key content &allow-other-keys)
+                                            (declare (ignore url))
+                                            (setf sent (com.inuoe.jzon:parse content))
+                                            "{\"ok\":true}")))
+      (sb::post-slack-message "C1" "I can't read \"<!here>\" as a day"))
+    (ok (string= "I can't read \"&lt;!here&gt;\" as a day" (gethash "text" sent)))))
 
 (deftest request-helpers
   ;; strip-mention
@@ -280,6 +307,14 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
   (ok (string= "héllo=wörld" (sb::read-body-string (body-env "héllo=wörld"))))
   (ok (string= "" (sb::read-body-string (body-env ""))))
   (ng (sb::read-body-string '(:path-info "/x")))
+  ;; ...and reads no more than *MAX-BODY-OCTETS*, whatever the length declared
+  (let ((sb::*max-body-octets* 4))
+    (ok (string= "abcd" (sb::read-body-string (body-env "abcd"))))
+    (ng (sb::read-body-string (body-env "abcde")))
+    (ng (sb::read-body-string (body-env "abcde" :content-length 1000)))
+    (ok (string= "ab" (sb::read-body-string (body-env "ab" :content-length 2))))
+    ;; a body longer than it declares is refused too
+    (ng (sb::read-body-string (body-env "abc" :content-length 2))))
   ;; help text describes the free-form contract
   (dolist (needle '("destination" "day" "passengers" "times" "vehicle" "re-send"
                     "/view" "/subscribe" "/unsubscribe" "/help"))

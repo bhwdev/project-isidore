@@ -6,6 +6,7 @@
   (:import-from #:bordeaux-threads)
   (:import-from #:cffi)
   (:import-from #:cl+ssl)
+  (:import-from #:cl-ppcre)
   (:import-from #:clog #:initialize #:is-running-p #:shutdown)
   (:import-from #:dexador)
   (:import-from #:ironclad)
@@ -55,6 +56,52 @@ entry point."))
 (defun conn::random-hex-string ()
   "Generate a cryptographic 128-bit random hex string for connection IDs."
   (ironclad:byte-array-to-hex-string (ironclad:random-data 16)))
+
+;;; Request guard
+
+(defparameter *max-request-octets* (* 1024 1024)
+  "The largest request body the server accepts.  Nothing it serves takes an
+upload: Slack's requests are a few kilobytes, and the browser talks to CLOG
+over its websocket.")
+
+(defun safe-path-p (path)
+  "True when PATH, a request's decoded path, is one the site may serve:
+'/'-separated segments of letters, digits and -_.~, none of them empty or
+beginning with a dot or a tilde.
+
+CLOG hands any path no page claims to Lack's file server, which drops the
+leading slash and merges the rest into the static root as an SBCL namestring.
+That rejects \"..\" but not the forms that make the result absolute or
+point elsewhere: \"//etc/passwd\" (also \"/%2Fetc/passwd\") reads
+/etc/passwd, \"/~/x\" the server's home directory, and \"/SYS:SRC;...\"
+a logical pathname.  Dot-segments are refused too, so a checkout's .git
+is not served."
+  (and (stringp path)
+       (cl-ppcre:scan "^(?:/[A-Za-z0-9_-][A-Za-z0-9_.~-]*)*/?$" path)
+       t))
+
+(defun make-request-guard ()
+  "Return a Lack middleware, to run before every other, that answers 400 to
+a path that is not SAFE-PATH-P, 411 to a body without a Content-Length, and
+413 to one longer than *MAX-REQUEST-OCTETS*.
+
+The body limits protect handlers that size a buffer from Content-Length or
+read the body whole before anything is authenticated: CLOG makes a string
+of Content-Length characters for any form POST to one of its pages, so a
+single request declaring a huge length exhausts the heap and kills the
+process, and the Slack endpoints read the body before checking its
+signature."
+  (lambda (app)
+    (lambda (env)
+      (let ((length (getf env :content-length))
+            (headers (getf env :headers)))
+        (cond ((not (safe-path-p (getf env :path-info)))
+               '(400 (:content-type "text/plain") ("Bad Request")))
+              ((and headers (gethash "transfer-encoding" headers))
+               '(411 (:content-type "text/plain") ("Length Required")))
+              ((and length (not (<= 0 length *max-request-octets*)))
+               '(413 (:content-type "text/plain") ("Payload Too Large")))
+              (t (funcall app env)))))))
 
 (defun wait-for-port-ready (port &key (host "127.0.0.1") (timeout 5.0) (interval 0.05))
   "Block until the web server on HOST:PORT has fully started, or TIMEOUT
@@ -106,7 +153,9 @@ site, the bible reader and the bot's endpoints on PORT, on localhost."
               :host "127.0.0.1"
               :port port
               :extended-routing t
-              :lack-middleware-list (list (bot:make-slack-middleware))
+              ;; The first is outermost: the guard sees every request first.
+              :lack-middleware-list (list (make-request-guard)
+                                          (bot:make-slack-middleware))
               :static-root (namestring
                             (asdf:system-relative-pathname :project-isidore "./")))
   (pages:register-routes)

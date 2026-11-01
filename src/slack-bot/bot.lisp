@@ -113,9 +113,11 @@ the project plan for Slack app configuration details."))
   "Load Slack credentials from environment variables.
 Must be called at runtime (from the application entry point), not at
 build time — a tree-shaken executable has no load-time at startup, so
-values read inside EVAL-WHEN would be baked in from the build host."
-  (setf *slack-bot-token* (uiop:getenv "SLACK_BOT_TOKEN"))
-  (setf *slack-signing-secret* (uiop:getenv "SLACK_SIGNING_SECRET")))
+values read inside EVAL-WHEN would be baked in from the build host.
+A variable set to the empty string counts as unset: an empty signing secret
+is an HMAC key anyone can sign with."
+  (setf *slack-bot-token* (uiop:getenvp "SLACK_BOT_TOKEN"))
+  (setf *slack-signing-secret* (uiop:getenvp "SLACK_SIGNING_SECRET")))
 
 (defvar *slash-commands* ()
   "Dispatch alist: slash command name -> handler symbol.
@@ -215,8 +217,9 @@ a message is read as a request: a booking needs `/book`.")
 Returns T if valid, NIL otherwise.
 TIMESTAMP is the X-Slack-Request-Timestamp header value (string).
 BODY-STRING is the raw request body.
-SIGNATURE is the X-Slack-Signature header value (v0=hex...)."
-  (when (or (null *slack-signing-secret*) (null signature) (null timestamp))
+SIGNATURE is the X-Slack-Signature header value (v0=hex...).
+Slack signs the body's UTF-8 octets, so BODY-STRING is encoded back to them."
+  (when (or (zerop (length *slack-signing-secret*)) (null signature) (null timestamp))
     (return-from verify-slack-signature nil))
   ;; Reject timestamps older than 5 minutes (replay protection)
   (let ((ts (parse-integer timestamp :junk-allowed t)))
@@ -225,20 +228,32 @@ SIGNATURE is the X-Slack-Signature header value (v0=hex...)."
                                    (+ ts 2208988800)))
                            300))
       (return-from verify-slack-signature nil)))
-  (let* ((basestring (format nil "v0:~A:~A" timestamp body-string))
-         (key-bytes (ironclad:ascii-string-to-byte-array *slack-signing-secret*))
-         (hmac (ironclad:make-hmac key-bytes :sha256)))
-    (ironclad:update-hmac hmac (ironclad:ascii-string-to-byte-array basestring))
-    (let* ((digest (ironclad:hmac-digest hmac))
-           (computed (format nil "v0=~(~{~2,'0X~}~)" (coerce digest 'list))))
-      (ironclad:constant-time-equal
-       (ironclad:ascii-string-to-byte-array computed)
-       (ironclad:ascii-string-to-byte-array signature)))))
+  (flet ((octets (string)
+           (flexi-streams:string-to-octets string :external-format :utf-8)))
+    (let* ((basestring (format nil "v0:~A:~A" timestamp body-string))
+           (hmac (ironclad:make-hmac (octets *slack-signing-secret*) :sha256)))
+      (ironclad:update-hmac hmac (octets basestring))
+      (let* ((digest (ironclad:hmac-digest hmac))
+             (computed (format nil "v0=~(~{~2,'0X~}~)" (coerce digest 'list))))
+        (ironclad:constant-time-equal (octets computed) (octets signature))))))
 
 ;;; Slack API
 
+(defun escape-control-sequences (text)
+  "TEXT with < and > written as &lt; and &gt;, which Slack shows as < and >.
+Between them Slack reads control sequences -- <!channel>, <!here>, <@U123>,
+<https://example.com|any label> -- and the bot's replies quote what people
+sent it (\"I can't read ... as a day\"), so unescaped, anyone could make the
+bot ping a whole channel or post a link labelled as something else.  The
+bot's own messages use none.  & is left alone: Events API text arrives with
+it already escaped, as &amp;, which Slack shows as &."
+  (cl-ppcre:regex-replace-all
+   "[<>]" text (lambda (match) (if (string= match "<") "&lt;" "&gt;"))
+   :simple-calls t))
+
 (defun post-slack-message (channel text)
-  "Post TEXT to Slack CHANNEL using the chat.postMessage API.
+  "Post TEXT to Slack CHANNEL using the chat.postMessage API, with Slack's
+control sequences escaped (ESCAPE-CONTROL-SEQUENCES).
 chat.postMessage returns HTTP 200 even when the call is rejected (e.g.
 not_authed, channel_not_found) — the real status is in the JSON body's
 \"ok\" field. Log rejections to *error-output* so bad credentials don't
@@ -247,7 +262,8 @@ fail silently."
       (let ((resp (dex:post "https://slack.com/api/chat.postMessage"
                             :content (com.inuoe.jzon:stringify
                                       (plist-hash-table
-                                       (list "channel" channel "text" text)
+                                       (list "channel" channel
+                                             "text" (escape-control-sequences text))
                                        :test #'equal))
                             :headers `(("Content-Type" . "application/json; charset=utf-8")
                                        ("Authorization" . ,(format nil "Bearer ~A" *slack-bot-token*))))))
@@ -717,12 +733,24 @@ synchronously or ignored."
 
 ;;; Lack Middleware
 
+(defparameter *max-body-octets* (* 1024 1024)
+  "The longest request body READ-BODY-STRING reads; Slack's are a few
+kilobytes.  The body is read before its signature can be checked, so this
+bounds what an unauthenticated POST can make the bot hold in memory.")
+
 (defun read-body-string (env)
-  "Read the raw request body from a Lack/Clack ENV plist into a UTF-8 string."
+  "Read the raw request body from a Lack/Clack ENV plist into a UTF-8 string,
+or return NIL when there is none or it is longer than *MAX-BODY-OCTETS*."
   (let ((stream (getf env :raw-body)))
     (when stream
-      (let ((octets (alexandria:read-stream-content-into-byte-vector stream)))
-        (flexi-streams:octets-to-string octets :external-format :utf-8)))))
+      (let* ((declared (getf env :content-length))
+             (buffer (make-array (1+ (if (and declared (<= 0 declared *max-body-octets*))
+                                         declared
+                                         *max-body-octets*))
+                                 :element-type '(unsigned-byte 8)))
+             (end (read-sequence buffer stream)))
+        (when (< end (length buffer))
+          (flexi-streams:octets-to-string buffer :end end :external-format :utf-8))))))
 
 (defun json-response (status hash-table)
   "Return a Lack response triplet with JSON content."

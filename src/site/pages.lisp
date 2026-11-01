@@ -11,7 +11,7 @@
                 #:html-document #:html-id #:inner-html #:js-execute #:location
                 #:path-name #:set-on-new-window #:set-styles #:title #:validp)
   (:import-from #:clog-web #:clog-web-initialize)
-  (:import-from #:project-isidore/site/layout #:with-page-chrome)
+  (:import-from #:project-isidore/site/layout #:escape-html #:with-page-chrome)
   (:export #:on-index-handler
            #:register-routes)
   (:documentation
@@ -241,7 +241,9 @@ behind any pre-rendered SSR content in the stacking order."))
       (lambda (main)
         (create-section main :h1 :content "404. That's an error." :class "title")
         (create-p main :content
-                  (format nil "The requested URL <code>~A</code> was not found on this server. But that's not all we know..." path))
+                  ;; PATH is whatever the browser reports, so it is escaped.
+                  (format nil "The requested URL <code>~A</code> was not found on this server. But that's not all we know..."
+                          (escape-html path)))
         (create-p main :content
                   "Please validate the URL. <a href=\"https://www.w3.org/Provider/Style/URI\">Although I try my best to keep permanent, eternal, everlasting URLs,</a> Mea culpa. If you have a vague certainty that something should be here but isn't; <a href=\"https://github.com/bhwdev/project-isidore\">please browse the source repository</a> or <a href=\"/contact\">contact me for more information.</a>")))))
 

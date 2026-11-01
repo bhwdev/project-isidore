@@ -6,12 +6,26 @@
   (:import-from #:clog
                 #:create-child #:create-div #:head-element #:html-document #:load-script)
   (:import-from #:clog-web #:clog-web-initialize)
-  (:export #:with-page-chrome)
+  (:export #:with-page-chrome
+           #:escape-html)
   (:documentation
    "The frame every page of the site shares: stylesheet, theme script, navbar
 and footer, around content a page fills in."))
 
 (in-package #:project-isidore/site/layout)
+
+(defun escape-html (string)
+  "STRING with & < > \" ' written as character references, for text or a
+quoted attribute value in HTML.  CLOG's ESCAPE-FOR-HTML does only < and >."
+  (with-output-to-string (out)
+    (loop for ch across string
+          do (case ch
+               (#\& (write-string "&amp;" out))
+               (#\< (write-string "&lt;" out))
+               (#\> (write-string "&gt;" out))
+               (#\" (write-string "&quot;" out))
+               (#\' (write-string "&#39;" out))
+               (t (write-char ch out))))))
 
 (defun create-navbar (parent)
   "Create the site navbar matching the blog archive style. Styled via global.css."

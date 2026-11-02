@@ -26,10 +26,11 @@ mirroring `src/`.
 ## Commands
 
 - `guix build -f guix.scm`: compiles, runs every test suite (the `check`
-  phase), then saves `bin/project-isidore` from an image that loaded only the
-  system. Its source is the files of HEAD's commit (Guix's `git-predicate`)
-  with their working-tree contents, so a new file is left out until it is
-  committed.
+  phase), then saves the executable (`bin/project-isidore` in its store
+  output) from an image that loaded only the system. Its source is the files
+  of HEAD's commit (Guix's `git-predicate`) with their working-tree contents,
+  so a new file is left out until it is committed. Production builds the same
+  file with the host's Guix (README.org, "Deployment").
 - `guix shell -D -f guix.scm`: the development environment. Its cache follows
   `guix.scm`'s mtime, so it is never stale.
 
@@ -70,5 +71,5 @@ the worker finds the dependencies however Claude Code was started. Then
 `load-system` `project-isidore/tests`. After a change to `guix.scm` that
 needs a package built, build the shell once (`guix shell -D -f guix.scm --
 true`) before starting Claude Code, or cl-mcp may time out connecting. Not
-CI's Guix (`guix time-machine --commit=v1.5.0`): its fasls are SBCL 2.5.8,
-the worker is cl-mcp's 2.6.4, and loading fails with `INVALID-FASL-VERSION`.
+under another Guix's `time-machine`: its SBCL may differ from cl-mcp's, and
+loading then fails with `INVALID-FASL-VERSION`.

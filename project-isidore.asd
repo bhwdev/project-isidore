@@ -1,11 +1,8 @@
 ;;;; SPDX-FileCopyrightText: 2021  Ben H. W. <foss@bhw.name>
 ;;;; SPDX-License-Identifier: AGPL-3.0-or-later
 
-#-asdf3.3 (error "Project Isidore requires ASDF 3.3 or later. Please upgrade your ASDF. See commit bf210b8.")
-
 (asdf:defsystem "project-isidore"
   :name "Project Isidore"
-  :version "2.0.0"
   :author " Ben H. W.<foss@bhw.name>"
   :maintainer " Ben H. W.<foss@bhw.name>"
   :description "Personal Web Application"

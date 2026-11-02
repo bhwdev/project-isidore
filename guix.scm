@@ -7,9 +7,10 @@
 ;;;   guix build -f guix.scm       compiles, tests, and saves bin/project-isidore
 ;;;   guix shell -D -f guix.scm    development environment: SBCL and the inputs
 ;;;
-;;; .github/workflows/deploy.yml packs it into the container image, with the
-;;; Guix release its GUIX_VERSION names.  Prefix any of these with
-;;; `guix time-machine --commit=vGUIX_VERSION --' to use that Guix.
+;;; Production builds it with the host's own Guix: the deploy hook that
+;;; .github/workflows/deploy.yml runs installs it with `guix package -f'.
+;;; `guix time-machine --commit=COMMIT --' before any of these uses that
+;;; Guix; `ssh oci-a1-flex guix describe' names the host's.
 
 (use-modules (guix packages)
              (guix gexp)
@@ -114,7 +115,7 @@ Prolog-like query language.")
 (define-public project-isidore
   (package
     (name "project-isidore")
-    (version "1.2.2")
+    (version "2.0.0")
     (source (local-file "." "project-isidore-checkout"
                         #:recursive? #t
                         #:select? vcs-file?))

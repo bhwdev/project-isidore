@@ -13,8 +13,8 @@ otherwise noted.
 
 Prerequisite(s): [[https://guix.gnu.org/][GNU Guix]], which provides [[http://www.sbcl.org/][SBCL]] and every Common Lisp dependency.
 =guix.scm= defines the package, including the dependencies Guix lacks, and
-its inputs are the development environment. CI builds with the Guix release
-that =GUIX_VERSION= in =.github/workflows/deploy.yml= names.
+its inputs are the development environment. Production builds it with the
+host's own Guix (see "Deployment").
 
 The code is three parts served by one process, each a group of
 package-inferred systems under =src/=:
@@ -67,51 +67,40 @@ graph-db plumbing the two databases share. The tests mirror this tree under
 
    #+begin_src bash
      $ guix build -f guix.scm
-     $ /gnu/store/...-project-isidore-1.2.2/bin/project-isidore
+     $ /gnu/store/...-project-isidore-2.0.0/bin/project-isidore
    #+end_src
 
-5. To build the container image that production runs,
+   Prefix =guix time-machine --commit=COMMIT --= to build it with another
+   Guix, such as production's (=ssh oci-a1-flex guix describe=).
+
+   Production runs it as a Shepherd service of its own user: Hunchentoot on
+   127.0.0.1:8080 and Slynk on 4005, with these in its environment:
 
    #+begin_src bash
-     $ guix pack -f docker \
-         --image-tag=project-isidore --entry-point=bin/project-isidore \
-         --symlink=/etc/ssl=etc/ssl --symlink=/usr/share/zoneinfo=share/zoneinfo \
-         --file=guix.scm nss-certs tzdata
-     $ podman load --input /gnu/store/...-docker-pack.tar.gz
+     HOME=/var/lib/project-isidore
+     PROJECT_ISIDORE_DATA=/var/lib/project-isidore/  # the bot's store, graph-db's system directory
+     SSL_CERT_DIR=/etc/ssl/certs                     # Guix's OpenSSL looks in its own store directory otherwise
+     SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+     # and SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET, VAN_SCHEDULE_SECRET
    #+end_src
 
-   Prefix =guix time-machine --commit=vGUIX_VERSION --= to =guix pack= to
-   build it with CI's Guix, as production's image is.
-
-   Production runs it as below: host networking (Hunchentoot on 127.0.0.1:8080,
-   Slynk on 4005), catatonit as PID 1, the bible
-   store and the data directory (the bot's store and graph-db's system
-   directory) mounted from the host, secrets from an environment file. The image has no =/etc/passwd=, so =HOME= is set for UIOP.
-
-   #+begin_src bash
-     $ podman run --rm --init --network=host \
-         --volume=/var/local/project-isidore:/var/local/project-isidore \
-         --volume=/root/.local/share/project-isidore:/var/lib/project-isidore \
-         --env=HOME=/root --env=PROJECT_ISIDORE_DATA=/var/lib/project-isidore/ \
-         --env=SSL_CERT_DIR=/etc/ssl/certs \
-         --env=SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
-         --env=TZDIR=/usr/share/zoneinfo --env=TZ=America/Toronto \
-         --env-file=secrets.env localhost/project-isidore:latest
-   #+end_src
+   The bible store and Montezuma index are in =/var/local/project-isidore/=.
 
 ** Deployment
 
-A push to =master= deploys. [[file:.github/workflows/deploy.yml][.github/workflows/deploy.yml]] builds the image with =guix
-pack= on a GitHub-hosted arm64 runner (production is aarch64), pushes it to
-=ghcr.io/bhwdev/project-isidore=, and connects to the production host with a key
-that can do nothing there but run its deploy hook: pull that image by digest,
-tag it =localhost/project-isidore:latest= and restart the service that runs it.
-The host runs Guix System, and the hook, that service (root Podman, the host's
-network, the data directories as volumes, the secrets as an env file) and
-Caddy are its system configuration, kept outside this repository.
-The workflow runs =ssh root@HOST IMAGE@DIGEST=; sshd hands =IMAGE@DIGEST= to the
-hook in =SSH_ORIGINAL_COMMAND=, and the hook refuses (exit 64) anything but
-=ghcr.io/bhwdev/project-isidore@sha256:= and 64 hex digits. One-time setup:
+A push to =master= deploys. [[file:.github/workflows/deploy.yml][.github/workflows/deploy.yml]] connects to the
+production host with a key that can do nothing there but run its deploy hook,
+and hands it the commit: =ssh root@HOST COMMIT=. sshd passes =COMMIT= to the
+hook in =SSH_ORIGINAL_COMMAND=, and the hook refuses (exit 64) anything but 40
+hex digits. It fetches GitHub's archive of that commit, builds =guix.scm= with
+the host's Guix (the build runs the test suites; a failure stops the deploy
+before the restart), installs the program as the next generation of the
+profile =/var/guix/profiles/project-isidore=, and restarts the service. The
+host runs Guix System; the hook, the service and Caddy are its system
+configuration, kept outside this repository. So the host's Guix, not this
+repository, fixes the SBCL and Lisp libraries that production builds with.
+To roll back: =guix package -p /var/guix/profiles/project-isidore --roll-back=,
+then =herd restart project-isidore=. One-time setup:
 
 1. On the host, allow a new deploy key in root's authorized keys, for the hook
    only:
@@ -124,13 +113,6 @@ hook in =SSH_ORIGINAL_COMMAND=, and the hook refuses (exit 64) anything but
    limited to the =master= branch, with the secret =DEPLOY_SSH_KEY= (the private
    key) and the variables =DEPLOY_HOST= (the host's address) and =DEPLOY_KNOWN_HOSTS=
    (=ssh-keyscan= output for it).
-
-3. Push. Once the image is on ghcr.io, make the =project-isidore= package public
-   (its settings page on GitHub), or the host cannot pull it anonymously. The
-   workflow can only write to a package it created; one that already exists (as
-   =ghcr.io/bhwdev/project-isidore= does, from an earlier repository) refuses
-   the push with =permission_denied: write_package= until the package's settings
-   grant this repository the Write role under "Manage Actions access".
 
 The Slack bot reads and writes the van schedule through a Google Apps Script
 web app, =src/slack-bot/van-booking.gs=, which is deployed by hand: its header

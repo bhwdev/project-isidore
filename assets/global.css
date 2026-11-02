@@ -25,6 +25,9 @@
      slashed or dotted zero. */
   --font-mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo,
                "DejaVu Sans Mono", "Liberation Mono", monospace;
+  /* Not a colour either: BODY's width from 910px, which the margins below
+     are measured from. */
+  --column: 900px;
 
   --page-bg: #FDF6E3;
   --text: #333;
@@ -67,6 +70,8 @@
   --mark-bg: #ffff00;
   --inlinetask-bg: #ffffcc;
   --timestamp-kwd: #2f6f70;
+  /* A footnote and its number while either is pointed at or focused. */
+  --note-hover: #F2E6C6;
 
   --button-bg: #F5DEB3;
   --button-fg: #222222;
@@ -132,6 +137,7 @@
     --mark-bg: #6b5300;
     --inlinetask-bg: #3a3120;
     --timestamp-kwd: #a9c49a;
+    --note-hover: #3b3024;
 
     --button-bg: #3b3024;
     --button-fg: #f0e6d0;
@@ -209,7 +215,7 @@ body  { width:  95%; margin:  2% auto; font-size:  18px; line-height:
    guideline, and 20px from 650px, which also brings the 900px column
    closer to a readable measure (about 100 characters of Palatino). */
 @media screen and (min-width: 650px)  { body  { font-size:  20px; } }
-@media screen and (min-width: 910px)  { body  { width:  900px; } }
+@media screen and (min-width: 910px)  { body  { width:  var(--column); } }
 /* ---------------------------------------------------------------------------
    Running text in Org pages, after gwern.net's head.css.
 
@@ -509,6 +515,70 @@ button:disabled {
 .org-sh-quoted-exec  { color:  var(--syn-function); }
 .org-sh-escaped-newline  { color:  var(--syn-regexp); }
 .org-org-level-1  { color:  var(--heading); }
+
+/* ---------------------------------------------------------------------------
+   The margins, after https://karthinks.com/software/understanding-org-latex-preview/
+   with the sides swapped: the table of contents on the left, the footnotes on
+   the right.  Its share, top and previous-post buttons are left out.
+
+   They come in only once both margins have room: from 1440px a margin is
+   at least (1440 - 17px scrollbar - 900) / 2 = 261px, a 205px panel after
+   2rem from the text and 1rem from the window edge.  Narrower, nothing
+   changes: the contents stay at the top of the page, the arrow before each
+   heading goes back to them, and the footnote numbers link down to the
+   notes and back up.
+
+   The contents are a fixed panel.  Percentages on a fixed box are of the
+   viewport less its scrollbar, so 50% + half the column is exactly the
+   column's left edge.
+
+   Org puts the footnotes at the end of the page, so theme.js copies each
+   into a .sidenote beside its reference.  Every copy is a right float with
+   a negative margin wider than itself: it sits on the reference's line,
+   clear:right stacks a note under the one before rather than over it, and
+   since its margin box has no width the text keeps the whole column -- the
+   way Tufte CSS and karthinks.com do it, with no script measuring the
+   page.  A float's percentages are of its paragraph, so the notes' width
+   is in vw, which counts a classic scrollbar; the 1rem at the edge takes
+   up the difference.  theme.js marks #content .has-sidenotes once every
+   note has a copy, and only then is the list at the end hidden.
+   --------------------------------------------------------------------------- */
+.sidenote  { display:  none; }
+@media screen and (min-width: 1440px)  {
+  #table-of-contents  { position:  fixed; top:  2rem;
+       right:  calc(50% + var(--column) / 2 + 2rem);
+       width:  min(20rem, calc(50% - var(--column) / 2 - 3rem));
+       max-height:  calc(100vh - 4rem); overflow-y:  auto;
+       overscroll-behavior:  contain; scrollbar-width:  thin;
+       font-size:  80%; line-height:  1.35; }
+  #table-of-contents h2  { margin:  0 0 .5em; font-size:  1.25em; }
+  #table-of-contents ul  { margin:  0; padding-left:  0; list-style:  none; }
+  #table-of-contents ul ul  { padding-left:  1em; font-size:  90%; }
+  #table-of-contents ul ul ul  { font-size:  100%; }
+  #table-of-contents li  { margin:  .35em 0; }
+  /* The entry for the section being read, by the browser alone: the TOC's
+     links become scroll markers for the headings they point at, and the
+     current one matches :target-current.  Chrome and Edge 140+ only;
+     elsewhere no entry is marked.  Colour rather than weight, since bold
+     would widen the entry and could rewrap the panel as the page scrolls. */
+  #table-of-contents  { scroll-target-group:  auto; }
+  #table-of-contents a:target-current  { color:  var(--heading);
+       text-decoration:  none; }
+  /* The contents are always in view. */
+  #content :is(h2,h3,h4,h5,h6) > a[href="#table-of-contents"]  { display:  none; }
+
+  .sidenote  { --note-width:  min(20rem, calc(50vw - var(--column) / 2 - 3rem));
+       display:  block; float:  right; clear:  right;
+       width:  var(--note-width);
+       margin:  0 calc(-1 * var(--note-width) - 2rem) 1em 0;
+       font-size:  80%; font-style:  normal; font-weight:  normal;
+       --text-align:  start; --line-height:  1.4; text-align:  start;
+       line-height:  var(--line-height); }
+  #content.has-sidenotes #footnotes  { display:  none; }
+  .sidenote.is-current, #content .footref.is-current  {
+       background-color:  var(--note-hover);
+       box-shadow:  0 0 0 .25em var(--note-hover); }
+}
 
 /* ---------------------------------------------------------------------------
    Print, after gwern.net's print styles: no site chrome, white paper, and

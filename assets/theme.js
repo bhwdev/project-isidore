@@ -72,3 +72,101 @@
     });
   });
 })();
+
+/* Sidenotes, for global.css's margins: a copy of each of an Org page's
+   footnotes beside its reference.  Here rather than in a file of its own
+   because every Org page already loads this one, so the exported pages and
+   the export settings need no change.
+
+   Built once, at DOMContentLoaded.  Which of the copies and the list at the
+   end is shown is global.css's media query, so resizing needs nothing from
+   here.  A page without #footnotes -- every CLOG page -- is left alone. */
+(function () {
+  // A note floats from the line of its reference, as wide as the margin past
+  // the reference's container.  Inside one of these that is the wrong
+  // place or the wrong edge, so the note goes before the outermost instead.
+  var HOIST = 'h1, h2, h3, h4, h5, h6, table, pre, figure, blockquote, '
+            + '.abstract, .org-src-container';
+
+  function showing(note) { return note.getClientRects().length > 0; }
+
+  function noteFor(num, body) {
+    var note = document.createElement('span');
+    note.className = 'sidenote';
+    note.setAttribute('role', 'note');
+    var mark = document.createElement('sup');
+    mark.className = 'sidenote-number';
+    mark.textContent = num.textContent;
+    note.appendChild(mark);
+    note.appendChild(document.createTextNode(' '));
+    var copy = body.cloneNode(true);
+    copy.removeAttribute('role');
+    copy.removeAttribute('id');
+    Array.prototype.forEach.call(copy.querySelectorAll('[id]'), function (el) {
+      el.removeAttribute('id');
+    });
+    note.appendChild(copy);
+    return note;
+  }
+
+  function place(note, ref, content) {
+    var beside = ref.parentElement.tagName === 'SUP' ? ref.parentElement : ref;
+    var before = null;
+    for (var el = beside.parentElement; el && el !== content; el = el.parentElement)
+      if (el.matches(HOIST)) before = el;
+    if (before) before.parentNode.insertBefore(note, before);
+    else beside.parentNode.insertBefore(note, beside.nextSibling);
+  }
+
+  // A note lights up with its number while either is under the pointer or
+  // the number has focus.
+  function pair(ref, note) {
+    var hovered = 0, focused = false;
+    function sync() {
+      var on = hovered > 0 || focused;
+      ref.classList.toggle('is-current', on);
+      note.classList.toggle('is-current', on);
+    }
+    [ref, note].forEach(function (el) {
+      el.addEventListener('mouseenter', function () { hovered++; sync(); });
+      el.addEventListener('mouseleave', function () { hovered--; sync(); });
+    });
+    ref.addEventListener('focus', function () { focused = true; sync(); });
+    ref.addEventListener('blur', function () { focused = false; sync(); });
+    // The list the number links to is hidden while the notes show.  A
+    // second reference to one note is not beside it, hence the scroll.
+    ref.addEventListener('click', function (event) {
+      if (!showing(note)) return;
+      event.preventDefault();
+      note.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
+  function build() {
+    var content = document.getElementById('content');
+    var list = document.getElementById('footnotes');
+    if (!content || !list || !Element.prototype.closest) return;
+    var notes = {}, made = 0;
+    Array.prototype.forEach.call(content.querySelectorAll('a.footref'), function (ref) {
+      var href = ref.getAttribute('href') || '';
+      if (href.charAt(0) !== '#' || list.contains(ref)) return;
+      var note = notes[href];
+      if (!note) {
+        var num = document.getElementById(href.slice(1));
+        var def = num && num.closest('.footdef');
+        var body = def && def.querySelector('.footpara');
+        if (!body) return;
+        note = notes[href] = noteFor(num, body);
+        place(note, ref, content);
+        made++;
+      }
+      pair(ref, note);
+    });
+    if (made > 0 && made === list.querySelectorAll('.footdef').length)
+      content.classList.add('has-sidenotes');
+  }
+
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', build);
+  else build();
+})();

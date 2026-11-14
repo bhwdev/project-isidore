@@ -384,3 +384,5 @@ a { color: #9cc4ff; }
 @media (max-width: 60rem) {
   .plp-console { grid-template-columns: 1fr; grid-template-rows: auto; height: auto; }
 }
+/* The next song stands a little apart from the next slide. */
+.plp-console .plp-nav button:last-child { margin-left: 0.6rem; letter-spacing: -0.15em; }

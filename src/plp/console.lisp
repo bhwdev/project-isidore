@@ -59,8 +59,8 @@ instead.
 Musician turns the console into a musician's page: the middle pane alone,
 and in it the song's slides once each (BHW/PLP/SONG:DECK-CHART) with their
 chords over the words, in columns and in type as large as shows the whole
-song (CHART-FONT-SIZE).  A tap on a slide shows it, the two buttons in the
-corner go back and on, and the key the song is played in moves by semitones
+song (CHART-FONT-SIZE).  A tap on a slide shows it, the buttons in the
+corner go back, on and to the next song of the setlist, and the key the song is played in moves by semitones
 for every page of the room; a setlist is saved with the keys of its songs.
 
 What the console has to say, it says in a box over the page, which is also
@@ -319,10 +319,11 @@ cannot tell which is meant."
          (check-song (create-button editor-buttons :content "Check"))
          (save-song (create-button editor-buttons :content "Save"))
          (delete-song (create-button editor-buttons :content "Delete"))
-         ;; A musician's two buttons, in the corner of the page.
+         ;; A musician's buttons, in the corner of the page.
          (nav (create-div root :class "plp-nav"))
          (nav-back (create-button nav :content "◂"))
          (nav-forward (create-button nav :content "▸"))
+         (nav-song (create-button nav :content "▸▸"))
          ;; The form for a song, over the console.
          (popup (create-div root :class "plp-popup"))
          (dialog (create-div popup :class "plp-dialog"))
@@ -386,6 +387,9 @@ cannot tell which is meant."
           (attribute lower "title") "A semitone lower"
           (attribute higher "title") "A semitone higher"
           (attribute key-button "title") "Back to the key it is written in"
+          (attribute nav-back "title") "The slide before"
+          (attribute nav-forward "title") "The next slide"
+          (attribute nav-song "title") "The next song of the setlist"
           (style cards-area "grid-template-columns")
           (format nil "repeat(~D, minmax(0, 1fr))" *card-columns*))
     (labels ((refocus ()
@@ -867,6 +871,7 @@ cannot tell which is meant."
       (click key-button (lambda () (live:transpose room nil)))
       (click nav-back (lambda () (live:step-slide room -1)))
       (click nav-forward (lambda () (live:step-slide room 1)))
+      (click nav-song (lambda () (live:step-song room 1)))
       ;; The setlist.
       (click load-button
              (lambda ()

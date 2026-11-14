@@ -199,11 +199,12 @@ a { color: #9cc4ff; }
 .plp-row .plp-name small { color: #9a9a9a; }
 .plp-row.plp-current { background: #26364f; }
 .plp-row button { padding: 0 0.4rem; }
-.plp-fields { display: flex; gap: 0.3rem; margin: 0.3rem 0; }
+.plp-fields { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.3rem 0; }
 .plp-fields input, .plp-fields select { flex: 1; min-width: 0; }
 
 .plp-pane:focus { outline: 2px solid #e0b020; }
-.plp-pane .plp-song-title { font-size: 1.3rem; font-weight: 700; }
+.plp-song-head { display: flex; align-items: center; gap: 0.6rem; }
+.plp-pane .plp-song-title { flex: 1; font-size: 1.3rem; font-weight: 700; }
 .plp-pane .plp-song-writers { color: #9a9a9a; margin-bottom: 0.5rem; }
 
 /* The console sets how many cards stand in a row (*CARD-COLUMNS*). */
@@ -253,7 +254,67 @@ a { color: #9cc4ff; }
 
 .plp-preview.plp-next { color: #9a9a9a; aspect-ratio: auto; min-height: 4rem; padding: 0.3rem; }
 .plp-console textarea { width: 100%; box-sizing: border-box; min-height: 14rem; font-family: monospace; font-size: 0.8rem; }
-.plp-message { color: #e0b020; min-height: 1.3em; white-space: pre-wrap; }
+
+/* The musician's page: the middle pane alone, each slide once with its
+   chords over its words, in columns.  The console sizes the type and the
+   columns' width so that the song is all there (CHART-FONT-SIZE). */
+
+.plp-transpose, .plp-nav { display: none; }
+.plp-transpose button { min-width: 2.4rem; }
+
+.plp-musician.plp-console {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  gap: 0.3rem;
+  padding: 0.3rem;
+}
+
+.plp-musician .plp-side, .plp-musician .plp-keys,
+.plp-musician .plp-song-writers,
+.plp-musician .plp-bar > :not(.plp-keep) { display: none; }
+.plp-musician .plp-bar { position: fixed; top: 0.3rem; right: 0.3rem; z-index: 5; }
+.plp-musician .plp-pane { border: 0; padding: 0.2rem 0.5rem; }
+/* The bar's two buttons stand over the pane's corner. */
+.plp-musician .plp-song-head { padding-right: 11rem; min-height: 2.2rem; }
+.plp-musician .plp-transpose { display: flex; gap: 0.3rem; }
+
+.plp-musician .plp-cards { display: block; column-gap: 1em; line-height: 1.25; }
+.plp-musician .plp-card {
+  break-inside: avoid;
+  margin-bottom: 0.5em;
+  padding: 0.25em 0.5em;
+  font-size: inherit;
+  line-height: inherit;
+}
+.plp-musician .plp-card.plp-next-up { border-color: #7a5c00; }
+.plp-musician .plp-card .plp-card-label { font-size: 0.8em; margin-bottom: 0; }
+
+.plp-seg { display: inline-block; white-space: pre; text-indent: 0; vertical-align: baseline; }
+.plp-chord {
+  display: block;
+  padding-right: 0.5em;
+  color: #9cc4ff;
+  font-size: 0.85em;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.plp-musician .plp-nav {
+  display: flex;
+  gap: 0.5rem;
+  position: fixed;
+  right: 0.6rem;
+  bottom: 0.6rem;
+  z-index: 5;
+}
+.plp-console .plp-nav button {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 50%;
+  font-size: 2rem;
+  background: rgba(40, 40, 40, 0.85);
+  touch-action: manipulation;
+}
 
 .plp-keys {
   grid-column: 1 / -1;
@@ -298,6 +359,20 @@ a { color: #9cc4ff; }
 }
 
 .plp-dialog textarea { font-family: inherit; font-size: inherit; }
+/* The order is the form's to give only for a song being corrected: a new
+   song's comes from its words. */
+.plp-dialog .plp-order-input { display: none; }
+.plp-dialog.plp-editing .plp-order-input { display: block; }
+.plp-dialog.plp-editing textarea { font-family: monospace; font-size: 0.85rem; }
+.plp-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; color: #9a9a9a; }
+.plp-console button.plp-tag { border-radius: 1rem; padding: 0.1rem 0.6rem; }
+
+/* What the console says and asks: over the form too. */
+.plp-popup.plp-alert { z-index: 20; }
+.plp-alert .plp-dialog { width: min(30rem, 92vw); gap: 0.8rem; font-size: 1.05rem; }
+.plp-alert-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.plp-alert .plp-confirm { display: none; }
+.plp-alert.plp-asking .plp-confirm { display: inline-block; background: #6b1f1f; border-color: #c05050; }
 .plp-outline { color: #9a9a9a; }
 .plp-outline .plp-row { color: #fff; }
 .plp-outline .plp-order { margin-top: 0.3rem; color: #e0b020; }

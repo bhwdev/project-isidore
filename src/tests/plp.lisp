@@ -401,6 +401,17 @@ CCLI Song #43192. CCLI License #0000."
                      (ids (format nil "Id: custom/new~%Title: Amazing Grace~%~%1.~%New words~%")))
               "an id the store lacks is new")))
       (ok (member '(:tempo "Slow" nil) (db:all-tags) :test #'equal))
+      (ng (member '(:liturgy "Christmas" "Dec 25") (db:all-tags) :test #'equal)
+          "a tag no song has any more is not offered")
+      (testing "chords are stored with the words"
+        (let ((chorded (db:save-song (song:parse-song *chorded*))))
+          (ok (equal (song:section-chords
+                      (first (song:song-sections (song:parse-song *chorded*))))
+                     (song:section-chords
+                      (first (song:song-sections (db:find-song chorded))))))
+          (ok (db:search-songs "even tide"))
+          (ok (null (db:search-songs "bb/d")) "and are no part of what is searched")
+          (db:delete-song chorded)))
       (testing "setlists"
         (ok (equal "friday-adoration"
                    (db:save-setlist "Friday Adoration" (list (cons id "") (cons grace "in G")))))
@@ -408,6 +419,15 @@ CCLI Song #43192. CCLI License #0000."
         (ok (equal (list (cons grace "in G"))
                    (getf (db:find-setlist "friday-adoration") :items)))
         (ok (= 1 (length (db:all-setlists))))
+        (ng (getf (db:find-setlist "friday-adoration") :transpositions))
+        (db:save-setlist "Friday Adoration" (list (cons grace "in G"))
+                         :transpositions (list (cons grace 2)))
+        (ok (equal (list (cons grace "in G"))
+                   (getf (db:find-setlist "friday-adoration") :items))
+            "the keys are not items")
+        (ok (equal (list (cons grace 2))
+                   (getf (db:find-setlist "friday-adoration") :transpositions)))
+        (ok (equal (list (cons grace "in G")) (getf (first (db:all-setlists)) :items)))
         (ok (db:delete-setlist "friday-adoration"))
         (ng (db:delete-setlist "friday-adoration"))
         (ok (null (db:all-setlists))))
@@ -419,6 +439,156 @@ CCLI Song #43192. CCLI License #0000."
         (ok (db:delete-song grace))
         (ng (db:delete-song grace))
         (ok (null (db:find-song grace)))))))
+
+(defparameter *chorded*
+  "Title: Abide With Me
+Tags: key=Eb
+
+1.
+[Eb]Abide with [Bb/D]me, fast [Cm]falls the even[Ab]tide; (x2)
+The darkness deepens;
+     Ab        Eb
+Lord, with me abide.
+
+Intro:
+Eb Bb Eb
+"
+  "A song with chords, written in its words and over them.")
+
+(deftest chords-in-the-text
+  (let* ((song (song:parse-song *chorded*))
+         (verse (first (song:song-sections song))))
+    (testing "chords come out of the words, each with its place"
+      (ok (equal '(("Abide with me, fast falls the eventide;"
+                    "The darkness deepens;"
+                    "Lord, with me abide."))
+                 (song:section-slides verse))
+          "the mark goes, the chords are not words")
+      (ok (equal '((((0 . "Eb") (11 . "Bb/D") (20 . "Cm") (34 . "Ab"))
+                    nil
+                    ((6 . "Ab") (14 . "Eb"))))
+                 (song:section-chords verse))
+          "a chord line is the chords of the line under it, snapped to its words")
+      (ok (= 1 (length (song:song-sections song))) "chords over no words are dropped"))
+    (testing "the text format writes them back"
+      (ok (search "[Eb]Abide with [Bb/D]me, fast [Cm]falls the even[Ab]tide;"
+                  (song:print-song song)))
+      (ok (search "Lord, [Ab]with me [Eb]abide." (song:print-song song)))
+      (ok (equalp (song:song-sections song)
+                  (song:song-sections (song:parse-song (song:print-song song))))))
+    (testing "brackets around anything else are words"
+      (ok (equal "Sing [softly] now" (song:split-chords "Sing [softly] now")))
+      (ok (null (song::label-line "[G]"))))
+    (testing "a song without chords has no :CHORDS"
+      (ng (song:section-chords (first (song:song-sections (song:parse-song *abide*))))))
+    (testing "the slides carry them"
+      (let ((slide (first (song:song-deck song))))
+        (ok (equal (first (song:section-chords verse)) (song:slide-chords slide)))
+        (ng (song:slide-chords (first (song:song-deck (song:parse-song *abide*)))))))
+    (testing "a pasted sheet's chords go into the outline's song"
+      (multiple-value-bind (parts places)
+          (song:outline (format nil "G        D~%Abide with me~%~%Chorus~%C~%Help of the helpless~%"))
+        (let ((song (song:outline-song parts places :tags '((:tempo "Slow" nil)))))
+          (ok (equal '(((((0 . "G") (11 . "D")))) ((((0 . "C")))))
+                     (mapcar #'song:section-chords (song:song-sections song))))
+          (ok (equal '((:tempo "Slow" nil)) (song:song-tags song))))))))
+
+(deftest transposition
+  (ok (equal "A" (song:transpose-chord "G" 2)))
+  (ok (equal "C#m7" (song:transpose-chord "Bm7" 2)))
+  (ok (equal "Dbm7" (song:transpose-chord "Bm7" 2 :flats t)))
+  (ok (equal "E/G#" (song:transpose-chord "D/F#" 2)))
+  (ok (equal "Bbsus4" (song:transpose-chord "Asus4" 1 :flats t)))
+  (ok (equal "F-C" (song:transpose-chord "G-D" -2)))
+  (ok (equal "Bb" (song:transpose-chord "Bb" 12)) "no change keeps the spelling")
+  (ok (equal "N.C." (song:transpose-chord "N.C." 3)))
+  (ok (equal "x2" (song:transpose-chord "x2" 3)))
+  (testing "the key"
+    (let ((song (song:parse-song *chorded*)))
+      (ok (equal "Eb" (song:song-key song)) "the key tag")
+      (setf (song:song-tags song) '())
+      (ok (equal "Eb" (song:song-key song)) "or the first chord")
+      (ng (song:song-key (song:parse-song *abide*)))))
+  (ok (song:flat-key-p "F"))
+  (ok (song:flat-key-p "Gm"))
+  (ok (song:flat-key-p "A#") "B flat by another name")
+  (ng (song:flat-key-p "G"))
+  (ng (song:flat-key-p "Em"))
+  (ng (song:flat-key-p nil)))
+
+(deftest a-musicians-chart
+  (let* ((deck (song:song-deck (song:parse-song *abide*)))
+         (chart (song:deck-chart deck)))
+    (ok (equal '(("1" 1) ("R" 1) ("R" 2) ("2" 1) ("B" 1) ("R2" 1)) (keys chart))
+        "each slide once, as they first come")
+    (testing "a slide is shown where it next comes"
+      (let ((refrain (second chart)))
+        (ok (eql 1 (song:deck-next deck 0 refrain)))
+        (ok (eql 4 (song:deck-next deck 1 refrain)) "the refrain after verse 2")
+        (ok (eql 1 (song:deck-next deck 5 refrain)) "round again")
+        (ok (eql 0 (song:deck-next deck 0 (first chart))) "the only place it stands")))
+    (testing "the chords stand over the words"
+      (ok (equal "<div class='plp-line'>a &amp; b</div>" (console:chord-line-html "a & b" nil)))
+      (ok (equal (concatenate 'string
+                              "<div class='plp-line plp-chorded'>"
+                              "<span class='plp-seg'>Lord, </span>"
+                              "<span class='plp-seg'><span class='plp-chord'>Bb</span>with me </span>"
+                              "<span class='plp-seg'><span class='plp-chord'>F C</span>&nbsp;</span>"
+                              "</div>")
+                 (console:chord-line-html "Lord, with me " '((6 . "Ab") (14 . "Eb") (99 . "Bb"))
+                                          :semitones 2 :flats t)))
+      (ok (search "<span class='plp-chord'>E</span>"
+                  (console:chart-card-html (first (song:song-deck (song:parse-song *chorded*)))
+                                           :semitones 1))))
+    (testing "the type is the largest that shows the whole song"
+      (multiple-value-bind (size width) (console:chart-font-size chart)
+        (ok (uiop:string-prefix-p "clamp(0.7rem, max(min(" size))
+        (ok (= 5 (count #\h size)) "one term for each number of columns, up to five")
+        (ok (= 25 width) "a column fits the longest line, of 46 letters"))
+      (ok (uiop:string-prefix-p "clamp(" (console:chart-font-size '()))))))
+
+(deftest tags-by-name
+  (let ((known '((:mass "Communion" nil) (:liturgy "Advent" "Dec") (:tempo "Slow" nil)
+                 (:theme "Slow" nil))))
+    (ok (equal '(:mass "Communion" nil) (console::read-tag "mass=communion" known)))
+    (ok (equal '(:liturgy "Advent" "Dec") (console::read-tag " advent " known)) "by its name")
+    (ok (equal '(:theme "Joy" nil) (console::read-tag "theme=Joy" known)) "a new one")
+    (ok (equal '(:tag "Joy" nil) (console::read-tag "Joy" known)) "a new one of no category")
+    (ok (null (console::read-tag "  " known)))
+    (multiple-value-bind (tag several) (console::read-tag "slow" known)
+      (ng tag)
+      (ok (= 2 (length several)) "a name two tags have"))))
+
+(deftest chords-from-the-page
+  ;; A chord row over two lines of words, the second broken in two by the
+  ;; page; and a chord over no words.
+  (let ((lines (import:page-chords
+                (list (word "Eb" 100 86 11) (word "Bb" 172 86 11)
+                      (word "1." 60 100 11) (word "Abide" 100 100 11) (word "with" 124 100 11)
+                      (word "me," 144 100 11) (word "fast" 160 100 11) (word "falls" 180 100 11)
+                      (word "Ab" 100 126 11) (word "Cm" 400 126 11)
+                      (word "The" 100 140 11) (word "darkness" 116 140 11)
+                      (word "deepens;" 360 154 11) (word "(Ref.)" 396 154 11)
+                      (word "G" 100 300 11)))))
+    (ok (equal '("Abide with me, fast falls" (0 . "Eb") (20 . "Bb")) (first lines))
+        "a chord over the end of a word is on the next, and the label is gone")
+    (ok (equal '("The darkness" (0 . "Ab")) (second lines)))
+    (ok (equal '("deepens;" (8 . "Cm")) (third lines))
+        "a chord past the end of its line is the next line's, whose mark is gone")
+    (ok (= 3 (length lines)) "a chord over no words is left out")
+    (testing "a song gets the chords of the lines it shares"
+      (let* ((song (song:parse-song (format nil "Title: T~%~%1.~%abide with me fast falls~%Other words~%The darkness~%~%2.~%Abide with me,~%fast falls~%")))
+             (grafted (import:graft-chords lines song)))
+        (ok (equal '((((0 . "Eb") (19 . "Bb")) nil ((0 . "Ab"))))
+                   (song:section-chords (first (song:song-sections grafted))))
+            "whatever the capitals and commas")
+        (ok (equal '((((0 . "Eb")) ((5 . "Bb"))))
+                   (song:section-chords (second (song:song-sections grafted))))
+            "two lines the page has as one share its chords")
+        (ng (song:section-chords (first (song:song-sections song))) "the song itself is as it was")
+        (ok (equalp (song:song-sections grafted)
+                    (song:song-sections (import:graft-chords lines grafted)))
+            "once is enough")))))
 
 (deftest the-passphrase
   (let ((db::*passphrase* "open sesame"))
@@ -500,7 +670,26 @@ CCLI Song #43192. CCLI License #0000."
           (ok (eql 1 (getf (live:snapshot room) :position)) "the place follows the song")
           (ok (live:remove-item room 0))
           (ok (eql 0 (getf (live:snapshot room) :position)))
-          (ng (live:move-item room 0 -1)))))))
+          (ng (live:move-item room 0 -1)))
+        (testing "the key a song is played in"
+          (live:show-song room id)
+          (ok (eql 0 (getf (live:snapshot room) :transposition)))
+          (setf heard '())
+          (ok (live:transpose room 2))
+          (ok (equal '(:song) heard) "the pages draw the song again")
+          (live:transpose room -3)
+          (ok (eql 11 (getf (live:snapshot room) :transposition)))
+          (ok (equal (list (cons id 11)) (live:transpositions room)))
+          (live:show-song room other)
+          (ok (eql 0 (getf (live:snapshot room) :transposition)) "each song has its own")
+          (live:show-song room id)
+          (ok (eql 11 (getf (live:snapshot room) :transposition)))
+          (live:transpose room nil)
+          (ok (null (live:transpositions room)) "back in the written key")
+          (live:set-items room (list (cons id "") (cons other ""))
+                          :transpositions (list (cons other 5)))
+          (ok (equal (list (cons other 5)) (live:transpositions room))
+              "a setlist brings its keys"))))))
 
 (deftest the-clock
   ;; 2026-11-20 00:42 UTC is 19:42 on the 19th in Ottawa, five hours behind.

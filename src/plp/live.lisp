@@ -11,11 +11,12 @@
                     (#:db #:bhw/plp/database))
   (:export #:room #:room-code #:room-song #:room-deck #:room-index #:room-mode
            #:room-items #:room-position #:room-end-time #:room-footer-p
-           #:room-waiting-image #:room-waiting-text
+           #:room-waiting-image #:room-waiting-text #:room-transposition
            #:valid-code-p #:new-code #:ensure-room #:find-room #:sweep-rooms
            #:subscribe #:unsubscribe
            #:snapshot
            #:show-song #:go-to #:step-slide #:jump #:set-mode #:press-key
+           #:transpose #:transpositions
            #:set-items #:add-item #:move-item #:remove-item #:show-item #:step-song
            #:set-end-time #:set-footer #:set-waiting-text
            #:images-directory #:waiting-images #:image-file
@@ -24,8 +25,9 @@
    "What is on the screen, and who is watching.
 
 A ROOM is one session of presenting: the song and its deck of slides, the
-slide showing, the mode (:LYRICS, :BLACK or :WAITING), the working setlist
-and the session's end time.  Its code is in the address of its console and
+slide showing, the mode (:LYRICS, :BLACK or :WAITING), the working setlist,
+the session's end time, and how far from its written key each song is played
+for the musicians' pages.  Its code is in the address of its console and
 of its screens, which is all that ties them together: whoever opens
 /plp-screen/CODE sees what /plp-console/CODE drives.  Rooms live in memory
 only; one nobody has touched for a day is dropped.
@@ -47,6 +49,8 @@ driven directly."))
   (items '()) position
   end-time (footer-p t)
   waiting-image (waiting-text "")
+  ;; Song ids to semitones above the written key.
+  (transpositions (make-hash-table :test #'equal))
   (subscribers '()) (next-subscriber 0)
   (touched (get-universal-time)))
 
@@ -127,7 +131,8 @@ Returns BODY's value."
 (defun snapshot (room)
   "ROOM's state as a plist, read under its lock: :SONG, :DECK, :INDEX, :MODE,
 :SLIDE (the one showing, or NIL), :NEXT (the one after it), :ITEMS,
-:POSITION, :END-TIME, :FOOTER-P, :WAITING-IMAGE and :WAITING-TEXT."
+:POSITION, :END-TIME, :FOOTER-P, :WAITING-IMAGE, :WAITING-TEXT and
+:TRANSPOSITION (see ROOM-TRANSPOSITION)."
   (bordeaux-threads:with-recursive-lock-held ((room-lock room))
     (let ((deck (room-deck room)) (index (room-index room)))
       (list :song (room-song room) :deck deck :index index :mode (room-mode room)
@@ -135,7 +140,8 @@ Returns BODY's value."
             :items (room-items room) :position (room-position room)
             :end-time (room-end-time room) :footer-p (room-footer-p room)
             :waiting-image (room-waiting-image room)
-            :waiting-text (room-waiting-text room)))))
+            :waiting-text (room-waiting-text room)
+            :transposition (room-transposition room)))))
 
 ;;; Slides
 
@@ -153,6 +159,37 @@ NIL when there is no such song."
                                                  :key #'car :test #'string=)
                                        (room-position room))))
       t)))
+
+(defun room-transposition (room)
+  "How many semitones above its written key ROOM plays the song showing: 0
+to 11."
+  (bordeaux-threads:with-recursive-lock-held ((room-lock room))
+    (let ((song (room-song room)))
+      (or (and song (gethash (song:song-id song) (room-transpositions room)))
+          0))))
+
+(defun transpose (room delta)
+  "Play the song showing in ROOM DELTA semitones higher than it is played
+now, for as long as the room lives; a DELTA of NIL puts it back in its
+written key.  Returns NIL when no song is showing."
+  (changing (room :song)
+    (let ((song (room-song room)))
+      (when song
+        (setf (gethash (song:song-id song) (room-transpositions room))
+              (if delta
+                  (mod (+ (room-transposition room) delta) 12)
+                  0))
+        t))))
+
+(defun transpositions (room)
+  "The songs ROOM plays in another key than they are written in, as a list
+of (song-id . semitones), by id: what a setlist is saved with."
+  (bordeaux-threads:with-recursive-lock-held ((room-lock room))
+    (sort (loop for id being the hash-keys of (room-transpositions room)
+                  using (hash-value semitones)
+                unless (zerop semitones)
+                  collect (cons id semitones))
+          #'string< :key #'car)))
 
 (defun go-to (room index)
   "Show the slide at INDEX of ROOM's deck, if it has one."
@@ -206,14 +243,22 @@ time the waiting slide comes up it shows the next image."
 
 ;;; The setlist
 
-(defun set-items (room items)
-  "Make ITEMS, a list of (song-id . note), ROOM's setlist."
+(defun set-items (room items &key transpositions)
+  "Make ITEMS, a list of (song-id . note), ROOM's setlist, and play its songs
+in the keys TRANSPOSITIONS gives, a list of (song-id . semitones): a song of
+ITEMS it does not name, in the key it is written in."
   (changing (room :list)
+    (dolist (item items)
+      (let ((semitones (cdr (assoc (car item) transpositions :test #'equal))))
+        (setf (gethash (car item) (room-transpositions room))
+              (if (integerp semitones) (mod semitones 12) 0))))
     (setf (room-items room) (copy-list items)
           (room-position room)
           (and (room-song room)
                (position (song:song-id (room-song room)) items
-                         :key #'car :test #'string=)))))
+                         :key #'car :test #'string=))))
+  ;; The song showing may be in another key now.
+  (notify room :song))
 
 (defun add-item (room id &key after-current)
   "Add the song ID to ROOM's setlist: at the end, or with AFTER-CURRENT after

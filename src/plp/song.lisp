@@ -10,21 +10,29 @@
            #:song-sections #:song-order #:song-tags #:song-reviewed
            #:section-kind #:section-number #:section-label #:section-slides
            #:section-key #:section-name
-           #:parse-song #:print-song #:song-problems
+           #:section-chords
+           #:parse-song #:parse-sections #:parse-words #:parse-tag
+           #:print-song #:print-sections #:print-tag
+           #:song-problems
            #:sung-line #:sung-lines
+           #:chord-line-p #:split-chords #:join-chords #:chorded-sections
+           #:replace-tracking #:snap-column
+           #:transpose-chord #:song-key #:flat-key-p
            #:outline #:*outline-kinds* #:kind-label #:relabel #:outline-song
            #:song-first-line #:slug
            #:*max-lines* #:split-lines
            #:song-deck #:slide-key #:slide-label #:slide-lines #:slide-part
-           #:slide-of #:slide-group
-           #:deck-jump)
+           #:slide-of #:slide-group #:slide-chords
+           #:deck-jump #:same-slide-p #:deck-chart #:deck-next)
   (:documentation
    "A song as data, with no store and no page.
 
 A SONG holds its credits and its SECTIONS in the order written.  A section is
 a plist: :KIND (:VERSE :REFRAIN :BRIDGE :PRE-CHORUS :TAG :ENDING :OTHER),
-:NUMBER, :LABEL (what the source called it) and :SLIDES, a list of slides,
-each a list of lines.  A section's key is what the operator presses and what
+:NUMBER, :LABEL (what the source called it), :SLIDES, a list of slides, each
+a list of lines, and, when the song has them, :CHORDS: for each slide a list
+with, for each of its lines, the chords played over it as (offset . chord),
+the offset counting the line's characters.  A section's key is what the operator presses and what
 an Order: header names: 1 2 3 for verses, R B P T O X for the other kinds,
 with the number after it from the second on (R2).
 
@@ -47,12 +55,20 @@ is verses, one per block.  The marks a song sheet puts beside its words for
 the musicians, (x2) or (V1, V2, Ref.), are not words: PARSE-SONG leaves
 them out (SUNG-LINE), and a deck never shows them.
 
+Chords are written in the words, each in brackets before the syllable it is
+played on: [G]Amazing [D/F#]grace.  A line of nothing but chords over a line
+of words, as a chord sheet has them, is read as that line's chords, each
+where it stands (INLINE-CHORD-LINES).  The lines of a section never hold
+them: the screen shows words only, and a musician's page puts the chords
+back over them, in another key if asked (TRANSPOSE-CHORD).
+
 OUTLINE reads words pasted from elsewhere, with or without labels, and
 suggests their sections and the order they are sung in; OUTLINE-SONG makes
 the song of it.
 
 SONG-DECK lays the song out as the slides to show, in its order, and
-DECK-JUMP finds where a key press leads."))
+DECK-JUMP finds where a key press leads; DECK-CHART is each of its slides
+once, as a musician reads them."))
 
 (in-package #:bhw/plp/song)
 
@@ -66,6 +82,7 @@ note a string or NIL; ORDER a list of section keys or NIL for as written."
 (defun section-number (section) (getf section :number))
 (defun section-label (section) (getf section :label))
 (defun section-slides (section) (getf section :slides))
+(defun section-chords (section) (getf section :chords))
 
 (defparameter *kinds*
   '((:refrain "R" "Refrain" "refrain" "chorus" "ref" "refr")
@@ -112,6 +129,184 @@ label line may use for it.")
   "The trimmed, non-empty parts of STRING between occurrences of SEPARATOR."
   (remove "" (mapcar #'trim (cl-ppcre:split separator string)) :test #'string=))
 
+;;; Chords
+
+(defparameter *chord-token*
+  (let* ((chord "[A-G][#b]?(?:maj|min|sus|dim|aug|add|m|M|[0-9]|\\+|°)*(?:/[A-G][#b]?)?\\*?")
+         (part (format nil "(?:(?:~A)+|/[A-G][#b]?|sus\\d?)" chord)))
+    (cl-ppcre:create-scanner
+     (format nil "^\\(?(?:~A(?:-~A)*-?|N\\.?C\\.?|[-–—|/%]+|x\\d|\\d+x)\\)?[,.]?$" part part)))
+  "Matches a word of a chord line: a chord (G, Bm7, Asus4, A/C#), chords run
+together (G-D, BE), a bass note alone (/F#), or one of the marks between
+them.")
+
+(defun chord-line-p (line)
+  "True when every word of LINE is a chord: G, Bm7, Asus4, A/C#, a dash."
+  (let ((words (cl-ppcre:split "\\s+" (string-trim " " line))))
+    (and words
+         (every (lambda (word) (cl-ppcre:scan *chord-token* word)) words)
+         ;; A dash alone is not a chord line.
+         (some (lambda (word) (cl-ppcre:scan "[A-GN]" word)) words))))
+
+(defun split-chords (line)
+  "LINE without the chords written in it, and as a second value those chords
+as a list of (offset . chord): \"[G]Amazing [D]grace\" -> \"Amazing grace\",
+((0 . \"G\") (8 . \"D\")).  Brackets around anything but a chord are words."
+  (let ((out (make-string-output-stream)) (chords '()) (length 0) (last 0))
+    (flet ((emit (text)
+             (write-string text out)
+             (incf length (length text))))
+      (cl-ppcre:do-scans (start end starts ends "\\[([^\\]\\[\\s]+)\\]" line)
+        (let ((chord (subseq line (aref starts 0) (aref ends 0))))
+          (when (cl-ppcre:scan *chord-token* chord)
+            (emit (subseq line last start))
+            (push (cons length chord) chords)
+            (setf last end))))
+      (emit (subseq line last)))
+    (let* ((text (get-output-stream-string out))
+           (lead (or (position #\Space text :test #'char/=) (length text)))
+           (text (trim text)))
+      (values text
+              (mapcar (lambda (chord)
+                        (cons (max 0 (min (- (car chord) lead) (length text))) (cdr chord)))
+                      (nreverse chords))))))
+
+(defun join-chords (line chords)
+  "LINE with CHORDS, a list of (offset . chord), written in it in brackets;
+SPLIT-CHORDS reads it back."
+  (if (null chords)
+      line
+      (with-output-to-string (out)
+        (let ((last 0))
+          (dolist (chord (stable-sort (copy-list chords) #'< :key #'car))
+            (let ((at (max last (min (car chord) (length line)))))
+              (write-string line out :start last :end at)
+              (format out "[~A]" (cdr chord))
+              (setf last at)))
+          (write-string line out :start last)))))
+
+(defun snap-column (lyric column)
+  "COLUMN, where a chord stands over LYRIC, or the start of the word beside
+it: a chord sheet is not set to the letter, and no chord is played on the
+space before a word, on its second letter or on the last of three or more."
+  (flet ((space-p (at) (char= (char lyric at) #\Space)))
+    (cond ((not (< 0 column (length lyric))) column)
+          ((space-p column) (1+ column))
+          ((and (not (space-p (1- column)))
+                (or (= column 1) (space-p (- column 2))))
+           (1- column))
+          ((and (>= column 2)
+                (notany #'space-p (list (1- column) (- column 2)))
+                (or (= (1+ column) (length lyric)) (space-p (1+ column))))
+           (min (+ column 2) (length lyric)))
+          (t column))))
+
+(defun inline-chord-lines (lines)
+  "LINES, as a chord sheet sets them, with each line of nothing but chords
+written into the line of words under it (JOIN-CHORDS), each chord where it
+stands over the words; a chord line over no words is dropped.  The lines
+come back trimmed."
+  (loop for (line next) on lines
+        for chords-p = (chord-line-p line)
+        for words-p = (and chords-p next
+                           (string/= (trim next) "")
+                           (not (chord-line-p next))
+                           (not (label-line (trim next))))
+        with skip = nil
+        if skip
+          do (setf skip nil)
+        else if words-p
+               collect (let ((indent (or (position #\Space next :test #'char/=) 0))
+                             (words (trim next))
+                             (chords '()))
+                         (cl-ppcre:do-matches (start end "\\S+" line)
+                           (push (cons (snap-column words (max 0 (- start indent)))
+                                       (subseq line start end))
+                                 chords))
+                         (setf skip t)
+                         (join-chords words (nreverse chords)))
+        else unless chords-p
+               collect (trim line)))
+
+(defun chorded-sections (sections)
+  "SECTIONS, whose lines may have chords written in them, with the chords
+taken out of the lines into each section's :CHORDS.  A line left with no
+words is dropped, and so are a slide and a section left with no line."
+  (loop for section in sections
+        for pairs = (remove nil
+                            (loop for slide in (section-slides section)
+                                  collect (loop for line in slide
+                                                for (text chords)
+                                                  = (multiple-value-list (split-chords line))
+                                                when (string/= text "")
+                                                  collect (cons text chords))))
+        when pairs
+          collect (append
+                   (loop for (key value) on section by #'cddr
+                         unless (member key '(:slides :chords))
+                           append (list key value))
+                   (list :slides (mapcar (lambda (slide) (mapcar #'car slide)) pairs))
+                   (and (some (lambda (slide) (some #'cdr slide)) pairs)
+                        (list :chords (mapcar (lambda (slide) (mapcar #'cdr slide))
+                                              pairs))))))
+
+(defun section-chorded-slides (section)
+  "The slides of SECTION with its chords written in their lines."
+  (let ((chords (section-chords section)))
+    (if (null chords)
+        (section-slides section)
+        (loop for slide in (section-slides section)
+              for slide-chords in chords
+              collect (loop for line in slide
+                            for line-chords = (pop slide-chords)
+                            collect (join-chords line line-chords))))))
+
+(defparameter *sharp-notes* #("C" "C#" "D" "D#" "E" "F" "F#" "G" "G#" "A" "A#" "B"))
+(defparameter *flat-notes* #("C" "Db" "D" "Eb" "E" "F" "Gb" "G" "Ab" "A" "Bb" "B"))
+
+(defun note-index (note)
+  "How many semitones the note NOTE, \"F#\" or \"Bb\", is above C."
+  (mod (+ (position (char note 0) "C D EF G A B")
+          (cond ((= (length note) 1) 0)
+                ((char= (char note 1) #\#) 1)
+                (t -1)))
+       12))
+
+(defun transpose-chord (chord semitones &key flats)
+  "CHORD, \"G\", \"Bm7\" or \"D/F#\", SEMITONES higher: every note it names
+moved, and spelled with flats when FLATS and with sharps when not.  CHORD
+itself when SEMITONES is no change, or CHORD names no note (N.C.)."
+  (if (or (zerop (mod semitones 12)) (cl-ppcre:scan "^\\(?N\\.?C" chord))
+      chord
+      (cl-ppcre:regex-replace-all
+       "[A-G][#b]?" chord
+       (lambda (note)
+         (aref (if flats *flat-notes* *sharp-notes*)
+               (mod (+ (note-index note) semitones) 12)))
+       :simple-calls t)))
+
+(defun song-key (song)
+  "The key SONG is written in, as \"D\" or \"Bm\": what its key tag says, or
+else its first chord; NIL for a song without either."
+  (or (second (find :key (song-tags song) :key #'first))
+      (loop for section in (song-sections song)
+            thereis (loop for slide in (section-chords section)
+                          thereis (loop for line in slide
+                                        thereis (loop for (nil . chord) in line
+                                                      thereis (cl-ppcre:scan-to-strings
+                                                               "[A-G][#b]?m?(?!aj)" chord)))))))
+
+(defun flat-key-p (key)
+  "True when the key KEY, \"F\" or \"Gm\", is written with flats."
+  (let ((note (and key (cl-ppcre:scan-to-strings "^[A-G][#b]?" key))))
+    (and note
+         (member (mod (+ (note-index note)
+                         ;; A minor key is written as the major a third above.
+                         (if (cl-ppcre:scan "^[A-G][#b]?m(?!aj)" key) 3 0))
+                      12)
+                 '(5 10 3 8 1))
+         t)))
+
 (defun parse-tag (text)
   "The tag (category name note) that TEXT, as \"mass=Communion\" or
 \"liturgy=Christmas {Dec 25}\", writes, or NIL."
@@ -151,9 +346,34 @@ holds nothing but repeats and names of sections, as (x2), (Ref. x2),
 (V1, V2, Ref.), (Pre-Chorus, Refrain 1), (Repeat last two lines).  Sung
 words in parentheses, (echo) or (You are), are not matched.")
 
+(defun replace-tracking (regex line replacement columns)
+  "LINE with every match of REGEX replaced by the string REPLACEMENT, and
+COLUMNS, positions in LINE, as the positions of the same places in the
+result: one inside a match goes to where the replacement starts."
+  (let ((edits '()))
+    (cl-ppcre:do-matches (start end regex line)
+      (push (cons start end) edits))
+    (values (cl-ppcre:regex-replace-all regex line replacement)
+            (mapcar (lambda (column)
+                      (let ((moved column))
+                        (loop for (start . end) in edits
+                              do (cond ((<= end column)
+                                        (incf moved (- (length replacement) (- end start))))
+                                       ((< start column)
+                                        (decf moved (- column start)))))
+                        moved))
+                    columns))))
+
 (defun sung-line (line)
-  "LINE without the marks for the musicians: \"Today (x2)\" -> \"Today\"."
-  (trim (cl-ppcre:regex-replace-all *marking* line "")))
+  "LINE without the marks for the musicians: \"Today (x2)\" -> \"Today\".
+The chords written in LINE stay, each where it was."
+  (multiple-value-bind (text chords) (split-chords line)
+    (multiple-value-bind (sung offsets)
+        (replace-tracking *marking* text "" (mapcar #'car chords))
+      ;; SPLIT-CHORDS trims what JOIN-CHORDS wrote, and keeps the offsets right.
+      (multiple-value-bind (sung chords)
+          (split-chords (join-chords sung (mapcar #'cons offsets (mapcar #'cdr chords))))
+        (join-chords sung chords)))))
 
 (defun sung-lines (lines)
   "LINES without their marks, and without the lines that were only marks."
@@ -227,13 +447,30 @@ has not used yet."
       (flush))
     (number-sections (nreverse sections))))
 
+(defun right-trim (string)
+  (string-right-trim '(#\Space #\Tab #\Return #\Newline) string))
+
+(defun parse-sections (lines)
+  "The sections that LINES, a song's text without its headers, write, and as
+a second value the keys of the sections that were written with nothing to
+sing in them."
+  (let* ((written (parse-body (inline-chord-lines lines)))
+         (sung (chorded-sections (sung-sections written))))
+    (values sung
+            (set-difference (mapcar #'section-key written) (mapcar #'section-key sung)
+                            :test #'string=))))
+
+(defun parse-words (text)
+  "The sections that TEXT, a song's text without its headers, writes."
+  (values (parse-sections (mapcar #'right-trim (cl-ppcre:split "\\r?\\n" text)))))
+
 (defun parse-song (text)
   "The SONG that TEXT writes in the text format.  Lenient: what is missing
 is NIL, and SONG-PROBLEMS says what is wrong with the result."
-  (let* ((lines (mapcar #'trim (cl-ppcre:split "\\r?\\n" text)))
+  (let* ((lines (mapcar #'right-trim (cl-ppcre:split "\\r?\\n" text)))
          (song (make-song)))
     (loop while (and lines (string= (first lines) "")) do (pop lines))
-    (loop for line = (first lines)
+    (loop for line = (and lines (trim (first lines)))
           while (and line (string/= line ""))
           do (multiple-value-bind (match groups)
                  (cl-ppcre:scan-to-strings "^([A-Za-z]+):\\s*(.*)$" line)
@@ -269,11 +506,8 @@ is NIL, and SONG-PROBLEMS says what is wrong with the result."
                        ;; Not a header: the body starts here.
                        (t (return))))
                (pop lines)))
-    (let* ((written (parse-body lines))
-           (sung (sung-sections written))
-           ;; A section that was only marks is gone, from the order too.
-           (gone (set-difference (mapcar #'section-key written) (mapcar #'section-key sung)
-                                 :test #'string=)))
+    ;; A section that was only marks is gone, from the order too.
+    (multiple-value-bind (sung gone) (parse-sections lines)
       (setf (song-sections song) sung
             (song-order song) (remove-if (lambda (key) (member key gone :test #'string=))
                                          (song-order song))))
@@ -312,7 +546,8 @@ fine."
 (defun words-key (lines)
   "LINES as they compare: their words in small letters, nothing else."
   (trim (string-downcase
-         (cl-ppcre:regex-replace-all "\\W+" (format nil "~{~A~^ ~}" lines) " "))))
+         (cl-ppcre:regex-replace-all
+          "\\W+" (format nil "~{~A~^ ~}" (mapcar #'split-chords lines)) " "))))
 
 (defun outline (text)
   "A suggestion of how TEXT, the words of a song as pasted from anywhere,
@@ -367,14 +602,15 @@ so is what stands under Intro or Instrumental."
                        (blocks
                         (take (first blocks) label)
                         (dolist (block (rest blocks)) (take block nil)))))))
-      (dolist (raw (cl-ppcre:split "\\r?\\n" text))
-        (let* ((line (trim raw))
-               (sung (sung-line line))
+      (dolist (line (inline-chord-lines
+                     (mapcar #'right-trim (cl-ppcre:split "\\r?\\n" text))))
+        (let* ((sung (sung-line line))
                (found (label-line sung)))
           (cond (found (flush) (setf label found))
                 ((string= line "") (push "" pending))
-                ;; A line that was only a mark is no line, and no break.
-                ((string/= sung "") (push sung pending)))))
+                ;; A line that was only a mark, or only chords, is no line,
+                ;; and no break.
+                ((string/= (split-chords sung) "") (push sung pending)))))
       (flush))
     (let ((free (remove-if (lambda (kind) (find kind parts :key #'section-kind))
                            '(:refrain :bridge :tag))))
@@ -396,10 +632,11 @@ so is what stands under Intro or Instrumental."
                                      parts))
                     when index collect index)))))
 
-(defun outline-song (parts places &key title writers copyright)
+(defun outline-song (parts places &key title writers copyright tags)
   "The song of PARTS sung in the order PLACES (see OUTLINE), with its
-credits: the parts numbered, and an order when it is not the parts' own."
-  (let* ((sections (number-sections parts))
+credits and TAGS: the parts numbered, their chords taken out of their lines,
+and an order when it is not the parts' own."
+  (let* ((sections (chorded-sections (number-sections parts)))
          (keys (mapcar #'section-key sections))
          (order (loop for place in places collect (nth place keys))))
     (flet ((text (string)
@@ -407,6 +644,7 @@ credits: the parts numbered, and an order when it is not the parts' own."
                (and (string/= string "") string))))
       (make-song :title (text title) :writers (text writers) :copyright (text copyright)
                  :sections sections
+                 :tags tags
                  :order (and (not (equal order keys)) order)))))
 
 ;;; Writing
@@ -414,6 +652,17 @@ credits: the parts numbered, and an order when it is not the parts' own."
 (defun print-tag (tag)
   (destructuring-bind (category name &optional note) tag
     (format nil "~(~A~)=~A~@[ {~A}~]" category name note)))
+
+(defun print-sections (sections)
+  "SECTIONS as the text format writes them under a song's headers, chords
+and all; PARSE-SECTIONS reads it back."
+  (with-output-to-string (out)
+    (loop for (section . more) on sections
+          do (if (eq (section-kind section) :verse)
+                 (format out "~D.~%" (section-number section))
+                 (format out "~A:~%" (section-name section)))
+             (format out "~{~{~A~%~}~^~%~}" (section-chorded-slides section))
+             (when more (terpri out)))))
 
 (defun print-song (song)
   "SONG in the text format; PARSE-SONG reads it back."
@@ -435,12 +684,9 @@ credits: the parts numbered, and an order when it is not the parts' own."
         (format out "Tags: ~{~A~^; ~}~%" (mapcar #'print-tag (song-tags song))))
       (when (song-reviewed song)
         (header "Reviewed" "yes")))
-    (dolist (section (song-sections song))
+    (when (song-sections song)
       (terpri out)
-      (if (eq (section-kind section) :verse)
-          (format out "~D.~%" (section-number section))
-          (format out "~A:~%" (section-name section)))
-      (format out "~{~{~A~%~}~^~%~}" (section-slides section)))))
+      (write-string (print-sections (song-sections song)) out))))
 
 (defun song-first-line (song)
   "The first line of SONG's words, or NIL."
@@ -471,6 +717,11 @@ one hyphen: \"O Come, All Ye Faithful\" -> \"o-come-all-ye-faithful\"."
 (defun slide-part (slide) (getf slide :part))
 (defun slide-of (slide) (getf slide :of))
 
+(defun slide-chords (slide)
+  "The chords over each line of SLIDE, lists of (offset . chord), or NIL for
+a slide of a song without chords."
+  (getf slide :chords))
+
 (defun slide-group (slide)
   "The key that jumps to SLIDE: its section's key without the number, or the
 verse's number."
@@ -478,24 +729,29 @@ verse's number."
 
 (defun section-deck (section index)
   "The slides of SECTION, the INDEXth of its song."
-  (let* ((slides (loop for block in (section-slides section)
-                       ;; A song stored before PARSE-SONG left the marks out.
-                       append (split-lines (sung-lines block))))
+  (let* ((chords (section-chords section))
+         (slides (loop for block in (section-slides section)
+                       ;; A song stored before PARSE-SONG left the marks out;
+                       ;; one with chords was stored since.
+                       append (split-lines (if chords block (sung-lines block)))))
+         (slide-chords (loop for block in chords append (split-lines block)))
          (of (length slides)))
     (loop for lines in slides
           for part from 1
-          collect (list :key (section-key section)
+          collect (list* :key (section-key section)
                         :group (if (eq (section-kind section) :verse)
                                    (section-key section)
                                    (kind-letter (section-kind section)))
                         :label (section-name section)
                         :section index
                         :rank (or (section-number section) 1)
-                        :part part :of of :lines lines))))
+                        :part part :of of :lines lines
+                        (and chords (list :chords (pop slide-chords)))))))
 
 (defun song-deck (song)
   "The slides of SONG in the order it is sung, as a list of plists (:KEY
-:GROUP :LABEL :SECTION :PART :OF :LINES): its Order:, or else as written,
+:GROUP :LABEL :SECTION :PART :OF :LINES, and :CHORDS for a song that has
+them): its Order:, or else as written,
 and then any section the order left out."
   (let* ((sections (song-sections song))
          (keys (mapcar #'section-key sections))
@@ -537,3 +793,21 @@ what follows it in the song."
                           (eql (slide-part slide) (slide-part target))))))
         (or (position-if same deck :start (or index 0))
             (position-if same deck))))))
+
+(defun same-slide-p (slide other)
+  "True when SLIDE and OTHER are the same slide of the song, wherever in its
+deck they stand."
+  (and (eql (getf slide :section) (getf other :section))
+       (eql (slide-part slide) (slide-part other))))
+
+(defun deck-chart (deck)
+  "The slides of DECK once each, in the order they first come: the song as a
+musician reads it, the refrain written out once."
+  (remove-duplicates deck :test #'same-slide-p :from-end t))
+
+(defun deck-next (deck index slide)
+  "The index in DECK where SLIDE next stands after INDEX, round again from
+the start; NIL when DECK has no such slide."
+  (or (position slide deck :test #'same-slide-p
+                           :start (min (1+ (or index -1)) (length deck)))
+      (position slide deck :test #'same-slide-p)))

@@ -13,17 +13,22 @@ systems under `src/`:
   `nlp` / `booking-nlp`, the schedule spreadsheet
   (`van-booking`, through the Apps Script in `van-booking.gs`), and the Slack
   endpoints and reminder scheduler (`bot`).
-- `plp/` -- the praise lyrics presenter: a song as data, its text format and
-  its slides (`song`), its graph-db store of songs, tags and setlists
+- `plp/` -- the praise lyrics presenter: a song as data, its text format
+  (chords written in the words as `[G]`), its slides and the transposing of
+  its chords (`song`), its graph-db store of songs, tags and setlists
   (`database`), the chord book's import (`import`), the rooms that tie a
   console to its screens (`live`), and the pages `/plp`, `/plp-console/CODE`
-  (`console`) and `/plp-screen/CODE` (`screen`). Its pages are public; saving
+  (`console`, which is also the musician's page: each slide once, chords
+  over the words, sized by the server) and `/plp-screen/CODE` (`screen`). Its pages are public; saving
   a song or a setlist needs `$BHW_PLP_PASSPHRASE`. The lyrics are not in the
   repository: store, staging files and waiting images are under
   `<data root>/plp/`, and the tests use a public-domain hymn. `import` runs
   poppler's `pdftotext`, on a development machine only:
   `(bhw/plp/import:import-book PDF)` stages the songs with a `REPORT.txt`,
   `(bhw/plp/import:load-staging)` stores them, as often as they are corrected.
+  Chords are placed by the PDF's word coordinates (`pdftotext -tsv`);
+  `add-chords-to-staging` and `add-chords-to-store` give them to songs staged
+  and stored without, leaving their corrections.
   The one script of the site's own is the expression that asks a browser its
   clock's offset from UTC (`screen:timezone-offset`).
 

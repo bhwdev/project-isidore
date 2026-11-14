@@ -33,7 +33,8 @@ package-inferred systems under =src/=:
   that tie an operator's console to its screens (=live=), and the two pages
   (=console=, =screen=). The screen is put full screen on the display the
   congregation sees; the console jumps to a verse, the refrain or the bridge
-  at a key press.
+  at a key press, and as a musician's page shows the whole song with its
+  chords over the words, in the key asked for.
 
 =main.lisp= starts them all (=initialize-application=); =store.lisp= is the
 graph-db plumbing the databases share. The tests mirror this tree under
@@ -111,6 +112,12 @@ static HTML file it sends, and links =assets/dark.css= when it applies.
    type ids belong to the host's graph-db system directory. On the host,
    through Slynk, =(bhw/plp/import:load-staging)= stores the staged songs, as
    often as they change.
+
+   Songs staged before the import read the chords get them from the PDF with
+   =(bhw/plp/import:add-chords-to-staging #p"...pdf")=, which changes nothing
+   else in the files. On the host, =(bhw/plp/import:add-chords-to-store)=
+   then gives each stored song the chords of its staged lines and keeps what
+   was corrected in the store, which =load-staging= would replace.
 
    The bible store and Montezuma index are in =/var/local/bhw-www/=.
 

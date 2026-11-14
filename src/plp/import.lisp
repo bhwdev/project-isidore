@@ -4,6 +4,7 @@
 (uiop:define-package #:bhw/plp/import
   (:use #:common-lisp)
   (:import-from #:cl-ppcre)
+  (:import-from #:bhw/plp/song #:chord-line-p)
   (:local-nicknames (#:song #:bhw/plp/song)
                     (#:db #:bhw/plp/database))
   (:export #:chord-line-p
@@ -13,7 +14,11 @@
            #:index-tags
            #:staging-directory
            #:import-book
-           #:load-staging)
+           #:load-staging
+           #:page-chords
+           #:graft-chords
+           #:add-chords-to-staging
+           #:add-chords-to-store)
   (:documentation
    "The Companions of the Cross chord book, from its PDF into the store, in
 two steps with a person between them.
@@ -31,7 +36,15 @@ line of nothing but chords is dropped, a page set in two columns is cut at
 the gutter, labels and verse numbers open sections, and the (Ref.) at the end
 of a verse puts the refrain after it in the song's order.  The indices are
 three columns of entries under headings that apply down a column, which only
-the words' positions (pdftotext -tsv) sort out.
+the words' positions (pdftotext -tsv) sort out.  The chords come from those
+positions too (PAGE-CHORDS): the laid-out text sets every letter as wide as
+the next, and a chord would stand letters away from its syllable.
+
+Songs staged or stored before the import kept the chords get them without
+losing what was corrected since: ADD-CHORDS-TO-STAGING reads the book again
+and gives each staged line that still has the book's words the book's chords
+(GRAFT-CHORDS), and ADD-CHORDS-TO-STORE does the same for the stored songs
+from the staging files, which is all a machine without the PDF needs.
 
 None of the book's text is in this repository: the staging files and the
 store are under the data root."))
@@ -40,25 +53,8 @@ store are under the data root."))
 
 ;;; Lines of a song page
 
-(defparameter *chord-token*
-  (let* ((chord "[A-G][#b]?(?:maj|min|sus|dim|aug|add|m|M|[0-9]|\\+|°)*(?:/[A-G][#b]?)?\\*?")
-         (part (format nil "(?:(?:~A)+|/[A-G][#b]?|sus\\d?)" chord)))
-    (cl-ppcre:create-scanner
-     (format nil "^\\(?(?:~A(?:-~A)*-?|N\\.?C\\.?|[-–—|/%]+|x\\d|\\d+x)\\)?[,.]?$" part part)))
-  "Matches a word of a chord line: a chord (G, Bm7, Asus4, A/C#), chords run
-together (G-D, BE), a bass note alone (/F#), or one of the marks between
-them.")
-
 (defun words (line)
   (cl-ppcre:split "\\s+" (string-trim " " line)))
-
-(defun chord-line-p (line)
-  "True when every word of LINE is a chord: G, Bm7, Asus4, A/C#, a dash."
-  (let ((words (words line)))
-    (and words
-         (every (lambda (word) (cl-ppcre:scan *chord-token* word)) words)
-         ;; A dash alone is not a chord line.
-         (some (lambda (word) (cl-ppcre:scan "[A-GN]" word)) words))))
 
 (defparameter *repeat-mark*
   (cl-ppcre:create-scanner
@@ -122,14 +118,21 @@ left as it was."
          (values (append (mapcar #'left lines) (list "") (mapcar #'right lines))
                  t))))))
 
-(defun clean-lyric (line)
+(defun clean-lyric (line &optional columns)
   "LINE as it is sung: one space between words, and a word spread under its
 notes closed up (\"fore ----- ver - more\", \"ev'n – ing\").  A dash is taken
-for such a break when a small letter follows it; one before a capital stays."
-  (let* ((line (cl-ppcre:regex-replace-all "\\s*-{2,}\\s*" line ""))
-         (line (cl-ppcre:regex-replace-all "(?<=[a-z'])\\s+[-–]\\s+(?=[a-z])" line ""))
-         (line (cl-ppcre:regex-replace-all "\\s+" line " ")))
-    (string-trim " " line)))
+for such a break when a small letter follows it; one before a capital stays.
+As a second value COLUMNS, positions in LINE, as positions in the result."
+  (dolist (edit '(("\\s*-{2,}\\s*" "")
+                  ("(?<=[a-z'])\\s+[-–]\\s+(?=[a-z])" "")
+                  ("\\s+" " ")))
+    (multiple-value-setq (line columns)
+      (song:replace-tracking (first edit) line (second edit) columns)))
+  (let ((lead (or (position #\Space line :test #'char/=) 0))
+        (line (string-trim " " line)))
+    (values line
+            (mapcar (lambda (column) (max 0 (min (- column lead) (length line))))
+                    columns))))
 
 (defun split-page (text)
   "The page TEXT as a list of the texts of its songs: a page may hold two
@@ -196,7 +199,7 @@ at the left margin.")
 was cut into two columns, :RESIDUE (lines kept that look like chords) and
 :LINES, its words in the text format: labels on lines of their own, a blank
 line after each stanza, and \"(Ref.)\" marks left at the ends of lines for
-STAGE-SONG."
+BUILD-SONG.  The chords are not among them: PAGE-CHORDS reads those."
   (let* ((lines (mapcar (lambda (line)
                           (string-right-trim
                            '(#\Space #\Return)
@@ -257,7 +260,7 @@ STAGE-SONG."
                              (format nil "~A ~A" (first out) (string-trim " " mark)))))
                     (t
                      (let ((lyric (clean-lyric words)))
-                       (when (>= (count-if (lambda (word) (cl-ppcre:scan *chord-token* word))
+                       (when (>= (count-if (lambda (word) (cl-ppcre:scan song::*chord-token* word))
                                            (words lyric))
                                  (max 2 (ceiling (length (words lyric)) 2)))
                          (push lyric residue))
@@ -355,9 +358,10 @@ what a reader should check, a list of sentences."
          (parsed (song::parse-body lines))
          (notes '()))
     (multiple-value-bind (sections order) (strip-marks (distinct-keys parsed))
-      (let* ((sections (remove-if (lambda (section)
-                                    (every #'null (song:section-slides section)))
-                                  sections))
+      (let* ((sections (song:chorded-sections
+                        (remove-if (lambda (section)
+                                     (every #'null (song:section-slides section)))
+                                   sections)))
              (keys (mapcar #'song:section-key sections))
              (order (remove-if-not (lambda (key) (member key keys :test #'string=)) order))
              (song (song:make-song
@@ -536,6 +540,214 @@ entries without a page number, as strings."
           (drop-pending))))
     (values (nreverse entries) (nreverse unresolved))))
 
+;;; Chords
+
+(defun page-rows (words)
+  "WORDS of one page (PARSE-INDEX-WORDS) as its rows from the top down, each
+a list of the words that stand at one height, from left to right."
+  (let ((rows '()))
+    (dolist (word (sort (copy-list words) #'< :key (lambda (word) (getf word :top))))
+      (if (and rows (< (abs (- (getf word :top) (getf (first (first rows)) :top))) 3))
+          (push word (first rows))
+          (push (list word) rows)))
+    (mapcar (lambda (row) (sort row #'< :key (lambda (word) (getf word :left))))
+            (nreverse rows))))
+
+(defun row-segments (row &key (gap 40))
+  "The words of ROW in runs: a run ends where the next word stands more than
+GAP points on, as across the gutter of a page set in two columns."
+  (let ((segments '()))
+    (loop for word in row
+          for previous = nil then last
+          for last = word
+          do (if (and previous
+                      (<= (- (getf word :left) (+ (getf previous :left) (getf previous :width)))
+                          gap))
+                 (push word (first segments))
+                 (push (list word) segments)))
+    (nreverse (mapcar #'reverse segments))))
+
+(defun segment-text (segment)
+  (format nil "~{~A~^ ~}" (mapcar (lambda (word) (getf word :text)) segment)))
+
+(defun segment-left (segment) (getf (first segment) :left))
+
+(defun segment-right (segment)
+  (let ((word (first (last segment))))
+    (+ (getf word :left) (getf word :width))))
+
+(defun segment-column (segment x)
+  "Which character of SEGMENT's text stands at X points from the page's left
+edge: the start of a word for the space before it, and the text's length
+past its end."
+  (let ((start 0))
+    (dolist (word segment (length (segment-text segment)))
+      (let ((left (getf word :left))
+            (length (length (getf word :text))))
+        (cond ((< x left) (return start))
+              ((< x (+ left (getf word :width)))
+               (return (+ start (min (1- length)
+                                     (round (* length (- x left)) (getf word :width)))))))
+        (incf start (1+ length))))))
+
+(defun page-chords (words)
+  "The lines of words of one page with the chords that stand over them, from
+WORDS (PARSE-INDEX-WORDS): a list of (line . chords) from the top down, the
+line as CLEAN-LYRIC leaves it, without its label and its repeat mark, and
+the chords as (offset . chord).  A chord is that of the words under it: of
+the run it stands over or, over none, of the nearest; one past the end of
+its line, over a line that goes on under that one with no chords of its own,
+is played on the line below.  A chord over no words at all is left out."
+  (let* ((rows (mapcar (lambda (row)
+                         (mapcar (lambda (segment)
+                                   (list :words segment
+                                         :chords-p (chord-line-p (segment-text segment))
+                                         :top (getf (first segment) :top)
+                                         :chords '()))
+                                 (row-segments row)))
+                       (page-rows words)))
+         (rows (coerce rows 'vector)))
+    (flet ((under (index)
+             ;; The runs of words in the row next below row INDEX.
+             (let ((next (and (< (1+ index) (length rows)) (aref rows (1+ index)))))
+               (and next
+                    (< (- (getf (first next) :top) (getf (first (aref rows index)) :top)) 22)
+                    (remove-if (lambda (segment) (getf segment :chords-p)) next))))
+           (distance (segment x)
+             (let ((words (getf segment :words)))
+               (cond ((< x (segment-left words)) (- (segment-left words) x))
+                     ((> x (segment-right words)) (- x (segment-right words)))
+                     (t 0)))))
+      (dotimes (index (length rows))
+        (let ((below (under index)))
+          (when below
+            (dolist (segment (aref rows index))
+              (when (getf segment :chords-p)
+                (dolist (chord (getf segment :words))
+                  (let* ((x (getf chord :left))
+                         (nearest (first (sort (copy-list below) #'<
+                                               :key (lambda (segment) (distance segment x)))))
+                         (wrapped (and (> x (+ 12 (segment-right (getf nearest :words))))
+                                       (notany (lambda (segment) (getf segment :chords-p))
+                                               (aref rows (1+ index)))
+                                       (find-if (lambda (segment) (< (distance segment x) 12))
+                                                (under (1+ index)))))
+                         (target (or wrapped nearest)))
+                    (push (cons x (getf chord :text)) (getf target :chords))))))))))
+    (loop for row across rows
+          append (loop for segment in row
+                       for text = (segment-text (getf segment :words))
+                       for label = (inline-label text)
+                       for line = (if label (second label) text)
+                       for shift = (- (length text) (length line))
+                       for words = (cl-ppcre:regex-replace *repeat-mark* line "")
+                       unless (or (getf segment :chords-p)
+                                  (string= (string-trim " " words) ""))
+                         collect (let ((chords (sort (copy-list (getf segment :chords)) #'<
+                                                     :key #'car)))
+                                   (multiple-value-bind (lyric columns)
+                                       (clean-lyric
+                                        words
+                                        (mapcar (lambda (chord)
+                                                  (- (segment-column (getf segment :words)
+                                                                     (car chord))
+                                                     shift))
+                                                chords))
+                                     (cons lyric
+                                           (mapcar (lambda (column chord)
+                                                     (cons (song:snap-column lyric column)
+                                                           (cdr chord)))
+                                                   columns chords))))))))
+
+(defun letters-before (line offset)
+  "How many of the first OFFSET characters of LINE BHW/PLP/SONG:SLUG keeps."
+  (count-if (lambda (char) (or (char<= #\a (char-downcase char) #\z) (digit-char-p char)))
+            line :end (min offset (length line))))
+
+(defun graft-line (from chords onto)
+  "CHORDS, those of the line FROM, as the chords of the line ONTO, which has
+FROM's words but not always its spaces, capitals and punctuation: each
+before the letter it stands before in FROM."
+  (loop for (offset . chord) in chords
+        for letters = (letters-before from offset)
+        collect (cons (or (and (< offset (length from))
+                               (loop for at from 0 below (length onto)
+                                     when (= (letters-before onto (1+ at)) (1+ letters))
+                                       return at))
+                          (length onto))
+                      chord)))
+
+(defun graft-chords (lines song)
+  "SONG with the chords of LINES, a list of (line . chords) as PAGE-CHORDS
+makes: each line of SONG that has no chords and has the words of one of
+LINES, whatever their capitals and punctuation, gets that line's chords.  Of
+several of LINES with the same words, each is taken once, in order, and the
+last of them from then on; one of them without chords, the sheet not giving
+them again, has those of the one before.  Two lines of SONG that have the words of one of
+LINES between them, the page's line having been broken, share its chords."
+  (let ((table (make-hash-table :test #'equal))
+        (played (make-hash-table :test #'equal))
+        (grafted (song:copy-song song)))
+    (dolist (line (reverse lines))
+      (push line (gethash (song:slug (car line)) table)))
+    (flet ((take (text)
+             ;; The chords of the line of LINES that has the words of TEXT.
+             (let* ((key (song:slug text))
+                    (found (first (gethash key table))))
+               (when (rest (gethash key table))
+                 (pop (gethash key table)))
+               (when (cdr found)
+                 (setf (gethash key played) found))
+               (let ((found (if (cdr found) found (gethash key played))))
+                 (and found (graft-line (car found) (cdr found) text))))))
+      (setf (song:song-sections grafted)
+            (loop for section in (song:song-sections song)
+                  for had = (song:section-chords section)
+                  for chords
+                    = (loop for slide in (song:section-slides section)
+                            for slide-had = (pop had)
+                            collect
+                            (let ((result (make-list (length slide))))
+                              (loop for (line next) on slide
+                                    for at from 0
+                                    for both = (and next (format nil "~A ~A" line next))
+                                    do (cond ((nth at result))
+                                             ((nth at slide-had)
+                                              ;; Its line of LINES is taken all the same.
+                                              (take line)
+                                              (setf (nth at result) (nth at slide-had)))
+                                             ((gethash (song:slug line) table)
+                                              (setf (nth at result) (take line)))
+                                             ((and both
+                                                   (not (nth (1+ at) slide-had))
+                                                   (gethash (song:slug both) table))
+                                              (let ((chords (take both))
+                                                    (end (length line)))
+                                                (setf (nth at result)
+                                                      (remove-if (lambda (chord) (> (car chord) end))
+                                                                 chords)
+                                                      (nth (1+ at) result)
+                                                      (loop for (offset . chord) in chords
+                                                            when (> offset end)
+                                                              collect (cons (- offset end 1)
+                                                                            chord)))))))
+                              result))
+                  collect (append (loop for (key value) on section by #'cddr
+                                        unless (eq key :chords)
+                                          append (list key value))
+                                  (and (some (lambda (slide) (some #'identity slide)) chords)
+                                       (list :chords chords))))))
+    grafted))
+
+(defun song-chords (song)
+  "The lines of SONG with their chords, as GRAFT-CHORDS takes them."
+  (loop for section in (song:song-sections song)
+        append (loop with chords = (song:section-chords section)
+                     for slide in (song:section-slides section)
+                     for slide-chords = (pop chords)
+                     append (loop for line in slide
+                                  collect (cons line (pop slide-chords))))))
+
 ;;; The book
 
 (defun staging-directory ()
@@ -563,10 +775,11 @@ entries without a page number, as strings."
                 (song:parse-song (uiop:read-file-string file :external-format :utf-8)))))
         (uiop:directory-files (staging-directory) "*.txt")))
 
-(defun import-book (pdf)
-  "Stage every song of the chord book PDF and write REPORT.txt beside them.
-A staging file that says Reviewed: yes is left as it is.  Returns the number
-of songs staged and the report's pathname."
+(defun book-songs (pdf)
+  "The songs of the chord book PDF in its order, each as (song . notes),
+notes being what a reader should check; and as a second and third value the
+numbers the indices name that no song has, and the index entries without a
+page number."
   (let* ((parsed (loop for text in (cl-ppcre:split "\\f" (pdftotext pdf "-layout"))
                        for page-number from 1
                        append (mapcar (lambda (part)
@@ -577,19 +790,25 @@ of songs staged and the report's pathname."
                                     (and (eql (getf page :number) 1)
                                          (not (search "INDEX" (string-upcase (getf page :title))))))
                                   parsed))
-         (songs '()) (group '()) (expected 1))
+         (words (parse-index-words (pdftotext pdf "-tsv")))
+         (chords (make-hash-table))
+         (groups '()) (group '()) (expected 1))
+    (flet ((page (word) (getf word :page)))
+      (dolist (page (remove-duplicates (mapcar #'page words)))
+        (setf (gethash page chords)
+              (page-chords (remove page words :key #'page :test #'/=)))))
     (unless first-song
       (error "No page of ~A opens song 1." pdf))
     (multiple-value-bind (entries unresolved)
-        (index-tags (parse-index-words
-                     (pdftotext pdf "-tsv" "-l"
-                                (princ-to-string (1- (getf (nth first-song parsed) :page))))))
+        (index-tags (remove-if (lambda (word)
+                                 (>= (getf word :page) (getf (nth first-song parsed) :page)))
+                               words))
       ;; A page opens a song when its number is the next one or near it; a
       ;; verse numbered at the top of a second page is not a title.
       (loop for page in (nthcdr first-song parsed)
             for number = (getf page :number)
             do (cond ((and number (<= expected number (+ expected 3)))
-                      (when group (push (nreverse group) songs))
+                      (when group (push (nreverse group) groups))
                       (setf group (list page)
                             expected (1+ number)))
                      (t
@@ -601,53 +820,142 @@ of songs staged and the report's pathname."
                                                   (getf page :lines))
                                           page)))
                       (push page group))))
-      (when group (push (nreverse group) songs))
-      (ensure-directories-exist (staging-directory))
-      (let ((report (uiop:subpathname (staging-directory) "REPORT.txt"))
-            (staged 0) (found '()))
-        (with-open-file (out report :direction :output :if-exists :supersede
-                                    :external-format :utf-8)
-          (format out "Staged from ~A~%~%" (file-namestring pdf))
-          (dolist (pages (nreverse songs))
-            (let* ((number (getf (first pages) :number))
-                   (mine (remove number entries :key #'first :test #'/=)))
-              (multiple-value-bind (song notes)
-                  (build-song pages
-                              :aliases (mapcar #'third (remove :alias mine :key #'second
+      (when group (push (nreverse group) groups))
+      (let ((songs (loop for pages in (nreverse groups)
+                         collect (let* ((number (getf (first pages) :number))
+                                        (mine (remove number entries :key #'first :test #'/=)))
+                                   (multiple-value-bind (song notes)
+                                       (build-song
+                                        pages
+                                        :aliases (mapcar #'third
+                                                         (remove :alias mine :key #'second
                                                                              :test-not #'eq))
-                              :tags (mapcar #'rest (remove :alias mine :key #'second)))
-                (setf (song:song-page song) (getf (first pages) :page))
-                (push number found)
-                (unless (remove :alias mine :key #'second)
-                  (push "in no index but the alphabetical" notes))
-                (cond ((reviewed-file-p number)
-                       (format out "~3D ~A: reviewed, left alone~%" number (song:song-title song)))
-                      (t
-                       (with-open-file (file (staging-file song) :direction :output
-                                                                 :if-exists :supersede
-                                                                 :external-format :utf-8)
-                         (write-string (song:print-song song) file))
-                       (incf staged)
-                       (when notes
-                         (format out "~3D ~A~%~{      ~A~%~}" number (song:song-title song)
-                                 notes)))))))
-          (format out "~%Numbers in the indices with no song: ~{~D~^, ~}~%"
-                  (sort (set-difference (remove-duplicates (mapcar #'first entries)) found)
-                        #'<))
-          (format out "~%Index entries with no page number:~%~{  ~A~%~}" unresolved))
-        (values staged report)))))
+                                        :tags (mapcar #'rest (remove :alias mine :key #'second)))
+                                     (setf (song:song-page song) (getf (first pages) :page))
+                                     (cons (graft-chords
+                                            (loop for page in (remove-duplicates
+                                                               (mapcar (lambda (page)
+                                                                         (getf page :page))
+                                                                       pages))
+                                                  append (gethash page chords))
+                                            song)
+                                           (if (remove :alias mine :key #'second)
+                                               notes
+                                               (cons "in no index but the alphabetical"
+                                                     notes))))))))
+        (values songs
+                (sort (set-difference (remove-duplicates (mapcar #'first entries))
+                                      (mapcar (lambda (song) (song:song-number (car song)))
+                                              songs))
+                      #'<)
+                unresolved)))))
+
+(defun write-staging-file (song)
+  (with-open-file (file (staging-file song) :direction :output
+                                            :if-exists :supersede
+                                            :external-format :utf-8)
+    (write-string (song:print-song song) file)))
+
+(defun import-book (pdf)
+  "Stage every song of the chord book PDF and write REPORT.txt beside them.
+A staging file that says Reviewed: yes is left as it is.  Returns the number
+of songs staged and the report's pathname."
+  (multiple-value-bind (songs missing unresolved) (book-songs pdf)
+    (ensure-directories-exist (staging-directory))
+    (let ((report (uiop:subpathname (staging-directory) "REPORT.txt"))
+          (staged 0))
+      (with-open-file (out report :direction :output :if-exists :supersede
+                                  :external-format :utf-8)
+        (format out "Staged from ~A~%~%" (file-namestring pdf))
+        (loop for (song . notes) in songs
+              for number = (song:song-number song)
+              do (cond ((reviewed-file-p number)
+                        (format out "~3D ~A: reviewed, left alone~%" number
+                                (song:song-title song)))
+                       (t
+                        (write-staging-file song)
+                        (incf staged)
+                        (when notes
+                          (format out "~3D ~A~%~{      ~A~%~}" number (song:song-title song)
+                                  notes)))))
+        (format out "~%Numbers in the indices with no song: ~{~D~^, ~}~%" missing)
+        (format out "~%Index entries with no page number:~%~{  ~A~%~}" unresolved))
+      (values staged report))))
 
 (defun load-staging (&key (directory (staging-directory)))
   "Store every song staged in DIRECTORY, in place of the stored song of the
 same id.  Returns the number stored and a list of (file . problems) for the
 files that were not."
   (let ((stored 0) (refused '()))
-    (dolist (file (sort (uiop:directory-files directory "*.txt")
-                        #'string< :key #'namestring))
-      (unless (string= (pathname-name file) "REPORT")
-        (let* ((song (song:parse-song (uiop:read-file-string file :external-format :utf-8)))
-               (problems (song:song-problems song)))
-          (cond (problems (push (cons (file-namestring file) problems) refused))
-                (t (db:save-song song)
-                   (incf stored))))))
+    (loop for (file . song) in (staged-songs directory)
+          for problems = (song:song-problems song)
+          do (cond (problems (push (cons (file-namestring file) problems) refused))
+                   (t (db:save-song song)
+                      (incf stored))))
     (values stored (nreverse refused))))
+
+;;; Chords for songs that were read without them
+
+(defun staged-songs (directory)
+  "The songs staged in DIRECTORY as a list of (file . song), by file name."
+  (loop for file in (sort (uiop:directory-files directory "*.txt")
+                          #'string< :key #'namestring)
+        unless (string= (pathname-name file) "REPORT")
+          collect (cons file (song:parse-song
+                              (uiop:read-file-string file :external-format :utf-8)))))
+
+(defun chorded-lines (song)
+  "How many lines of SONG have chords."
+  (loop for section in (song:song-sections song)
+        sum (loop for slide in (song:section-chords section)
+                  sum (count-if #'identity slide))))
+
+(defun chorded-text (text song)
+  "TEXT, a song in the text format, with the chords of SONG, the song that
+TEXT writes with chords since found for it, written into its lines.  Nothing
+else of TEXT changes: its marks for the musicians stay."
+  (let ((chords (song-chords song))
+        (headers-p t))
+    (format nil "~{~A~%~}"
+            (loop for line in (cl-ppcre:split "\\r?\\n" text)
+                  for sung = (song:split-chords (song:sung-line (string-trim " " line)))
+                  collect (cond ((string= line "") (setf headers-p nil) line)
+                                ((or headers-p
+                                     (string/= sung (or (car (first chords)) "")))
+                                 line)
+                                (t (song:join-chords
+                                    (string-trim " " line)
+                                    (graft-line sung (cdr (pop chords))
+                                                (string-trim " " line)))))))))
+
+(defun add-chords-to-staging (pdf &key (directory (staging-directory)))
+  "Give the songs staged in DIRECTORY the chords the chord book PDF has over
+their lines (GRAFT-CHORDS), and write again the files that gained some: what
+was corrected in them stays.  Returns the number of files written."
+  (let ((book (mapcar #'car (book-songs pdf)))
+        (written 0))
+    (loop for (file . song) in (staged-songs directory)
+          for from = (find (song:song-id song) book :key #'song:song-id :test #'equal)
+          for grafted = (and from (graft-chords (song-chords from) song))
+          when (and grafted (> (chorded-lines grafted) (chorded-lines song)))
+            do (let ((text (chorded-text (uiop:read-file-string file :external-format :utf-8)
+                                         grafted)))
+                 (with-open-file (out file :direction :output :if-exists :supersede
+                                           :external-format :utf-8)
+                   (write-string text out)))
+               (incf written))
+    written))
+
+(defun add-chords-to-store (&key (directory (staging-directory)))
+  "Give each stored song the chords that the song of its id staged in
+DIRECTORY has over the same lines (GRAFT-CHORDS), and store those that
+gained some: what was corrected in the store stays.  Returns the number of
+songs stored."
+  (let ((stored 0))
+    (loop for (nil . from) in (staged-songs directory)
+          for song = (and (song:song-id from) (db:find-song (song:song-id from)))
+          for grafted = (and song (graft-chords (song-chords from) song))
+          when (and grafted (> (chorded-lines grafted) (chorded-lines song)))
+            do (db:save-song grafted)
+               (incf stored))
+    stored))

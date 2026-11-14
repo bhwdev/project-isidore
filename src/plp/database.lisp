@@ -36,7 +36,8 @@ A SONG vertex holds what a BHW/PLP/SONG song does, bar its tags: a TAG vertex
 is one heading of the chord book's indices (category and name: :TEMPO
 \"Slow\", :MASS \"Communion\", :LITURGY \"Advent\"), and a TAGGED edge runs
 from a song to each of its tags.  A SETLIST vertex holds a named, ordered
-list of song ids, each with a note.
+list of song ids, each with a note, and how far from its written key each
+is played.
 
 The package's name is part of the store: graph-db spells a stored symbol
 with it.  Do not rename it.
@@ -351,12 +352,20 @@ has the id of a stored song, which saving it would replace."
                      *catalog*))))
 
 (defun all-tags ()
-  "Every tag as (category name note), by category and name."
+  "Every tag a song has, as (category name note), by category and name.  A
+tag is stored once and stays when its last song loses it: such a one is
+left out."
   (if *database*
-      (sort (graph-db:map-vertices
-             (lambda (tag) (list (category-of tag) (name-of tag) (note-of tag)))
-             *database* :vertex-type 'tag :collect-p t)
-            #'string< :key #'tag-key)
+      (let ((used (make-hash-table :test #'equal)))
+        (dolist (entry *catalog*)
+          (dolist (key (getf entry :tags))
+            (setf (gethash key used) t)))
+        (sort (remove-if-not
+               (lambda (tag) (gethash (tag-key tag) used))
+               (graph-db:map-vertices
+                (lambda (tag) (list (category-of tag) (name-of tag) (note-of tag)))
+                *database* :vertex-type 'tag :collect-p t))
+              #'string< :key #'tag-key))
       '()))
 
 ;;; Setlists
@@ -365,14 +374,25 @@ has the id of a stored song, which saving it would replace."
   (store:find-by-view *database* 'setlist 'setlist-by-id id))
 
 (defun setlist-plist (vertex)
-  (list :id (setlist-id-of vertex) :name (name-of vertex)
-        :date (date-of vertex) :items (items-of vertex)))
+  "The setlist that VERTEX stores, as a plist.  The vertex has one slot for
+both lists: the transpositions are the item whose first is :TRANSPOSITIONS
+and not a song's id, which a setlist stored before it had them lacks."
+  (let ((stored (items-of vertex)))
+    (list :id (setlist-id-of vertex) :name (name-of vertex)
+          :date (date-of vertex)
+          :items (remove :transpositions stored :key #'car)
+          :transpositions (cdr (assoc :transpositions stored)))))
 
-(defun save-setlist (name items &key date)
+(defun save-setlist (name items &key date transpositions)
   "Store the setlist NAME, in place of the one of that name if there is one:
-ITEMS is a list of (song-id . note).  Returns its id, the name's slug."
+ITEMS is a list of (song-id . note), and TRANSPOSITIONS a list of (song-id .
+semitones) for the songs played in another key than they are written in.
+Returns its id, the name's slug."
   (bordeaux-threads:with-lock-held (*write-lock*)
-    (let ((id (song:slug name)))
+    (let ((id (song:slug name))
+          (items (append items
+                         (and transpositions
+                              (list (cons :transpositions transpositions))))))
       (when (string= id "")
         (error "A setlist needs a name."))
       (store:with-transaction (*database* :context "save-setlist")
@@ -387,7 +407,8 @@ ITEMS is a list of (song-id . note).  Returns its id, the name's slug."
       id)))
 
 (defun find-setlist (id)
-  "The setlist whose id is ID as a plist (:ID :NAME :DATE :ITEMS), or NIL."
+  "The setlist whose id is ID as a plist (:ID :NAME :DATE :ITEMS
+:TRANSPOSITIONS), or NIL."
   (let ((vertex (and *database* (stringp id) (setlist-vertex id))))
     (and vertex (setlist-plist vertex))))
 

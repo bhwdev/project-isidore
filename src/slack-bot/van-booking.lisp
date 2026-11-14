@@ -82,7 +82,7 @@
     now) and proposal-trip-view (the trip as it will read), which
     commit-booking writes after re-reading the sheet and checking again;
     revise-proposal applies an edit (\"8 to 10 pm\", \"take the LGH\")
-  - view-schedule — render a plaintext table of booked trips for a natural-language date range"))
+  - view-schedule — list the booked trips of a natural-language date range, day by day"))
 
 (in-package #:bhw/slack-bot/van-booking)
 
@@ -1278,6 +1278,46 @@ a code block.  Times such as \"12:00 pm\" fit the Dep and Ret caps.")
                  (emit-cells cells))))
     (get-output-stream-string out)))
 
+(defun format-schedule-list (trips)
+  "Render TRIPS as Slack mrkdwn that reads on a phone, where the rows of
+FORMAT-SCHEDULE-TABLE are wider than the screen and wrap.  Each day is a bold
+heading such as \"*Tue Sep 8*\", with a blank line between days; under it each
+trip is a bullet -- its times in bold, then the vehicle and the destination --
+and, on the line below, its passengers, driver first:
+
+  *Tue Sep 8*
+  • *8:35 am – 10:30 am* · DGH · SHMS
+        MM, DM
+
+The passengers are listed once when the same people go and come back, and as
+\"out: ... · back: ...\" when they differ.  Nothing is shortened: a long note
+wraps.  TRIPS must already be ordered by day."
+  (with-output-to-string (out)
+    (let ((previous-day nil))
+      (dolist (tr trips)
+        (unless (equal (trip-day tr) previous-day)
+          (when previous-day (terpri out))
+          (format out "*~a*~%" (format-short-date (trip-day tr)))
+          (setf previous-day (trip-day tr)))
+        (let ((departure (trip-departure tr))
+              (return-time (trip-return-time tr))
+              (destination (trip-destination tr))
+              (going (trip-dep-passengers tr))
+              (coming (trip-ret-passengers tr)))
+          (format out "• *~a* · ~a~@[ · ~a~]~%"
+                  (cond ((and (non-blank-p departure) (non-blank-p return-time))
+                         (format nil "~a – ~a" departure return-time))
+                        ((non-blank-p departure) departure)
+                        ((non-blank-p return-time) (format nil "back ~a" return-time))
+                        (t "no time"))
+                  (string-upcase (symbol-name (trip-vehicle tr)))
+                  (and (non-blank-p destination) destination))
+          (cond ((not (equal going coming))
+                 (format out "      out: ~:[—~;~:*~{~a~^, ~}~] · back: ~:[—~;~:*~{~a~^, ~}~]~%"
+                         going coming))
+                (going
+                 (format out "      ~{~a~^, ~}~%" going))))))))
+
 (defun schedule-order (a b)
   "True when trip A comes before trip B in a schedule table: by day, then
 departure time, then vehicle priority.  A day that cannot be read sorts
@@ -1294,7 +1334,8 @@ first."
                            (vehicle-priority (trip-vehicle b))))))))))
 
 (defun view-schedule (&optional (range-phrase "today"))
-  "Display booked trips over a natural-language date range as a plaintext table.
+  "Display booked trips over a natural-language date range, as the list of
+   FORMAT-SCHEDULE-LIST (Slack mrkdwn, a few short lines a trip).
    RANGE-PHRASE may be a single day or period (\"today\", \"tomorrow\", \"Apr 20\",
    \"in 3 days\", \"this week\", \"the whole week\", \"the rest of the week\",
    \"next week\", \"the weekend\", \"this month\", \"May\") for that window, or two of them joined by 'to',
@@ -1327,13 +1368,13 @@ first."
                               ((null trips)
                                (format nil "No trips scheduled from ~a to ~a.~%"
                                        start-label end-label))
-                              (t (format-schedule-table trips)))))
+                              (t (format-schedule-list trips)))))
               (write-string out)
               out)))))))
 
 (defun proposal-day-view (proposal)
   "The trips already booked on PROPOSAL's day, in the schedule it was decided
-against, as VIEW-SCHEDULE's table, or NIL when none is."
+against, as a table (FORMAT-SCHEDULE-TABLE), or NIL when none is."
   (let ((booked (remove-if-not #'booked-trip-p
                                (find-trips (proposal-trips proposal)
                                            :day (proposal-day proposal)))))
@@ -1341,7 +1382,8 @@ against, as VIEW-SCHEDULE's table, or NIL when none is."
       (format-schedule-table (sort booked #'schedule-order)))))
 
 (defun proposal-trip-view (proposal)
-  "PROPOSAL's trip as it will read once written, as VIEW-SCHEDULE's table."
+  "PROPOSAL's trip as it will read once written, as a table
+(FORMAT-SCHEDULE-TABLE)."
   (format-schedule-table (list (proposal-trip proposal))))
 
 (defun proposal-clash-checked-p (proposal)

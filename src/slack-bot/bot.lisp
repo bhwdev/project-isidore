@@ -672,7 +672,7 @@ dropped unwritten whatever the answer."
 (defun post-command-reply (reply-to reply)
   "Post a command handler's REPLY to REPLY-TO.
 A handler returns one string, or a list of strings that are posted as
-separate messages (a long table in code fences)."
+separate messages (a long schedule)."
   (when (and reply reply-to (plusp (length reply)))
     (dolist (part (if (listp reply) reply (list reply)))
       (when (plusp (length part))
@@ -905,6 +905,37 @@ of strings."
       (push (fence (reverse current)) chunks))
     (nreverse chunks)))
 
+(defun message-chunks (text &key (limit 3500))
+  "TEXT as a list of messages of at most LIMIT characters each, for a reply
+that may be longer than the 4000 characters past which Slack splits or
+truncates a message.  A split lands on a blank line (the gap between two days
+of a schedule), so no message opens in the middle of a day; a single day
+longer than LIMIT is split between its lines."
+  (let ((chunks '())
+        (current nil))
+    (flet ((add (piece separator)
+             (cond ((null current)
+                    (setf current piece))
+                   ((<= (+ (length current) (length separator) (length piece)) limit)
+                    (setf current (concatenate 'string current separator piece)))
+                   (t
+                    (push current chunks)
+                    (setf current piece))))
+           (flush ()
+             (when current
+               (push current chunks)
+               (setf current nil))))
+      (dolist (day (cl-ppcre:split "\\n{2,}" (string-trim '(#\Newline #\Space) text)))
+        (cond ((<= (length day) limit)
+               (add day (format nil "~2%")))
+              (t
+               (flush)
+               (dolist (line (cl-ppcre:split "\\n" day))
+                 (add line (string #\Newline)))
+               (flush))))
+      (flush))
+    (nreverse chunks)))
+
 (defslash-command "/book" (params)
   "/book <plain-English request> — book a trip or join one already on the sheet.
 Examples:
@@ -935,7 +966,7 @@ can also come as the argument of `/book` itself:
                 (type-of c) c)))))
 
 (defslash-command "/view" (params)
-  "/view [<date range>] — show booked trips as a table. With no argument, shows today.
+  "/view [<date range>] — list the booked trips, day by day. With no argument, shows today.
 Examples:
   /view
   /view tomorrow
@@ -957,12 +988,9 @@ A range it cannot read gets examples of ones it can."
     (handler-case
         (let ((out (with-output-to-string (*standard-output*)
                      (view-schedule range))))
-          ;; A table is several lines: post it in code fences so the columns
-          ;; line up in Slack's proportional font, in more than one message if
-          ;; it is long.  One-line answers ("No trips scheduled ...") stay plain.
-          (if (find #\Newline (string-trim '(#\Newline #\Space) out))
-              (code-block-chunks out :header-lines 2)
-              out))
+          ;; The list is mrkdwn that wraps (FORMAT-SCHEDULE-LIST), so it
+          ;; needs no code fences; a long range goes in several messages.
+          (message-chunks out))
       (error (c)
         (format nil "View failed [~A]: ~A" (type-of c) c)))))
 

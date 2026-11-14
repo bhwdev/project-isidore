@@ -471,22 +471,18 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
 (deftest cmd-view-replies
   (with-mocked-functions ((vb:view-schedule
                            (lambda (&optional range) (format t "TABLE for ~a" range) "ignored")))
-    (ok (search "TABLE for today" (sb::cmd-view (make-params "text" ""))))
-    (ok (search "TABLE for today" (sb::cmd-view (make-params))))
-    (ok (search "TABLE for Apr 20 to Apr 26"
-                (sb::cmd-view (make-params "text" " Apr 20 to Apr 26 ")))))
-  ;; a multi-line table is posted in code fences (a list of message parts)
-  ;; so its columns line up in Slack
+    (ok (equal '("TABLE for today") (sb::cmd-view (make-params "text" ""))))
+    (ok (equal '("TABLE for today") (sb::cmd-view (make-params))))
+    (ok (equal '("TABLE for Apr 20 to Apr 26")
+               (sb::cmd-view (make-params "text" " Apr 20 to Apr 26 ")))))
+  ;; the schedule is posted as it is listed, mrkdwn and all, with no code
+  ;; fences: a fenced table's rows wrap on a phone
   (with-mocked-functions ((vb:view-schedule
                            (lambda (&optional range) (declare (ignore range))
-                             (format t "Date  Vehicle~%----  -------~%Mon   DGH~%")
+                             (format t "*Mon Apr 20*~%• *8 am* · DGH · SHMS~%      MM~%")
                              "ignored")))
-    (let ((reply (sb::cmd-view (make-params "text" "today"))))
-      (ok (listp reply))
-      (ok (= 1 (length reply)))
-      (ok (uiop:string-prefix-p (format nil "```~%Date  Vehicle~%") (first reply)))
-      (ok (search "Mon   DGH" (first reply)))
-      (ok (uiop:string-suffix-p (first reply) "```"))))
+    (ok (equal (list (format nil "*Mon Apr 20*~%• *8 am* · DGH · SHMS~%      MM"))
+               (sb::cmd-view (make-params "text" "today")))))
   (with-mocked-functions ((vb:view-schedule
                            (lambda (&optional range) (declare (ignore range)) (error "no sheet"))))
     (let ((reply (sb::cmd-view (make-params "text" "tomorrow"))))
@@ -502,6 +498,34 @@ literal SIGNATURE).  EXTRA-HEADERS is a plist of additional header values."
       (let ((reply (sb::cmd-view (make-params "text" text))))
         (ok (search (format nil "I can't read \"~a\"" text) reply))
         (ok (search "/view tomorrow" reply))))))
+
+(deftest message-chunks
+  ;; short text: one message, without the newline that ends it
+  (ok (equal '("No trips.") (sb::message-chunks (format nil "No trips.~%"))))
+  (ok (null (sb::message-chunks "")))
+  ;; long text is split between days (at blank lines), every part under the
+  ;; limit, and no day lost, duplicated or cut in two
+  (let* ((days (loop for d from 1 to 8
+                     collect (format nil "*Day ~d*~%~{~a~^~%~}" d
+                                     (loop for r from 1 to 5
+                                           collect (format nil "• ROW ~d-~d ~a" d r
+                                                           (make-string 30 :initial-element #\z))))))
+         (parts (sb::message-chunks (format nil "~{~a~^~2%~}~%" days) :limit 700)))
+    (ok (> (length parts) 1))
+    (dolist (p parts)
+      (ok (<= (length p) 700))
+      (ok (uiop:string-prefix-p "*Day " p)))
+    (ok (equal days
+               (loop for p in parts append (cl-ppcre:split "\\n\\n" p)))))
+  ;; a day longer than the limit is split between its lines
+  (let* ((lines (loop for i from 1 to 30
+                      collect (format nil "line ~2d ~a" i (make-string 40 :initial-element #\x))))
+         (parts (sb::message-chunks (format nil "short day~2%~{~a~%~}" lines) :limit 300)))
+    (ok (string= "short day" (first parts)))
+    (dolist (p parts)
+      (ok (<= (length p) 300)))
+    (ok (equal lines
+               (loop for p in (rest parts) append (cl-ppcre:split "\\n" p))))))
 
 (deftest code-block-chunks
   ;; short text: one fenced part

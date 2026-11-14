@@ -959,7 +959,10 @@ by date, so they neither depend on the live spreadsheet's tabs nor fetch them.")
                                        (ok (search "8:35 am" out))
                                        (ok (search "DGH" out))
                                        (ok (search "MM, DM" out))
-                                       (ok (search "Vehicle" out)))))))
+                                       ;; the phone list, not the table
+                                       (ok (uiop:string-prefix-p
+                                            (format nil "*Wed Apr 22*~%• *8:35 am ") out))
+                                       (ng (search "Vehicle" out)))))))
 
   (testing "view-schedule-no-sheet"
       ;; Date out of any configured week → informative message, no fetch.
@@ -1000,6 +1003,45 @@ by date, so they neither depend on the live spreadsheet's tabs nor fetch them.")
                                        (ok morning-pos)
                                        (ok afternoon-pos)
                                        (ok (< morning-pos afternoon-pos))))))))
+
+(deftest format-schedule-list
+  (let* ((dash (string (code-char 8211)))
+         (trips (list (make-trip :day "Monday April 20" :vehicle :dgh :destination "SHMS"
+                                 :departure "8 am" :return-time "10 am"
+                                 :dep-passengers '("MM" "DM") :ret-passengers '("MM" "DM"))
+                      ;; different people come back; a long note is not shortened
+                      (make-trip :day "Monday April 20" :vehicle :lgh :destination "Bank"
+                                 :departure "1 pm"
+                                 :return-time "after reception (around 2:30 pm)"
+                                 :dep-passengers '("DM") :ret-passengers '("DM" "BW"))
+                      ;; nobody listed coming back, and no return time
+                      (make-trip :day "Tuesday April 21" :vehicle :chevy :destination "Pool"
+                                 :departure "9 am" :return-time ""
+                                 :dep-passengers '("CG"))
+                      ;; a destination and nothing else
+                      (make-trip :day "Tuesday April 21" :vehicle :personal
+                                 :destination "Airport" :departure "" :return-time "")
+                      ;; a return time only, and no destination
+                      (make-trip :day "Tuesday April 21" :vehicle :dgh
+                                 :destination "" :departure nil :return-time "5 pm"
+                                 :ret-passengers '("BW"))))
+         (lines (cl-ppcre:split "\\n" (vb::format-schedule-list trips))))
+    (ok (equal (list "*Mon Apr 20*"
+                     (format nil "• *8 am ~a 10 am* · DGH · SHMS" dash)
+                     "      MM, DM"
+                     (format nil "• *1 pm ~a after reception (around 2:30 pm)* · LGH · Bank" dash)
+                     "      out: DM · back: DM, BW"
+                     ""
+                     "*Tue Apr 21*"
+                     "• *9 am* · CHEVY · Pool"
+                     "      out: CG · back: —"
+                     "• *no time* · PERSONAL · Airport"
+                     "• *back 5 pm* · DGH"
+                     "      out: — · back: BW")
+               lines))
+    ;; no line is wider than a phone shows without wrapping, the long note aside
+    (dolist (line (remove-if (lambda (line) (search "reception" line)) lines))
+      (ok (<= (length line) 36)))))
 
 (deftest format-schedule-table-groups-by-day
   (let* ((trips (list (make-trip :day "Monday April 20" :vehicle :dgh :destination "SHMS"
